@@ -30,7 +30,25 @@ Claude: *creates scripts, builds scene, configures lighting, adds player control
 
 ### 1. Install the Bridge Addon in s&box
 
-Copy the `sbox-bridge-addon/` folder into your s&box addons directory. When s&box loads, it will compile the addon and start the WebSocket server on port 29015.
+**Automatic (recommended):**
+
+```powershell
+# Windows PowerShell
+git clone https://github.com/lousputthole/sbox-claude.git
+cd sbox-claude
+.\install.ps1
+```
+
+```bash
+# Linux / WSL
+git clone https://github.com/lousputthole/sbox-claude.git
+cd sbox-claude
+./install.sh
+```
+
+The installer auto-detects your s&box installation and copies the Bridge Addon.
+
+**Manual:** Copy the `sbox-bridge-addon/` folder into your s&box addons directory. See [INSTALL.md](INSTALL.md) for detailed instructions.
 
 ### 2. Connect Claude Code (one command)
 
@@ -38,7 +56,7 @@ Copy the `sbox-bridge-addon/` folder into your s&box addons directory. When s&bo
 claude mcp add sbox -- npx sbox-mcp-server
 ```
 
-That's it. No cloning, no building. `npx` downloads and runs the server automatically.
+That's it. No building needed. `npx` downloads and runs the server automatically.
 
 ### 3. Start Building
 
@@ -52,6 +70,8 @@ Open s&box, open a project, and start talking to Claude:
 "Search for a table model and place it in the scene"
 "Enter play mode and take a screenshot"
 ```
+
+> For detailed setup, configuration, updating, and troubleshooting see **[INSTALL.md](INSTALL.md)**
 
 ## Alternative Setup
 

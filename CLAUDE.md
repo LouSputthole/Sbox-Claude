@@ -30,6 +30,11 @@ The MCP Server translates Claude's tool calls into WebSocket messages. The Bridg
 Sbox-Claude/
 ├── CLAUDE.md                          ← YOU ARE HERE — project context for Claude
 ├── README.md                          ← User-facing docs + setup guide
+├── INSTALL.md                         ← Detailed installation guide
+├── CONTRIBUTING.md                    ← How to add tools, conventions, protocol
+├── LICENSE                            ← MIT license
+├── install.ps1                        ← Windows installer (auto-detects s&box)
+├── install.sh                         ← Linux/WSL installer
 ├── .gitignore
 │
 ├── sbox-mcp-server/                   # MCP Server (TypeScript)
