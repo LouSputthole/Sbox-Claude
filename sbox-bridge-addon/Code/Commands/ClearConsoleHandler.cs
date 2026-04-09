@@ -10,7 +10,7 @@ public class ClearConsoleHandler : ICommandHandler
 {
 	public Task<object> Execute( JsonElement parameters )
 	{
-		GetConsoleOutputHandler.Clear();
+		LogCapture.Clear();
 
 		return Task.FromResult<object>( new
 		{

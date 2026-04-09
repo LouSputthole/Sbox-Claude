@@ -22,6 +22,13 @@ public static class BridgeServer
 	private static bool _running;
 
 	public const int DefaultPort = 29015;
+	public const int MaxMessageSize = 1024 * 1024; // 1 MB
+
+	// Structured error codes
+	public const string ErrorInvalidRequest = "INVALID_REQUEST";
+	public const string ErrorUnknownCommand = "UNKNOWN_COMMAND";
+	public const string ErrorHandlerError = "HANDLER_ERROR";
+	public const string ErrorMessageTooLarge = "MESSAGE_TOO_LARGE";
 
 	/// <summary>
 	/// Register a command handler.
@@ -61,6 +68,14 @@ public static class BridgeServer
 		_running = false;
 
 		Log.Info( "[SboxBridge] WebSocket server stopped" );
+	}
+
+	/// <summary>
+	/// Returns a list of all registered command names.
+	/// </summary>
+	public static IReadOnlyCollection<string> GetRegisteredCommands()
+	{
+		return _handlers.Keys;
 	}
 
 	private static async Task AcceptLoop( CancellationToken ct )
@@ -109,11 +124,18 @@ public static class BridgeServer
 
 				if ( result.MessageType == WebSocketMessageType.Text )
 				{
+					// Guard: reject messages over 1 MB
+					if ( result.Count > MaxMessageSize )
+					{
+						var errorResponse = MakeError( null, ErrorMessageTooLarge,
+							$"Message exceeds maximum size of {MaxMessageSize / 1024}KB" );
+						await SendResponse( ws, errorResponse, ct );
+						continue;
+					}
+
 					var json = Encoding.UTF8.GetString( buffer, 0, result.Count );
 					var response = await ProcessRequest( json );
-					var responseBytes = Encoding.UTF8.GetBytes( response );
-					await ws.SendAsync( new ArraySegment<byte>( responseBytes ),
-						WebSocketMessageType.Text, true, ct );
+					await SendResponse( ws, response, ct );
 				}
 			}
 		}
@@ -125,15 +147,32 @@ public static class BridgeServer
 		Log.Info( "[SboxBridge] MCP client disconnected" );
 	}
 
+	private static async Task SendResponse( WebSocket ws, string response, CancellationToken ct )
+	{
+		var responseBytes = Encoding.UTF8.GetBytes( response );
+		await ws.SendAsync( new ArraySegment<byte>( responseBytes ),
+			WebSocketMessageType.Text, true, ct );
+	}
+
 	private static async Task<string> ProcessRequest( string json )
 	{
+		string id = null;
+
 		try
 		{
 			using var doc = JsonDocument.Parse( json );
 			var root = doc.RootElement;
 
-			var id = root.GetProperty( "id" ).GetString() ?? "";
-			var command = root.GetProperty( "command" ).GetString() ?? "";
+			id = root.TryGetProperty( "id", out var idProp ) ? idProp.GetString() : null;
+			var command = root.TryGetProperty( "command", out var cmdProp ) ? cmdProp.GetString() : null;
+
+			// Validate required fields
+			if ( string.IsNullOrEmpty( id ) )
+				return MakeError( null, ErrorInvalidRequest, "Missing or empty 'id' field" );
+
+			if ( string.IsNullOrEmpty( command ) )
+				return MakeError( id, ErrorInvalidRequest, "Missing or empty 'command' field" );
+
 			var paramsElement = root.TryGetProperty( "params", out var p ) ? p : default;
 
 			if ( _handlers.TryGetValue( command, out var handler ) )
@@ -150,30 +189,26 @@ public static class BridgeServer
 				}
 				catch ( Exception ex )
 				{
-					return JsonSerializer.Serialize( new
-					{
-						id,
-						success = false,
-						error = ex.Message
-					} );
+					return MakeError( id, ErrorHandlerError, ex.Message );
 				}
 			}
 
-			return JsonSerializer.Serialize( new
-			{
-				id,
-				success = false,
-				error = $"Unknown command: {command}"
-			} );
+			return MakeError( id, ErrorUnknownCommand, $"Unknown command: {command}" );
 		}
 		catch ( Exception ex )
 		{
-			return JsonSerializer.Serialize( new
-			{
-				id = (string)null,
-				success = false,
-				error = $"Failed to parse request: {ex.Message}"
-			} );
+			return MakeError( id, ErrorInvalidRequest, $"Failed to parse request: {ex.Message}" );
 		}
+	}
+
+	private static string MakeError( string id, string code, string message )
+	{
+		return JsonSerializer.Serialize( new
+		{
+			id,
+			success = false,
+			error = message,
+			errorCode = code,
+		} );
 	}
 }
