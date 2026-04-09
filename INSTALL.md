@@ -8,7 +8,24 @@ This guide walks you through setting up the s&box Claude Bridge from scratch. To
 - **Node.js 18+** installed ([download](https://nodejs.org/))
 - **Claude Code** installed ([setup guide](https://docs.anthropic.com/en/docs/claude-code))
 
-## Quick Install (Recommended)
+## Install via s&box Asset Library (Easiest)
+
+If the addon has been published to the s&box Asset Library:
+
+1. Open **s&box** editor
+2. Open the **Asset Library** browser (in-editor)
+3. Search for **"Claude Bridge"**
+4. Click **Install**
+5. Restart s&box — the Bridge starts automatically on port 29015
+
+Then connect Claude Code:
+```bash
+claude mcp add sbox -- npx sbox-mcp-server
+```
+
+> **Note:** The Asset Library version may lag behind the latest GitHub release. For the newest features, use the installer scripts below.
+
+## Quick Install (From Source)
 
 ### Windows (PowerShell)
 
@@ -184,3 +201,23 @@ Delete the `sbox-bridge-addon/` folder from your s&box addons directory.
 - Check the s&box console for error messages
 - Make sure the addon folder structure is correct (see Manual Install)
 - Some s&box APIs may need adjustment for your SDK version — see `API-NOTE` comments in handler files
+
+## Publishing to the s&box Asset Library (Maintainers)
+
+The Bridge Addon can be published to the s&box Asset Library so users can install it with one click from inside the editor.
+
+### Prerequisites
+1. A Steam account with s&box access
+2. An organization registered on [sbox.game](https://sbox.game)
+
+### Steps
+1. Update `Org` and `Ident` in `sbox-bridge-addon.sbproj` to match your sbox.game organization
+2. Open the project in s&box editor
+3. Go to **Edit** → **Publish Project** (or upload at sbox.game → My Creations)
+4. Add a thumbnail image, description, and set visibility to Public
+5. Click **Publish**
+
+The addon will be immediately available in the in-editor Asset Library. Users can search for "Claude Bridge" and install with one click.
+
+### Package ID Format
+The published package ID follows the format `org.ident` (e.g., `sbox-claude.claude-bridge`). This is what users would reference in their project's `PackageReferences` for dependency resolution.

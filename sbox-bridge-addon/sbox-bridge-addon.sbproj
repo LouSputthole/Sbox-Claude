@@ -1,8 +1,9 @@
 {
   "Title": "Claude Bridge",
   "Type": "library",
-  "Description": "Bridge addon that enables Claude Code to interact with the s&box editor via MCP protocol",
-  "PackageIdent": "sbox-bridge-addon",
+  "Org": "sbox-claude",
+  "Ident": "claude-bridge",
+  "Description": "Bridge addon that enables Claude Code to interact with the s&box editor via MCP. Lets non-coders build games through conversation — 53 tools for scripts, scenes, GameObjects, components, assets, materials, audio, play mode, and more.",
   "Version": "1.0.0",
 
   "PackageReferences": [],
@@ -19,5 +20,10 @@
 
   "CodeFiles": [
     "Code/**/*.cs"
-  ]
+  ],
+
+  "Metadata": {
+    "Summary": "Claude Code MCP Bridge — build s&box games through conversation",
+    "Public": true
+  }
 }
