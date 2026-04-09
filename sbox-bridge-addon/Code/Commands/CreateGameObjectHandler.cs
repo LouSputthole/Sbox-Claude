@@ -8,6 +8,10 @@ namespace SboxBridge;
 /// <summary>
 /// Creates a new GameObject in the active scene.
 /// Supports optional name, position, rotation, scale, and parent.
+///
+/// Also provides static helper methods (<see cref="ParseVector3"/>, <see cref="ParseRotation"/>,
+/// <see cref="FormatVector3"/>, <see cref="FormatRotation"/>) that are reused by other handlers
+/// and by <see cref="ComponentHelper"/> for type conversion.
 /// </summary>
 public class CreateGameObjectHandler : ICommandHandler
 {
@@ -72,6 +76,11 @@ public class CreateGameObjectHandler : ICommandHandler
 		} );
 	}
 
+	/// <summary>
+	/// Parse a <see cref="Vector3"/> from a JSON element.
+	/// Accepts an object with {x, y, z} properties or a comma-separated string "x,y,z".
+	/// Returns <see cref="Vector3.Zero"/> if the format is unrecognized.
+	/// </summary>
 	public static Vector3 ParseVector3( JsonElement element )
 	{
 		if ( element.ValueKind == JsonValueKind.Object )
@@ -98,6 +107,12 @@ public class CreateGameObjectHandler : ICommandHandler
 		return Vector3.Zero;
 	}
 
+	/// <summary>
+	/// Parse a <see cref="Rotation"/> from a JSON element.
+	/// Accepts either euler angles {pitch, yaw, roll} or a quaternion {x, y, z, w}.
+	/// The presence of a "w" property distinguishes quaternion from euler format.
+	/// Returns <see cref="Rotation.Identity"/> if the format is unrecognized.
+	/// </summary>
 	public static Rotation ParseRotation( JsonElement element )
 	{
 		if ( element.ValueKind == JsonValueKind.Object )
@@ -123,11 +138,17 @@ public class CreateGameObjectHandler : ICommandHandler
 		return Rotation.Identity;
 	}
 
+	/// <summary>
+	/// Format a <see cref="Vector3"/> as an anonymous {x, y, z} object for JSON serialization.
+	/// </summary>
 	public static object FormatVector3( Vector3 v )
 	{
 		return new { x = v.x, y = v.y, z = v.z };
 	}
 
+	/// <summary>
+	/// Format a <see cref="Rotation"/> as euler angles {pitch, yaw, roll} for JSON serialization.
+	/// </summary>
 	public static object FormatRotation( Rotation r )
 	{
 		var angles = r.Angles();

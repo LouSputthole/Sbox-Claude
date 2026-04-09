@@ -2,6 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Audio tools: list_sounds, create_sound_event, assign_sound, play_sound_preview.
+ * Manages sound assets, .sound event files, and SoundPointComponent attachment.
+ */
 export function registerAudioTools(
   server: McpServer,
   bridge: BridgeClient

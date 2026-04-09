@@ -2,6 +2,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Component inspection and manipulation tools.
+ *
+ * Registers: get_property, get_all_properties, list_available_components,
+ * add_component_with_properties. These tools read/write component data on
+ * GameObjects and discover available component types (both built-in and custom).
+ */
 export function registerComponentTools(
   server: McpServer,
   bridge: BridgeClient

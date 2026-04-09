@@ -2,6 +2,13 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Play mode control and related editor tools.
+ *
+ * Beyond play/pause/resume/stop, this file also registers: set_property
+ * (editor-mode property writes), get/set_runtime_property (live tweaking
+ * during play mode), take_screenshot, and undo/redo.
+ */
 export function registerPlayModeTools(
   server: McpServer,
   bridge: BridgeClient

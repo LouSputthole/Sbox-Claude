@@ -2,6 +2,11 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Script management tools: create_script, edit_script, delete_script, trigger_hotload.
+ * create_script generates boilerplate from parameters or writes raw C# content.
+ * edit_script supports find/replace, line insert, append, and line deletion operations.
+ */
 export function registerScriptTools(
   server: McpServer,
   bridge: BridgeClient

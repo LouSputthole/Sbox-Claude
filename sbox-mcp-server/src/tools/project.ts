@@ -2,6 +2,14 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Project and file management tools: get_project_info, list_project_files,
+ * read_file, write_file.
+ *
+ * This is the simplest tool file and serves as a good template for contributors.
+ * Every tool follows the same pattern: define with server.tool(), send the
+ * command to the Bridge, and return the result (or error) as text content.
+ */
 export function registerProjectTools(
   server: McpServer,
   bridge: BridgeClient

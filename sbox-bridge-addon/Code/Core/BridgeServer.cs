@@ -12,7 +12,9 @@ namespace SboxBridge;
 
 /// <summary>
 /// WebSocket server that runs inside the s&box editor.
-/// Listens on port 29015 for commands from the MCP Server.
+/// Listens on a configurable port (default 29015) for JSON commands from the MCP Server,
+/// dispatches them to registered <see cref="ICommandHandler"/> instances, and returns
+/// JSON responses. Supports both single and batch command requests.
 /// </summary>
 public static class BridgeServer
 {
@@ -31,16 +33,23 @@ public static class BridgeServer
 	public const string ErrorMessageTooLarge = "MESSAGE_TOO_LARGE";
 
 	/// <summary>
-	/// Register a command handler.
+	/// Register a command handler for a given command name.
+	/// The <paramref name="command"/> string must match the corresponding MCP tool name exactly
+	/// (e.g. "create_gameobject") since the MCP server forwards requests using the same name.
 	/// </summary>
+	/// <param name="command">Command name, must match the MCP tool name 1:1.</param>
+	/// <param name="handler">Handler instance that will execute the command.</param>
 	public static void RegisterHandler( string command, ICommandHandler handler )
 	{
 		_handlers[command] = handler;
 	}
 
 	/// <summary>
-	/// Start the WebSocket server.
+	/// Start the WebSocket server on the specified port.
+	/// Creates an HTTP listener on 127.0.0.1 that upgrades incoming connections to WebSocket.
+	/// Each connected client is handled in its own background task.
 	/// </summary>
+	/// <param name="port">TCP port to listen on (default <see cref="DefaultPort"/> = 29015).</param>
 	public static async Task Start( int port = DefaultPort )
 	{
 		if ( _running ) return;
@@ -57,7 +66,8 @@ public static class BridgeServer
 	}
 
 	/// <summary>
-	/// Stop the WebSocket server.
+	/// Stop the WebSocket server. Cancels the accept loop and all pending client connections,
+	/// then disposes the HTTP listener.
 	/// </summary>
 	public static void Stop()
 	{
@@ -71,7 +81,8 @@ public static class BridgeServer
 	}
 
 	/// <summary>
-	/// Returns a list of all registered command names.
+	/// Returns the names of all registered command handlers.
+	/// Useful for diagnostics (e.g. the get_bridge_status tool).
 	/// </summary>
 	public static IReadOnlyCollection<string> GetRegisteredCommands()
 	{
@@ -104,6 +115,11 @@ public static class BridgeServer
 		}
 	}
 
+	/// <summary>
+	/// Message receive loop for a single WebSocket client. Reads frames into a 64 KB buffer,
+	/// rejects messages larger than <see cref="MaxMessageSize"/> (1 MB), parses the UTF-8 text
+	/// as JSON, dispatches to <see cref="ProcessRequest"/>, and sends the response back.
+	/// </summary>
 	private static async Task HandleClient( WebSocket ws, CancellationToken ct )
 	{
 		var buffer = new byte[65536];
@@ -158,6 +174,11 @@ public static class BridgeServer
 			WebSocketMessageType.Text, true, ct );
 	}
 
+	/// <summary>
+	/// Parse a JSON request and route it. A request containing a "commands" array is treated
+	/// as a batch and forwarded to <see cref="ProcessBatch"/>; otherwise it is treated as a
+	/// single command and forwarded to <see cref="ExecuteSingle"/>.
+	/// </summary>
 	private static async Task<string> ProcessRequest( string json )
 	{
 		string id = null;
@@ -196,6 +217,11 @@ public static class BridgeServer
 		}
 	}
 
+	/// <summary>
+	/// Look up the registered <see cref="ICommandHandler"/> for the given command name,
+	/// execute it, and wrap the result in a success/error JSON envelope.
+	/// Returns an <see cref="ErrorUnknownCommand"/> response if no handler is registered.
+	/// </summary>
 	private static async Task<string> ExecuteSingle( string id, string command, JsonElement paramsElement )
 	{
 		if ( _handlers.TryGetValue( command, out var handler ) )
@@ -214,6 +240,10 @@ public static class BridgeServer
 		return MakeError( id, ErrorUnknownCommand, $"Unknown command: {command}" );
 	}
 
+	/// <summary>
+	/// Execute an array of commands sequentially, collecting each result (success or error)
+	/// into a "results" array. Returns a single JSON response containing all outcomes.
+	/// </summary>
 	private static async Task<string> ProcessBatch( string id, JsonElement commandsArray )
 	{
 		var results = new List<object>();
@@ -250,6 +280,10 @@ public static class BridgeServer
 		return JsonSerializer.Serialize( new { id, success = true, results } );
 	}
 
+	/// <summary>
+	/// Build a structured error JSON response with the given request id, error code
+	/// (one of the Error* constants), and human-readable message.
+	/// </summary>
 	private static string MakeError( string id, string code, string message )
 	{
 		return JsonSerializer.Serialize( new

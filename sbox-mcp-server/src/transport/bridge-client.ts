@@ -1,11 +1,24 @@
 import WebSocket from "ws";
 
+/**
+ * WebSocket transport layer for communicating with the s&box Bridge Addon.
+ *
+ * This module provides the sole communication channel between the MCP server
+ * and the s&box editor. All tool calls flow through {@link BridgeClient.send}
+ * as JSON messages over a WebSocket connection to localhost:29015 (configurable).
+ *
+ * Protocol: Each request gets a unique ID. The Bridge responds with the same ID,
+ * allowing multiple in-flight requests. See {@link BridgeRequest} and {@link BridgeResponse}.
+ */
+
+/** A single command request sent to the s&box Bridge over WebSocket. */
 export interface BridgeRequest {
   id: string;
   command: string;
   params: Record<string, unknown>;
 }
 
+/** Response from the s&box Bridge. Check `success` before reading `data`. */
 export interface BridgeResponse {
   id: string;
   success: boolean;
@@ -14,14 +27,15 @@ export interface BridgeResponse {
 }
 
 /**
- * WebSocket client that connects to the s&box Bridge Addon.
- * The Bridge runs inside the s&box editor on port 29015.
+ * WebSocket client that connects to the s&box Bridge Addon running inside the editor.
  *
- * Features:
- * - Auto-reconnect on disconnect (3s delay)
- * - Per-request timeouts (default 30s)
- * - Ping/pong keepalive every 15s, disconnects after 3 missed pings
- * - Graceful rejection of in-flight requests on connection loss
+ * Handles the full connection lifecycle: initial connect, auto-reconnect on
+ * disconnect (3s delay), ping/pong keepalive (15s interval, disconnects after
+ * 3 missed pings), per-request timeouts (default 30s), and graceful rejection
+ * of all in-flight requests when the connection drops.
+ *
+ * Usage: Instantiate once, call {@link connect}, then use {@link send} for each tool call.
+ * The client auto-reconnects on failure, so callers rarely need to call connect() directly.
  */
 export class BridgeClient {
   private ws: WebSocket | null = null;
@@ -47,12 +61,21 @@ export class BridgeClient {
   static readonly MAX_MISSED_PINGS = 3;
   static readonly RECONNECT_DELAY_MS = 3000;
 
+  /**
+   * @param host - WebSocket host, defaults to 127.0.0.1
+   * @param port - WebSocket port, defaults to 29015 (configurable via SBOX_BRIDGE_PORT)
+   */
   constructor(host = "127.0.0.1", port = 29015) {
     this.host = host;
     this.port = port;
     this.url = `ws://${host}:${port}`;
   }
 
+  /**
+   * Establish the WebSocket connection to the s&box Bridge.
+   * Sets up message, pong, close, and error handlers, and starts the ping keepalive loop.
+   * Rejects if the initial connection fails (e.g., s&box is not running).
+   */
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
@@ -109,6 +132,14 @@ export class BridgeClient {
     });
   }
 
+  /**
+   * Send a command to the s&box Bridge and wait for its response.
+   * Auto-reconnects if the WebSocket is not currently connected.
+   * @param command - Bridge command name (matches the MCP tool name 1:1)
+   * @param params - Command parameters, forwarded as JSON to the Bridge handler
+   * @param timeoutMs - Per-request timeout in ms (default 30s)
+   * @returns The Bridge response; check `success` before reading `data`
+   */
   async send(
     command: string,
     params: Record<string, unknown> = {},
@@ -156,8 +187,10 @@ export class BridgeClient {
   }
 
   /**
-   * Send multiple commands in a single WebSocket message.
+   * Send multiple commands in a single WebSocket message for efficiency.
    * The Bridge processes them sequentially and returns all results at once.
+   * @param commands - Array of command/params pairs to execute as a batch
+   * @param timeoutMs - Timeout for the entire batch (default 30s)
    */
   async sendBatch(
     commands: Array<{ command: string; params?: Record<string, unknown> }>,
@@ -203,8 +236,8 @@ export class BridgeClient {
   }
 
   /**
-   * Send a ping and measure round-trip latency in ms.
-   * Returns -1 if not connected.
+   * Send a WebSocket ping and measure round-trip latency.
+   * @returns Latency in milliseconds, or -1 if not connected or ping times out (5s)
    */
   async ping(): Promise<number> {
     if (!this.ws || !this.connected) return -1;
@@ -225,22 +258,30 @@ export class BridgeClient {
     });
   }
 
+  /** Whether the WebSocket is currently open and connected. */
   isConnected(): boolean {
     return this.connected;
   }
 
+  /** The configured Bridge host address. */
   getHost(): string {
     return this.host;
   }
 
+  /** The configured Bridge port number. */
   getPort(): number {
     return this.port;
   }
 
+  /** Timestamp (ms since epoch) of the last pong received, or 0 if never connected. */
   getLastPongTime(): number {
     return this.lastPongTime;
   }
 
+  /**
+   * Cleanly shut down the connection: cancel any pending reconnect,
+   * stop the ping loop, reject all in-flight requests, and close the socket.
+   */
   disconnect(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -255,6 +296,7 @@ export class BridgeClient {
     this.connected = false;
   }
 
+  /** Start the periodic ping keepalive. Terminates the socket after MAX_MISSED_PINGS unanswered pings. */
   private startPingLoop(): void {
     this.stopPingLoop();
     this.pingTimer = setInterval(() => {
@@ -277,6 +319,7 @@ export class BridgeClient {
     }, BridgeClient.PING_INTERVAL_MS);
   }
 
+  /** Stop the ping interval timer. */
   private stopPingLoop(): void {
     if (this.pingTimer) {
       clearInterval(this.pingTimer);
@@ -284,6 +327,7 @@ export class BridgeClient {
     }
   }
 
+  /** Schedule a reconnection attempt after RECONNECT_DELAY_MS. No-op if already scheduled. */
   private scheduleReconnect(): void {
     if (this.reconnectTimer) return;
     this.reconnectTimer = setTimeout(() => {
@@ -294,6 +338,7 @@ export class BridgeClient {
     }, BridgeClient.RECONNECT_DELAY_MS);
   }
 
+  /** Resolve all pending requests with a failure response and clear the map. */
   private rejectAllPending(reason: string): void {
     for (const [id, pending] of this.pendingRequests) {
       clearTimeout(pending.timer);

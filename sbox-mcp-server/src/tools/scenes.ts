@@ -2,6 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Scene management tools: list_scenes, load_scene, save_scene, create_scene.
+ * create_scene generates .scene JSON with optional default objects (camera, light, ground).
+ */
 export function registerSceneTools(
   server: McpServer,
   bridge: BridgeClient

@@ -7,8 +7,10 @@ using Sandbox;
 namespace SboxBridge;
 
 /// <summary>
-/// Sets a single property value on a component.
-/// Reads the value back after write to confirm it was applied.
+/// Sets a single property value on a component in editor mode.
+/// Uses <see cref="ComponentHelper.DeserializeValue"/> to convert the incoming JSON value
+/// to the correct C# type, and <see cref="ComponentHelper.SerializeValue"/> to read back
+/// the applied value for confirmation.
 /// </summary>
 public class SetPropertyHandler : ICommandHandler
 {

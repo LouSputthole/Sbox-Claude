@@ -30,6 +30,12 @@ public class BridgeAddon
 		BridgeServer.Stop();
 	}
 
+	/// <summary>
+	/// Register every command handler with the Bridge server.
+	/// The string key passed to <see cref="BridgeServer.RegisterHandler"/> must match
+	/// the MCP tool name exactly (snake_case, e.g. "create_gameobject") because the
+	/// MCP server forwards requests using the same name as the command key.
+	/// </summary>
 	private static void RegisterHandlers()
 	{
 		// Phase 1.1 — Project Awareness

@@ -2,6 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Material and model tools: assign_model, create_material, assign_material, set_material_property.
+ * Handles .vmat creation, ModelRenderer management, and runtime material property changes.
+ */
 export function registerMaterialTools(
   server: McpServer,
   bridge: BridgeClient

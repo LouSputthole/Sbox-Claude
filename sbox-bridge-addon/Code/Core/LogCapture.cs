@@ -84,8 +84,13 @@ public static class LogCapture
 
 	/// <summary>
 	/// Get log entries, optionally filtered by severity.
-	/// Returns entries in chronological order (oldest first).
+	/// Reads the circular buffer starting from the oldest entry (the slot after the write
+	/// head when the buffer is full, or slot 0 when it has not yet wrapped), so entries
+	/// are returned in chronological order (oldest first). If there are more matching
+	/// entries than <paramref name="maxCount"/>, only the most recent ones are returned.
 	/// </summary>
+	/// <param name="maxCount">Maximum number of entries to return (default 50).</param>
+	/// <param name="severity">Filter by severity ("info", "warning", "error") or "all".</param>
 	public static List<LogEntry> GetEntries( int maxCount = 50, string severity = "all" )
 	{
 		lock ( _lock )

@@ -2,6 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Asset browser tools: search_assets, list_asset_library, install_asset, get_asset_info.
+ * Provides access to both project-local assets and the s&box community asset library.
+ */
 export function registerAssetTools(
   server: McpServer,
   bridge: BridgeClient

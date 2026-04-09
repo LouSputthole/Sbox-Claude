@@ -5,8 +5,12 @@ using Sandbox;
 
 namespace SboxBridge;
 
+// This file contains five play-mode handler classes:
+//   StartPlayHandler, StopPlayHandler, IsPlayingHandler, PausePlayHandler, ResumePlayHandler.
+
 /// <summary>
-/// Enters play mode in the s&box editor.
+/// Enters play mode in the s&amp;box editor.
+/// Returns immediately if already playing.
 /// </summary>
 public class StartPlayHandler : ICommandHandler
 {

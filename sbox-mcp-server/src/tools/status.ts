@@ -1,6 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Diagnostic and health-check tool (get_bridge_status).
+ * Reports connection state, latency, host/port, and editor version.
+ */
 export function registerStatusTools(
   server: McpServer,
   bridge: BridgeClient

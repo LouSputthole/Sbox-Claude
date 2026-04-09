@@ -2,6 +2,10 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * Console and error feedback tools: get_console_output, get_compile_errors, clear_console.
+ * Reads from the Bridge's circular log buffer (LogCapture) to surface editor output.
+ */
 export function registerConsoleTools(
   server: McpServer,
   bridge: BridgeClient

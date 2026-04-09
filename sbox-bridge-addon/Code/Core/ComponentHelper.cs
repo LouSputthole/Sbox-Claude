@@ -12,6 +12,16 @@ public static class ComponentHelper
 {
 	/// <summary>
 	/// Convert a C# value to a JSON-safe representation.
+	/// Supported s&amp;box types and their JSON shapes:
+	/// <list type="bullet">
+	///   <item><see cref="Vector3"/> / <see cref="Vector2"/> to {x, y, z} / {x, y}</item>
+	///   <item><see cref="Rotation"/> / <see cref="Angles"/> to {pitch, yaw, roll}</item>
+	///   <item><see cref="Color"/> to {r, g, b, a}</item>
+	///   <item><see cref="GameObject"/> to {id, name}</item>
+	///   <item>Enums to their string name</item>
+	///   <item>Primitives (string, bool, int, float, double) pass through unchanged</item>
+	///   <item>All other types fall back to <c>ToString()</c></item>
+	/// </list>
 	/// </summary>
 	public static object SerializeValue( object value )
 	{
@@ -37,7 +47,14 @@ public static class ComponentHelper
 
 	/// <summary>
 	/// Convert a JSON value to the target C# type.
+	/// Tries each type in order: primitives (string, bool, int, float, double),
+	/// then Vector3/Vector2 (delegating to <see cref="CreateGameObjectHandler.ParseVector3"/>),
+	/// then Rotation, Angles, Color (object or CSS-string form), then enums.
+	/// Falls back to the raw string value if no specific converter matches, or null if
+	/// the element cannot be converted.
 	/// </summary>
+	/// <param name="element">The JSON element to convert.</param>
+	/// <param name="targetType">The target C# property type.</param>
 	public static object DeserializeValue( JsonElement element, Type targetType )
 	{
 		if ( element.ValueKind == JsonValueKind.Null )

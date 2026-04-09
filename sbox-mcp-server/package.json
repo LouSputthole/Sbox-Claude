@@ -7,10 +7,35 @@
   "bin": {
     "sbox-mcp": "dist/index.js"
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "sbox",
+    "s&box",
+    "game-engine",
+    "claude",
+    "ai",
+    "source2",
+    "model-context-protocol"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lousputthole/sbox-claude"
+  },
+  "homepage": "https://github.com/lousputthole/sbox-claude#readme",
+  "bugs": {
+    "url": "https://github.com/lousputthole/sbox-claude/issues"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",

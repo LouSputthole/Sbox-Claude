@@ -1,5 +1,16 @@
 #!/usr/bin/env node
 
+/**
+ * Entry point for the sbox-mcp MCP server.
+ *
+ * Creates an MCP server (stdio transport), connects to the s&box Bridge Addon
+ * via WebSocket, and registers all tool handlers. Each tool domain (project,
+ * scripts, console, scenes, etc.) has its own register function in src/tools/.
+ *
+ * CLI flags: --version / -v, --help / -h
+ * Environment: SBOX_BRIDGE_HOST, SBOX_BRIDGE_PORT
+ */
+
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -21,6 +32,7 @@ import { registerPlayModeTools } from "./tools/playmode.js";
 // ── CLI flags ──────────────────────────────────────────────────────
 const args = process.argv.slice(2);
 
+/** Read the package version from package.json, or return "unknown" on failure. */
 function getVersion(): string {
   try {
     const __filename = fileURLToPath(import.meta.url);
@@ -98,7 +110,7 @@ registerAudioTools(server, bridge);
 registerStatusTools(server, bridge);
 registerPlayModeTools(server, bridge);
 
-// Start the server with stdio transport
+/** Start the MCP server on stdio and attempt initial Bridge connection. */
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);

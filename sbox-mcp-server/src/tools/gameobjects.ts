@@ -2,6 +2,17 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 
+/**
+ * GameObject lifecycle, hierarchy, and selection tools.
+ *
+ * Registers: create/delete/duplicate/rename_gameobject, set_parent,
+ * set_enabled, set_transform, get_scene_hierarchy, get_selected_objects,
+ * select_object, focus_object.
+ *
+ * Uses shared Zod schemas (Vector3Schema, RotationSchema) for consistent
+ * Vector3 and Rotation parameter validation across multiple tools.
+ */
+
 const Vector3Schema = z
   .object({
     x: z.number().describe("X coordinate"),
