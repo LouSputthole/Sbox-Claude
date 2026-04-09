@@ -52,11 +52,19 @@ public class SetTransformHandler : ICommandHandler
 			if ( scaleProp.ValueKind == JsonValueKind.Number )
 			{
 				var uniform = scaleProp.GetSingle();
-				go.WorldScale = new Vector3( uniform, uniform, uniform );
+				var scaleVec = new Vector3( uniform, uniform, uniform );
+				if ( useLocal )
+					go.LocalScale = scaleVec;
+				else
+					go.WorldScale = scaleVec;
 			}
 			else
 			{
-				go.WorldScale = CreateGameObjectHandler.ParseVector3( scaleProp );
+				var scaleVec = CreateGameObjectHandler.ParseVector3( scaleProp );
+				if ( useLocal )
+					go.LocalScale = scaleVec;
+				else
+					go.WorldScale = scaleVec;
 			}
 		}
 

@@ -27,7 +27,14 @@ public class ListProjectFilesHandler : ICommandHandler
 		var recursive = !parameters.TryGetProperty( "recursive", out var recProp )
 			|| recProp.GetBoolean();
 
-		var fullPath = Path.Combine( projectRoot, relativePath );
+		// Ensure trailing separator for safe StartsWith check
+		if ( !projectRoot.EndsWith( Path.DirectorySeparatorChar ) )
+			projectRoot += Path.DirectorySeparatorChar;
+
+		var fullPath = Path.GetFullPath( Path.Combine( projectRoot, relativePath ) );
+		if ( !fullPath.StartsWith( projectRoot ) )
+			throw new System.Exception( "Path must be within the project directory" );
+
 		if ( !Directory.Exists( fullPath ) )
 			throw new System.Exception( $"Directory not found: {relativePath}" );
 

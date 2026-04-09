@@ -40,8 +40,9 @@ public class AddPhysicsHandler : ICommandHandler
 		}
 
 		// Configure Rigidbody properties
-		if ( parameters.TryGetProperty( "mass", out var massProp ) )
-			rigidbody.PhysicsBody?.Mass.Equals( massProp.GetSingle() );
+		// API-NOTE: PhysicsBody may be null immediately after Create; mass may need a frame tick
+		if ( parameters.TryGetProperty( "mass", out var massProp ) && rigidbody.PhysicsBody != null )
+			rigidbody.PhysicsBody.Mass = massProp.GetSingle();
 
 		if ( parameters.TryGetProperty( "gravity", out var gravProp ) )
 			rigidbody.Gravity = gravProp.GetBoolean();

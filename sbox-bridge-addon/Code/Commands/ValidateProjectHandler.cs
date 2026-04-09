@@ -92,8 +92,18 @@ public class ValidateProjectHandler : ICommandHandler
 		var hasType = config?.Type != null;
 		checks.Add( new { check = "projectType", passed = hasType, message = hasType ? $"Type: {config.Type}" : "Project type not set" } );
 
-		// Summary
-		var passedCount = checks.Cast<dynamic>().Count( c => ((dynamic)c).passed );
+		// Summary — count passed checks using the tracked boolean
+		var passedCount = checks.Count - (allPassed ? 0 : checks.Count);
+		// Re-count properly: we track allPassed for blocking issues, but need individual count
+		passedCount = 0;
+		foreach ( var check in checks )
+		{
+			// Access via JSON round-trip to avoid dynamic cast on anonymous types
+			var json = System.Text.Json.JsonSerializer.Serialize( check );
+			using var doc = JsonDocument.Parse( json );
+			if ( doc.RootElement.GetProperty( "passed" ).GetBoolean() )
+				passedCount++;
+		}
 
 		return Task.FromResult<object>( new
 		{

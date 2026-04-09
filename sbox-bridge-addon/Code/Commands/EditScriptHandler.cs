@@ -51,6 +51,9 @@ public class EditScriptHandler : ICommandHandler
 						?? throw new Exception( "replace operation requires 'find'" );
 					var replacement = op.GetProperty( "replacement" ).GetString() ?? "";
 
+					if ( string.IsNullOrEmpty( find ) )
+						throw new Exception( "replace operation 'find' must not be empty" );
+
 					var joined = string.Join( "\n", lines );
 					if ( !joined.Contains( find ) )
 						throw new Exception( $"Could not find text to replace: {find[..Math.Min( find.Length, 50 )]}..." );

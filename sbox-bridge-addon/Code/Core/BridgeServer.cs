@@ -116,9 +116,10 @@ public static class BridgeServer
 	}
 
 	/// <summary>
-	/// Message receive loop for a single WebSocket client. Reads frames into a 64 KB buffer,
-	/// rejects messages larger than <see cref="MaxMessageSize"/> (1 MB), parses the UTF-8 text
-	/// as JSON, dispatches to <see cref="ProcessRequest"/>, and sends the response back.
+	/// Message receive loop for a single WebSocket client. Reads frames into a buffer,
+	/// accumulates multi-frame messages, rejects messages larger than <see cref="MaxMessageSize"/>
+	/// (1 MB), parses the UTF-8 text as JSON, dispatches to <see cref="ProcessRequest"/>,
+	/// and sends the response back.
 	/// </summary>
 	private static async Task HandleClient( WebSocket ws, CancellationToken ct )
 	{
@@ -130,7 +131,34 @@ public static class BridgeServer
 		{
 			while ( ws.State == WebSocketState.Open && !ct.IsCancellationRequested )
 			{
-				var result = await ws.ReceiveAsync( new ArraySegment<byte>( buffer ), ct );
+				// Accumulate frames until EndOfMessage is true
+				using var messageStream = new System.IO.MemoryStream();
+				WebSocketReceiveResult result;
+
+				do
+				{
+					result = await ws.ReceiveAsync( new ArraySegment<byte>( buffer ), ct );
+
+					if ( result.MessageType == WebSocketMessageType.Close )
+						break;
+
+					messageStream.Write( buffer, 0, result.Count );
+
+					// Guard: reject messages over 1 MB
+					if ( messageStream.Length > MaxMessageSize )
+					{
+						// Drain remaining frames to keep the connection clean
+						while ( !result.EndOfMessage )
+							result = await ws.ReceiveAsync( new ArraySegment<byte>( buffer ), ct );
+
+						var errorResponse = MakeError( null, ErrorMessageTooLarge,
+							$"Message exceeds maximum size of {MaxMessageSize / 1024}KB" );
+						await SendResponse( ws, errorResponse, ct );
+						messageStream.SetLength( 0 ); // Reset for next message
+						break;
+					}
+				}
+				while ( !result.EndOfMessage );
 
 				if ( result.MessageType == WebSocketMessageType.Close )
 				{
@@ -138,18 +166,9 @@ public static class BridgeServer
 					break;
 				}
 
-				if ( result.MessageType == WebSocketMessageType.Text )
+				if ( result.MessageType == WebSocketMessageType.Text && messageStream.Length > 0 )
 				{
-					// Guard: reject messages over 1 MB
-					if ( result.Count > MaxMessageSize )
-					{
-						var errorResponse = MakeError( null, ErrorMessageTooLarge,
-							$"Message exceeds maximum size of {MaxMessageSize / 1024}KB" );
-						await SendResponse( ws, errorResponse, ct );
-						continue;
-					}
-
-					var json = Encoding.UTF8.GetString( buffer, 0, result.Count );
+					var json = Encoding.UTF8.GetString( messageStream.GetBuffer(), 0, (int)messageStream.Length );
 					var response = await ProcessRequest( json );
 					await SendResponse( ws, response, ct );
 				}

@@ -39,7 +39,9 @@ public class SetMaterialPropertyHandler : ICommandHandler
 			throw new Exception( $"No material on '{go.Name}'" );
 
 		// Determine value type and set
-		if ( parameters.TryGetProperty( "value", out var valueProp ) )
+		if ( !parameters.TryGetProperty( "value", out var valueProp ) )
+			throw new Exception( "Missing required parameter: value" );
+
 		{
 			switch ( valueProp.ValueKind )
 			{

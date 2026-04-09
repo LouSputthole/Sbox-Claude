@@ -79,16 +79,34 @@ public class AddRpcMethodHandler : ICommandHandler
 
 		sb.AppendLine( "\t}" );
 
-		// Insert before the closing brace of the class
-		var lastBrace = content.LastIndexOf( '}' );
-		if ( lastBrace < 0 )
+		// Insert before the closing brace of the class.
+		// Use regex to find the class declaration and its closing brace,
+		// handling both traditional and file-scoped namespaces.
+		var classMatch = System.Text.RegularExpressions.Regex.Match( content, @"\bclass\s+\w+[^{]*\{" );
+		if ( !classMatch.Success )
+			throw new Exception( "Could not find class declaration in script" );
+
+		// Count braces from the class opening to find its closing brace
+		var braceDepth = 0;
+		var classCloseBrace = -1;
+		for ( int i = classMatch.Index + classMatch.Length - 1; i < content.Length; i++ )
+		{
+			if ( content[i] == '{' ) braceDepth++;
+			else if ( content[i] == '}' )
+			{
+				braceDepth--;
+				if ( braceDepth == 0 )
+				{
+					classCloseBrace = i;
+					break;
+				}
+			}
+		}
+
+		if ( classCloseBrace < 0 )
 			throw new Exception( "Could not find closing brace of class" );
 
-		// Find the second-to-last closing brace (class end, not namespace end)
-		var secondLastBrace = content.LastIndexOf( '}', lastBrace - 1 );
-		var insertPos = secondLastBrace > 0 ? secondLastBrace : lastBrace;
-
-		content = content.Insert( insertPos, sb.ToString() );
+		content = content.Insert( classCloseBrace, sb.ToString() );
 
 		File.WriteAllText( fullPath, content );
 

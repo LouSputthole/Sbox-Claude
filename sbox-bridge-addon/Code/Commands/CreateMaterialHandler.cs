@@ -55,10 +55,12 @@ public class CreateMaterialHandler : ICommandHandler
 			var entries = new System.Collections.Generic.List<string>();
 			foreach ( var kvp in propsProp.EnumerateObject() )
 			{
+				// Use JsonSerializer for safe escaping of keys and string values
+				var escapedKey = JsonSerializer.Serialize( kvp.Name );
 				var val = kvp.Value.ValueKind == JsonValueKind.String
-					? $"\"{kvp.Value.GetString()}\""
+					? JsonSerializer.Serialize( kvp.Value.GetString() )
 					: kvp.Value.GetRawText();
-				entries.Add( $"    \"{kvp.Name}\": {val}" );
+				entries.Add( $"    {escapedKey}: {val}" );
 			}
 			sb.AppendLine( string.Join( ",\n", entries ) );
 		}

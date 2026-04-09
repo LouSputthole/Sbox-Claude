@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Sandbox;
@@ -21,6 +22,15 @@ public class SaveSceneHandler : ICommandHandler
 			var path = pathProp.GetString();
 			if ( !string.IsNullOrEmpty( path ) )
 			{
+				// Validate path stays within project directory
+				var projectRoot = Project.Current?.GetRootPath() ?? "";
+				if ( !projectRoot.EndsWith( Path.DirectorySeparatorChar ) )
+					projectRoot += Path.DirectorySeparatorChar;
+
+				var fullPath = Path.GetFullPath( Path.Combine( projectRoot, path ) );
+				if ( !fullPath.StartsWith( projectRoot ) )
+					throw new System.Exception( "Path must be within the project directory" );
+
 				EditorScene.SaveAs( path );
 				return Task.FromResult<object>( new
 				{

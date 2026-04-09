@@ -17,7 +17,6 @@ public class ListScenesHandler : ICommandHandler
 		if ( string.IsNullOrEmpty( projectRoot ) )
 			throw new System.Exception( "No project is currently open" );
 
-		var scenesDir = Path.Combine( projectRoot, "scenes" );
 		var scenes = new System.Collections.Generic.List<object>();
 
 		// Search the entire project for .scene files
@@ -42,7 +41,7 @@ public class ListScenesHandler : ICommandHandler
 		return Task.FromResult<object>( new
 		{
 			count = scenes.Count,
-			scenes = scenes.OrderBy( s => s.ToString() ).ToList(),
+			scenes = scenes.OrderBy( s => JsonSerializer.Serialize( s ) ).ToList(),
 		} );
 	}
 }

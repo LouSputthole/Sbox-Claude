@@ -51,20 +51,23 @@ public class CreateSoundEventHandler : ICommandHandler
 		if ( !string.IsNullOrEmpty( dir ) )
 			Directory.CreateDirectory( dir );
 
-		// Generate sound event JSON
+		// Generate sound event JSON using serializer for safe string escaping
+		var inv = System.Globalization.CultureInfo.InvariantCulture;
+		var escapedSoundPath = JsonSerializer.Serialize( soundPath ); // includes quotes + escaping
+
 		var sb = new StringBuilder();
 		sb.AppendLine( "{" );
-		sb.AppendLine( $"  \"UI\": false," );
-		sb.AppendLine( $"  \"Volume\": {volume:F2}," );
-		sb.AppendLine( $"  \"Pitch\": {pitch:F2}," );
-		sb.AppendLine( $"  \"Decibels\": 70," );
-		sb.AppendLine( $"  \"SelectionMode\": \"Random\"," );
-		sb.AppendLine( $"  \"MaximumDistance\": {maxDistance:F0}," );
-		sb.AppendLine( $"  \"MinimumDistance\": {minDistance:F0}," );
+		sb.AppendLine( "  \"UI\": false," );
+		sb.AppendLine( $"  \"Volume\": {volume.ToString( "F2", inv )}," );
+		sb.AppendLine( $"  \"Pitch\": {pitch.ToString( "F2", inv )}," );
+		sb.AppendLine( "  \"Decibels\": 70," );
+		sb.AppendLine( "  \"SelectionMode\": \"Random\"," );
+		sb.AppendLine( $"  \"MaximumDistance\": {maxDistance.ToString( "F0", inv )}," );
+		sb.AppendLine( $"  \"MinimumDistance\": {minDistance.ToString( "F0", inv )}," );
 		sb.AppendLine( $"  \"Looping\": {(loop ? "true" : "false")}," );
-		sb.AppendLine( $"  \"Sounds\": [" );
-		sb.AppendLine( $"    \"{soundPath}\"" );
-		sb.AppendLine( $"  ]" );
+		sb.AppendLine( "  \"Sounds\": [" );
+		sb.AppendLine( $"    {escapedSoundPath}" );
+		sb.AppendLine( "  ]" );
 		sb.AppendLine( "}" );
 
 		File.WriteAllText( fullPath, sb.ToString() );

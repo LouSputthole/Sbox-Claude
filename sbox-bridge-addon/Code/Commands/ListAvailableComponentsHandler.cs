@@ -60,9 +60,17 @@ public class ListAvailableComponentsHandler : ICommandHandler
 			} );
 		}
 
+		// Sort by serializing to JSON to avoid dynamic cast on anonymous types
 		var sorted = components
-			.OrderBy( c => ((dynamic)c).group )
-			.ThenBy( c => ((dynamic)c).name )
+			.Select( c =>
+			{
+				var j = System.Text.Json.JsonSerializer.Serialize( c );
+				using var d = JsonDocument.Parse( j );
+				return new { obj = c, group = d.RootElement.GetProperty( "group" ).GetString() ?? "", name = d.RootElement.GetProperty( "name" ).GetString() ?? "" };
+			} )
+			.OrderBy( x => x.group )
+			.ThenBy( x => x.name )
+			.Select( x => x.obj )
 			.ToList();
 
 		return Task.FromResult<object>( new

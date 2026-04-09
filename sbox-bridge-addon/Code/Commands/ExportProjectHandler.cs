@@ -123,7 +123,7 @@ public class ExportProjectHandler : ICommandHandler
 	{
 		foreach ( var file in Directory.GetFiles( sourceDir, pattern, SearchOption.AllDirectories ) )
 		{
-			var relativePath = file.Substring( sourceDir.Length );
+			var relativePath = Path.GetRelativePath( sourceDir, file );
 			var targetPath = Path.Combine( targetDir, relativePath );
 			var targetFileDir = Path.GetDirectoryName( targetPath );
 			if ( !string.IsNullOrEmpty( targetFileDir ) )
@@ -137,7 +137,7 @@ public class ExportProjectHandler : ICommandHandler
 		Directory.CreateDirectory( targetDir );
 		foreach ( var file in Directory.GetFiles( sourceDir, "*", SearchOption.AllDirectories ) )
 		{
-			var relativePath = file.Substring( sourceDir.Length );
+			var relativePath = Path.GetRelativePath( sourceDir, file );
 			var targetPath = Path.Combine( targetDir, relativePath );
 			var targetFileDir = Path.GetDirectoryName( targetPath );
 			if ( !string.IsNullOrEmpty( targetFileDir ) )

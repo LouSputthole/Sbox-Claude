@@ -53,6 +53,8 @@ public class CreateRazorUIHandler : ICommandHandler
 			{
 				var scssPath = $"code/{directory}/{name}.razor.scss";
 				var fullScssPath = Path.GetFullPath( Path.Combine( projectRoot, scssPath ) );
+				if ( !fullScssPath.StartsWith( projectRoot ) )
+					throw new Exception( "SCSS path must be within the project directory" );
 				File.WriteAllText( fullScssPath, stylesProp.GetString() ?? "" );
 			}
 
@@ -133,6 +135,8 @@ public class CreateRazorUIHandler : ICommandHandler
 		{
 			var scssRelPath = $"code/{directory}/{name}.razor.scss";
 			var fullScss = Path.GetFullPath( Path.Combine( projectRoot, scssRelPath ) );
+			if ( !fullScss.StartsWith( projectRoot ) )
+				throw new Exception( "SCSS path must be within the project directory" );
 
 			var scss = new StringBuilder();
 			scss.AppendLine( $"// Styles for {name} component" );

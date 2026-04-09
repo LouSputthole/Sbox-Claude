@@ -36,13 +36,14 @@ public class WriteFileHandler : ICommandHandler
 		if ( !string.IsNullOrEmpty( directory ) )
 			Directory.CreateDirectory( directory );
 
+		var existed = File.Exists( fullPath );
 		File.WriteAllText( fullPath, content );
 
 		return Task.FromResult<object>( new
 		{
 			path = relativePath,
-			bytesWritten = content.Length,
-			created = true,
+			bytesWritten = System.Text.Encoding.UTF8.GetByteCount( content ),
+			created = !existed,
 		} );
 	}
 }

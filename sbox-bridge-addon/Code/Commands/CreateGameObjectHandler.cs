@@ -97,9 +97,9 @@ public class CreateGameObjectHandler : ICommandHandler
 			if ( parts.Length >= 3 )
 			{
 				return new Vector3(
-					float.Parse( parts[0].Trim() ),
-					float.Parse( parts[1].Trim() ),
-					float.Parse( parts[2].Trim() )
+					float.Parse( parts[0].Trim(), System.Globalization.CultureInfo.InvariantCulture ),
+					float.Parse( parts[1].Trim(), System.Globalization.CultureInfo.InvariantCulture ),
+					float.Parse( parts[2].Trim(), System.Globalization.CultureInfo.InvariantCulture )
 				);
 			}
 		}
