@@ -55,6 +55,27 @@ public class BridgeAddon
 		BridgeServer.RegisterHandler( "save_scene", new SaveSceneHandler() );
 		BridgeServer.RegisterHandler( "create_scene", new CreateSceneHandler() );
 
-		Log.Info( "[SboxBridge] All Phase 1 command handlers registered" );
+		// Phase 2.1 — GameObject Lifecycle
+		BridgeServer.RegisterHandler( "create_gameobject", new CreateGameObjectHandler() );
+		BridgeServer.RegisterHandler( "delete_gameobject", new DeleteGameObjectHandler() );
+		BridgeServer.RegisterHandler( "duplicate_gameobject", new DuplicateGameObjectHandler() );
+		BridgeServer.RegisterHandler( "rename_gameobject", new RenameGameObjectHandler() );
+		BridgeServer.RegisterHandler( "set_parent", new SetParentHandler() );
+		BridgeServer.RegisterHandler( "set_enabled", new SetEnabledHandler() );
+		BridgeServer.RegisterHandler( "set_transform", new SetTransformHandler() );
+
+		// Phase 2.2 — Component Operations
+		BridgeServer.RegisterHandler( "get_property", new GetPropertyHandler() );
+		BridgeServer.RegisterHandler( "get_all_properties", new GetAllPropertiesHandler() );
+		BridgeServer.RegisterHandler( "list_available_components", new ListAvailableComponentsHandler() );
+		BridgeServer.RegisterHandler( "add_component_with_properties", new AddComponentWithPropertiesHandler() );
+
+		// Phase 2.3 — Hierarchy & Selection
+		BridgeServer.RegisterHandler( "get_scene_hierarchy", new GetSceneHierarchyHandler() );
+		BridgeServer.RegisterHandler( "get_selected_objects", new GetSelectedObjectsHandler() );
+		BridgeServer.RegisterHandler( "select_object", new SelectObjectHandler() );
+		BridgeServer.RegisterHandler( "focus_object", new FocusObjectHandler() );
+
+		Log.Info( "[SboxBridge] All Phase 1 + Phase 2 command handlers registered" );
 	}
 }

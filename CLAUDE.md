@@ -2,11 +2,11 @@
 
 > Let non-coders build s&box games through conversation with Claude Code.
 
-## Status: Phase 1 Complete — Phase 2 Next
+## Status: Phase 2 Complete — Phase 3 Next
 
 **Last updated:** 2026-04-09
-**Current phase:** Phase 1 (Foundation) ✅ — 15 tools implemented
-**Next up:** Phase 2 (Scene Building) — GameObject lifecycle, components, hierarchy
+**Current phase:** Phase 2 (Scene Building) ✅ — 30 tools implemented (15 Phase 1 + 15 Phase 2)
+**Next up:** Phase 3 (Assets & Resources) — asset browser, materials, models, audio
 
 ---
 
@@ -43,7 +43,9 @@ Sbox-Claude/
 │   │       ├── project.ts             # get_project_info, list_project_files, read_file, write_file
 │   │       ├── scripts.ts             # create_script, edit_script, delete_script, trigger_hotload
 │   │       ├── console.ts             # get_console_output, get_compile_errors, clear_console
-│   │       └── scenes.ts              # list_scenes, load_scene, save_scene, create_scene
+│   │       ├── scenes.ts              # list_scenes, load_scene, save_scene, create_scene
+│   │       ├── gameobjects.ts         # create/delete/duplicate/rename, set_parent/enabled/transform, hierarchy, selection
+│   │       └── components.ts          # get_property, get_all_properties, list_available_components, add_component
 │   └── dist/                          # Compiled JS (gitignored, built with `npm run build`)
 │
 └── sbox-bridge-addon/                 # s&box Bridge Addon (C#)
@@ -53,7 +55,8 @@ Sbox-Claude/
         │   ├── BridgeAddon.cs         # Entry point — registers handlers on editor load
         │   ├── BridgeServer.cs        # WebSocket server, accepts connections, dispatches commands
         │   ├── ICommandHandler.cs     # Interface: Execute(JsonElement) → Task<object>
-        │   └── LogCapture.cs          # Hooks Logger.OnMessage → buffers for get_console_output
+        │   ├── LogCapture.cs          # Hooks Logger.OnMessage → buffers for get_console_output
+        │   └── ComponentHelper.cs     # Serialize/deserialize component property values
         └── Commands/
             ├── GetProjectInfoHandler.cs
             ├── ListProjectFilesHandler.cs
@@ -69,7 +72,22 @@ Sbox-Claude/
             ├── ListScenesHandler.cs
             ├── LoadSceneHandler.cs
             ├── SaveSceneHandler.cs
-            └── CreateSceneHandler.cs
+            ├── CreateSceneHandler.cs
+            ├── CreateGameObjectHandler.cs
+            ├── DeleteGameObjectHandler.cs
+            ├── DuplicateGameObjectHandler.cs
+            ├── RenameGameObjectHandler.cs
+            ├── SetParentHandler.cs
+            ├── SetEnabledHandler.cs
+            ├── SetTransformHandler.cs
+            ├── GetPropertyHandler.cs
+            ├── GetAllPropertiesHandler.cs
+            ├── ListAvailableComponentsHandler.cs
+            ├── AddComponentWithPropertiesHandler.cs
+            ├── GetSceneHierarchyHandler.cs
+            ├── GetSelectedObjectsHandler.cs
+            ├── SelectObjectHandler.cs
+            └── FocusObjectHandler.cs
 ```
 
 ---
@@ -96,11 +114,31 @@ Sbox-Claude/
 | `save_scene` | `tools/scenes.ts` | `SaveSceneHandler.cs` | Save current scene |
 | `create_scene` | `tools/scenes.ts` | `CreateSceneHandler.cs` | New scene with optional defaults |
 
-### Phase 2 — Scene Building (NOT YET IMPLEMENTED)
+### Phase 2 — Scene Building (15 tools) ✅
 
-Planned tools: `create_gameobject`, `delete_gameobject`, `duplicate_gameobject`, `rename_gameobject`, `set_parent`, `set_enabled`, `set_transform`, `get_property`, `get_all_properties`, `list_available_components`, `add_component_with_properties`, `get_scene_hierarchy`, `get_selected_objects`, `select_object`, `focus_object`
+| Tool | MCP File | Bridge Handler | What It Does |
+|------|----------|----------------|-------------|
+| `create_gameobject` | `tools/gameobjects.ts` | `CreateGameObjectHandler.cs` | Create object with name, position, rotation, scale, parent |
+| `delete_gameobject` | `tools/gameobjects.ts` | `DeleteGameObjectHandler.cs` | Remove object by GUID |
+| `duplicate_gameobject` | `tools/gameobjects.ts` | `DuplicateGameObjectHandler.cs` | Clone with all components, optional offset |
+| `rename_gameobject` | `tools/gameobjects.ts` | `RenameGameObjectHandler.cs` | Change display name |
+| `set_parent` | `tools/gameobjects.ts` | `SetParentHandler.cs` | Reparent object (or move to root) |
+| `set_enabled` | `tools/gameobjects.ts` | `SetEnabledHandler.cs` | Enable/disable object |
+| `set_transform` | `tools/gameobjects.ts` | `SetTransformHandler.cs` | Set position/rotation/scale (world or local) |
+| `get_property` | `tools/components.ts` | `GetPropertyHandler.cs` | Read single component property value |
+| `get_all_properties` | `tools/components.ts` | `GetAllPropertiesHandler.cs` | Dump all properties as JSON |
+| `list_available_components` | `tools/components.ts` | `ListAvailableComponentsHandler.cs` | Browse all component types (built-in + custom) |
+| `add_component_with_properties` | `tools/components.ts` | `AddComponentWithPropertiesHandler.cs` | Add component + set properties in one call |
+| `get_scene_hierarchy` | `tools/gameobjects.ts` | `GetSceneHierarchyHandler.cs` | Full scene tree with GUIDs, components, positions |
+| `get_selected_objects` | `tools/gameobjects.ts` | `GetSelectedObjectsHandler.cs` | What the user has selected in editor |
+| `select_object` | `tools/gameobjects.ts` | `SelectObjectHandler.cs` | Programmatically select an object |
+| `focus_object` | `tools/gameobjects.ts` | `FocusObjectHandler.cs` | Move editor camera to look at object |
 
-### Phase 3–7 — See README.md roadmap
+### Phase 3 — Assets & Resources (NOT YET IMPLEMENTED)
+
+Planned tools: `search_assets`, `list_asset_library`, `install_asset`, `get_asset_info`, `assign_model`, `create_material`, `assign_material`, `set_material_property`, `list_sounds`, `create_sound_event`, `assign_sound`, `play_sound_preview`
+
+### Phase 4–7 — See README.md roadmap
 
 ---
 

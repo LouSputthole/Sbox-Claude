@@ -7,6 +7,8 @@ import { registerProjectTools } from "./tools/project.js";
 import { registerScriptTools } from "./tools/scripts.js";
 import { registerConsoleTools } from "./tools/console.js";
 import { registerSceneTools } from "./tools/scenes.js";
+import { registerGameObjectTools } from "./tools/gameobjects.js";
+import { registerComponentTools } from "./tools/components.js";
 
 const server = new McpServer({
   name: "sbox-mcp",
@@ -19,11 +21,13 @@ const bridge = new BridgeClient(
   parseInt(process.env.SBOX_BRIDGE_PORT ?? "29015", 10)
 );
 
-// Register all Phase 1 tools
+// Register all tools
 registerProjectTools(server, bridge);
 registerScriptTools(server, bridge);
 registerConsoleTools(server, bridge);
 registerSceneTools(server, bridge);
+registerGameObjectTools(server, bridge);
+registerComponentTools(server, bridge);
 
 // Start the server with stdio transport
 async function main(): Promise<void> {
