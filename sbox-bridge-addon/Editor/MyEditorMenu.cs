@@ -129,12 +129,13 @@ public static class ClaudeBridge
 		Register( "assign_model",        new AssignModelHandler() );
 		Register( "create_material",     new CreateMaterialHandler() );
 		Register( "assign_material",     new AssignMaterialHandler() );
-		// set_material_property — complex material API, omitted
+		Register( "set_material_property", new SetMaterialPropertyHandler() );
 
 		// ── Batch 7: Audio ───────────────────────────────────────────────
 		Register( "list_sounds",         new ListSoundsHandler() );
 		Register( "create_sound_event",  new CreateSoundEventHandler() );
-		// assign_sound / play_sound_preview — SoundPointComponent uncertain, omitted
+		Register( "assign_sound",        new AssignSoundHandler() );
+		Register( "play_sound_preview",  new PlaySoundPreviewHandler() );
 
 		// ── Batch 8: Prefabs ─────────────────────────────────────────────
 		Register( "create_prefab",       new CreatePrefabHandler() );
@@ -145,7 +146,7 @@ public static class ClaudeBridge
 		// ── Batch 9: Physics ─────────────────────────────────────────────
 		Register( "add_physics",         new AddPhysicsHandler() );
 		Register( "add_collider",        new AddColliderHandler() );
-		// add_joint — joint types uncertain, omitted
+		Register( "add_joint",           new AddJointHandler() );
 		Register( "raycast",             new RaycastHandler() );
 
 		// ── Batch 10: Code templates ─────────────────────────────────────
@@ -156,10 +157,18 @@ public static class ClaudeBridge
 
 		// ── Batch 11: UI ─────────────────────────────────────────────────
 		Register( "create_razor_ui",     new CreateRazorUIHandler() );
-		// add_screen_panel / add_world_panel — ScreenPanel uncertain, omitted
+		Register( "add_screen_panel",    new AddScreenPanelHandler() );
+		Register( "add_world_panel",     new AddWorldPanelHandler() );
+
+		// ── Batch 11b: Undo/Redo ─────────────────────────────────────────
+		Register( "undo",                new UndoHandler() );
+		Register( "redo",                new RedoHandler() );
 
 		// ── Batch 12: Networking ─────────────────────────────────────────
-		// add_network_helper / configure_network / get_network_status / set_ownership — uncertain, omitted
+		Register( "add_network_helper",  new AddNetworkHelperHandler() );
+		Register( "configure_network",   new ConfigureNetworkHandler() );
+		Register( "get_network_status",  new GetNetworkStatusHandler() );
+		Register( "set_ownership",       new SetOwnershipHandler() );
 		Register( "network_spawn",            new NetworkSpawnHandler() );
 		Register( "add_sync_property",        new AddSyncPropertyHandler() );
 		Register( "add_rpc_method",           new AddRpcMethodHandler() );
@@ -172,12 +181,14 @@ public static class ClaudeBridge
 		Register( "set_project_config",  new SetProjectConfigHandler() );
 		Register( "validate_project",    new ValidateProjectHandler() );
 		Register( "set_project_thumbnail",new SetProjectThumbnailHandler() );
-		// build_project / get_build_status / clean_build / export_project /
-		// get_package_details / prepare_publish — compile API uncertain, omitted
+		Register( "get_package_details", new GetPackageDetailsHandler() );
+		Register( "install_asset",       new InstallAssetHandler() );
+		Register( "list_asset_library",  new ListAssetLibraryHandler() );
 
 		// ── Batch 14: Console / diagnostics ─────────────────────────────
-		// get_console_output / get_compile_errors / clear_console /
-		// trigger_hotload / take_screenshot — LogCapture not available, omitted
+		// get_console_output / get_compile_errors / clear_console — LogCapture not available, omitted
+		Register( "take_screenshot",     new TakeScreenshotHandler() );
+		Register( "trigger_hotload",     new TriggerHotloadHandler() );
 
 		Log.Info( $"[SboxBridge] Registered {_handlers.Count} handlers" );
 	}
@@ -2362,6 +2373,602 @@ public class SetProjectThumbnailHandler : IBridgeHandler
 		File.Copy( fullSource, thumbDest, overwrite: true );
 
 		return Task.FromResult<object>( new { set = true, thumbnail = "thumb.png" } );
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BATCH 15 — New handlers (joints, sound, UI panels, undo/redo,
+//             networking helpers, packages, assets, screenshot, hotload)
+// ═══════════════════════════════════════════════════════════════════
+
+public class AddJointHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var scene = SceneEditorSession.Active?.Scene;
+		if ( scene == null )
+			return Task.FromResult<object>( new { error = "No active scene" } );
+
+		var id = p.GetProperty( "id" ).GetString();
+		if ( !Guid.TryParse( id, out var guid ) )
+			return Task.FromResult<object>( new { error = "Invalid GUID" } );
+
+		var go = scene.Directory.FindByGuid( guid );
+		if ( go == null )
+			return Task.FromResult<object>( new { error = $"GameObject not found: {id}" } );
+
+		var jointType = p.TryGetProperty( "type", out var jt ) ? jt.GetString() : "fixed";
+
+		// Resolve optional target body
+		GameObject targetGo = null;
+		if ( p.TryGetProperty( "targetId", out var tid ) && Guid.TryParse( tid.GetString(), out var targetGuid ) )
+			targetGo = scene.Directory.FindByGuid( targetGuid );
+
+		try
+		{
+			string addedType;
+			switch ( jointType?.ToLower() )
+			{
+				case "spring":
+				{
+					var joint = go.AddComponent<SpringJoint>();
+					if ( targetGo != null ) joint.Body = targetGo;
+					if ( p.TryGetProperty( "frequency", out var freq ) ) joint.Frequency = freq.GetSingle();
+					if ( p.TryGetProperty( "damping",   out var damp ) ) joint.Damping   = damp.GetSingle();
+					addedType = "SpringJoint";
+					break;
+				}
+				case "hinge":
+				{
+					var joint = go.AddComponent<HingeJoint>();
+					if ( targetGo != null ) joint.Body = targetGo;
+					addedType = "HingeJoint";
+					break;
+				}
+				case "slider":
+				{
+					var joint = go.AddComponent<SliderJoint>();
+					if ( targetGo != null ) joint.Body = targetGo;
+					addedType = "SliderJoint";
+					break;
+				}
+				default: // "fixed"
+				{
+					var joint = go.AddComponent<FixedJoint>();
+					if ( targetGo != null ) joint.Body = targetGo;
+					addedType = "FixedJoint";
+					break;
+				}
+			}
+			return Task.FromResult<object>( new { added = true, id, joint = addedType, targetId = targetGo?.Id.ToString() } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to add joint: {ex.Message}" } );
+		}
+	}
+}
+
+public class AssignSoundHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var scene = SceneEditorSession.Active?.Scene;
+		if ( scene == null )
+			return Task.FromResult<object>( new { error = "No active scene" } );
+
+		var id = p.GetProperty( "id" ).GetString();
+		if ( !Guid.TryParse( id, out var guid ) )
+			return Task.FromResult<object>( new { error = "Invalid GUID" } );
+
+		var go = scene.Directory.FindByGuid( guid );
+		if ( go == null )
+			return Task.FromResult<object>( new { error = $"GameObject not found: {id}" } );
+
+		var soundPath  = p.GetProperty( "sound" ).GetString();
+		var playOnStart = p.TryGetProperty( "playOnStart", out var pos ) && pos.GetBoolean();
+
+		try
+		{
+			var spc = go.GetOrAddComponent<SoundPointComponent>();
+
+			// Load the SoundEvent from the path and assign it
+			var soundEvent = ResourceLibrary.Get<SoundEvent>( soundPath );
+			if ( soundEvent != null )
+				spc.SoundEvent = soundEvent;
+
+			if ( playOnStart )
+				spc.StartSound();
+
+			return Task.FromResult<object>( new
+			{
+				assigned    = true,
+				id,
+				sound       = soundPath,
+				soundLoaded = soundEvent != null,
+				playOnStart
+			} );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to assign sound: {ex.Message}" } );
+		}
+	}
+}
+
+public class PlaySoundPreviewHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var eventName = p.GetProperty( "sound" ).GetString();
+		var volume    = p.TryGetProperty( "volume", out var v ) ? v.GetSingle() : 1.0f;
+
+		try
+		{
+			var handle = Sound.Play( eventName );
+			return Task.FromResult<object>( new { playing = true, sound = eventName, volume } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to play sound: {ex.Message}" } );
+		}
+	}
+}
+
+public class SetMaterialPropertyHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var scene = SceneEditorSession.Active?.Scene;
+		if ( scene == null )
+			return Task.FromResult<object>( new { error = "No active scene" } );
+
+		var id = p.GetProperty( "id" ).GetString();
+		if ( !Guid.TryParse( id, out var guid ) )
+			return Task.FromResult<object>( new { error = "Invalid GUID" } );
+
+		var go = scene.Directory.FindByGuid( guid );
+		if ( go == null )
+			return Task.FromResult<object>( new { error = $"GameObject not found: {id}" } );
+
+		var renderer = go.GetComponent<ModelRenderer>();
+		if ( renderer == null )
+			return Task.FromResult<object>( new { error = "No ModelRenderer on GameObject" } );
+
+		var propertyName = p.GetProperty( "property" ).GetString();
+		var value        = p.GetProperty( "value" );
+
+		try
+		{
+			// Ensure we have a mutable material override
+			var mat = renderer.MaterialOverride;
+			if ( mat == null )
+				return Task.FromResult<object>( new { error = "No MaterialOverride set — assign a material first via assign_material" } );
+
+			// Apply the property based on the JSON value kind
+			switch ( value.ValueKind )
+			{
+				case JsonValueKind.Number:
+					mat.Set( propertyName, value.GetSingle() );
+					break;
+				case JsonValueKind.True:
+				case JsonValueKind.False:
+					mat.Set( propertyName, value.GetBoolean() ? 1f : 0f );
+					break;
+				case JsonValueKind.Object:
+					// Try to interpret as Color (r,g,b,a) or Vector3 (x,y,z)
+					if ( value.TryGetProperty( "r", out var cr ) )
+					{
+						float r = cr.GetSingle();
+						float g = value.TryGetProperty( "g", out var cg ) ? cg.GetSingle() : 0f;
+						float b = value.TryGetProperty( "b", out var cb ) ? cb.GetSingle() : 0f;
+						float a = value.TryGetProperty( "a", out var ca ) ? ca.GetSingle() : 1f;
+						mat.Set( propertyName, new Color( r, g, b, a ) );
+					}
+					else
+					{
+						float x = value.TryGetProperty( "x", out var vx ) ? vx.GetSingle() : 0f;
+						float y = value.TryGetProperty( "y", out var vy ) ? vy.GetSingle() : 0f;
+						float z = value.TryGetProperty( "z", out var vz ) ? vz.GetSingle() : 0f;
+						mat.Set( propertyName, new Vector3( x, y, z ) );
+					}
+					break;
+				default:
+					mat.Set( propertyName, value.GetString() );
+					break;
+			}
+
+			return Task.FromResult<object>( new { set = true, id, property = propertyName } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to set material property: {ex.Message}" } );
+		}
+	}
+}
+
+public class AddScreenPanelHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var scene = SceneEditorSession.Active?.Scene;
+		if ( scene == null )
+			return Task.FromResult<object>( new { error = "No active scene" } );
+
+		var name   = p.TryGetProperty( "name",   out var n  ) ? n.GetString()  : "Screen Panel";
+		var zIndex = p.TryGetProperty( "zIndex", out var zi ) ? zi.GetInt32()  : 0;
+
+		// Resolve optional parent
+		GameObject parentGo = null;
+		if ( p.TryGetProperty( "parent", out var par ) && Guid.TryParse( par.GetString(), out var parGuid ) )
+			parentGo = scene.Directory.FindByGuid( parGuid );
+
+		try
+		{
+			var go = scene.CreateObject( true );
+			go.Name = name;
+
+			if ( parentGo != null )
+				go.SetParent( parentGo, false );
+
+			var panel = go.AddComponent<ScreenPanel>();
+			panel.ZIndex = zIndex;
+
+			// Optionally add a named panel component type
+			if ( p.TryGetProperty( "panelComponent", out var pc ) )
+			{
+				var typeName = pc.GetString();
+				if ( !string.IsNullOrEmpty( typeName ) )
+				{
+					var typeDesc = Game.TypeLibrary.GetType( typeName );
+					if ( typeDesc != null )
+						go.Components.Create( typeDesc );
+				}
+			}
+
+			return Task.FromResult<object>( new { created = true, gameObject = ClaudeBridge.SerializeGo( go ) } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to add ScreenPanel: {ex.Message}" } );
+		}
+	}
+}
+
+public class AddWorldPanelHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var scene = SceneEditorSession.Active?.Scene;
+		if ( scene == null )
+			return Task.FromResult<object>( new { error = "No active scene" } );
+
+		var name          = p.TryGetProperty( "name",          out var n   ) ? n.GetString()    : "World Panel";
+		var lookAtCamera  = p.TryGetProperty( "lookAtCamera",  out var lac ) && lac.GetBoolean();
+
+		// Resolve optional parent
+		GameObject parentGo = null;
+		if ( p.TryGetProperty( "parent", out var par ) && Guid.TryParse( par.GetString(), out var parGuid ) )
+			parentGo = scene.Directory.FindByGuid( parGuid );
+
+		try
+		{
+			var go = scene.CreateObject( true );
+			go.Name = name;
+
+			if ( parentGo != null )
+				go.SetParent( parentGo, false );
+
+			if ( p.TryGetProperty( "position", out var pos ) )
+				go.WorldPosition = ClaudeBridge.ParseVector3( pos );
+
+			if ( p.TryGetProperty( "rotation", out var rot ) )
+				go.WorldRotation = ClaudeBridge.ParseRotation( rot );
+
+			if ( p.TryGetProperty( "worldScale", out var ws ) )
+				go.WorldScale = ClaudeBridge.ParseVector3( ws );
+
+			var panel = go.AddComponent<WorldPanel>();
+			panel.LookAtCamera = lookAtCamera;
+
+			// Optionally add a named panel component type
+			if ( p.TryGetProperty( "panelComponent", out var pc ) )
+			{
+				var typeName = pc.GetString();
+				if ( !string.IsNullOrEmpty( typeName ) )
+				{
+					var typeDesc = Game.TypeLibrary.GetType( typeName );
+					if ( typeDesc != null )
+						go.Components.Create( typeDesc );
+				}
+			}
+
+			return Task.FromResult<object>( new { created = true, gameObject = ClaudeBridge.SerializeGo( go ) } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to add WorldPanel: {ex.Message}" } );
+		}
+	}
+}
+
+public class UndoHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		try
+		{
+			SceneEditorSession.Active?.UndoSystem?.Undo();
+			return Task.FromResult<object>( new { undone = true } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Undo failed: {ex.Message}" } );
+		}
+	}
+}
+
+public class RedoHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		try
+		{
+			SceneEditorSession.Active?.UndoSystem?.Redo();
+			return Task.FromResult<object>( new { redone = true } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Redo failed: {ex.Message}" } );
+		}
+	}
+}
+
+public class AddNetworkHelperHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var scene = SceneEditorSession.Active?.Scene;
+		if ( scene == null )
+			return Task.FromResult<object>( new { error = "No active scene" } );
+
+		var id = p.GetProperty( "id" ).GetString();
+		if ( !Guid.TryParse( id, out var guid ) )
+			return Task.FromResult<object>( new { error = "Invalid GUID" } );
+
+		var go = scene.Directory.FindByGuid( guid );
+		if ( go == null )
+			return Task.FromResult<object>( new { error = $"GameObject not found: {id}" } );
+
+		var name = p.TryGetProperty( "name", out var n ) ? n.GetString() : null;
+		if ( name != null ) go.Name = name;
+
+		try
+		{
+			var helper = go.GetOrAddComponent<NetworkHelper>();
+			helper.StartServer = true;
+
+			return Task.FromResult<object>( new { added = true, id, component = "NetworkHelper" } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to add NetworkHelper: {ex.Message}" } );
+		}
+	}
+}
+
+public class ConfigureNetworkHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		try
+		{
+			// Networking.MaxPlayers is read-only — set via lobby config
+			if ( p.TryGetProperty( "lobbyName",   out var ln ) ) Networking.ServerName  = ln.GetString();
+
+			return Task.FromResult<object>( new
+			{
+				configured   = true,
+				maxPlayers   = Networking.MaxPlayers,
+				serverName   = Networking.ServerName
+			} );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to configure network: {ex.Message}" } );
+		}
+	}
+}
+
+public class GetNetworkStatusHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		try
+		{
+			return Task.FromResult<object>( new
+			{
+				isActive      = Networking.IsActive,
+				isHost        = Networking.IsHost,
+				isClient      = Networking.IsClient,
+				isConnecting  = Networking.IsConnecting,
+				maxPlayers    = Networking.MaxPlayers,
+				serverName    = Networking.ServerName
+			} );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to get network status: {ex.Message}" } );
+		}
+	}
+}
+
+public class SetOwnershipHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var scene = SceneEditorSession.Active?.Scene;
+		if ( scene == null )
+			return Task.FromResult<object>( new { error = "No active scene" } );
+
+		var id = p.GetProperty( "id" ).GetString();
+		if ( !Guid.TryParse( id, out var guid ) )
+			return Task.FromResult<object>( new { error = "Invalid GUID" } );
+
+		var go = scene.Directory.FindByGuid( guid );
+		if ( go == null )
+			return Task.FromResult<object>( new { error = $"GameObject not found: {id}" } );
+
+		var connectionId = p.TryGetProperty( "connectionId", out var cid ) ? cid.GetString() : null;
+
+		try
+		{
+			if ( string.IsNullOrEmpty( connectionId ) )
+			{
+				go.Network.DropOwnership();
+				return Task.FromResult<object>( new { ownershipDropped = true, id } );
+			}
+			else
+			{
+				// Find connection by steam ID or display name
+				var conn = Connection.All.FirstOrDefault( c =>
+					c.SteamId.ToString() == connectionId ||
+					c.Id.ToString()      == connectionId );
+
+				if ( conn == null )
+					return Task.FromResult<object>( new { error = $"Connection not found: {connectionId}" } );
+
+				go.Network.AssignOwnership( conn );
+				return Task.FromResult<object>( new { ownershipAssigned = true, id, connectionId } );
+			}
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to set ownership: {ex.Message}" } );
+		}
+	}
+}
+
+public class GetPackageDetailsHandler : IBridgeHandler
+{
+	public async Task<object> Execute( JsonElement p )
+	{
+		var ident = p.GetProperty( "ident" ).GetString();
+
+		try
+		{
+			var pkg = await Package.FetchAsync( ident, false );
+			if ( pkg == null )
+				return new { error = $"Package not found: {ident}" };
+
+			return new
+			{
+				fullIdent   = pkg.FullIdent,
+				title       = pkg.Title,
+				summary     = pkg.Summary,
+				description = pkg.Description,
+				org         = pkg.Org
+			};
+		}
+		catch ( Exception ex )
+		{
+			return new { error = $"Failed to fetch package: {ex.Message}" };
+		}
+	}
+}
+
+public class InstallAssetHandler : IBridgeHandler
+{
+	public async Task<object> Execute( JsonElement p )
+	{
+		var ident = p.GetProperty( "ident" ).GetString();
+
+		try
+		{
+			var asset = await AssetSystem.InstallAsync( ident, true );
+			if ( asset == null )
+				return new { error = $"Failed to install asset: {ident}" };
+
+			return new
+			{
+				installed     = true,
+				ident,
+				name          = asset.Name,
+				path          = asset.Path,
+				relativePath  = asset.RelativePath
+			};
+		}
+		catch ( Exception ex )
+		{
+			return new { error = $"Failed to install asset: {ex.Message}" };
+		}
+	}
+}
+
+public class ListAssetLibraryHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var query      = p.TryGetProperty( "query",      out var q  ) ? q.GetString()  : null;
+		var typeFilter = p.TryGetProperty( "type",       out var tf ) ? tf.GetString() : null;
+		var maxResults = p.TryGetProperty( "maxResults", out var mr ) ? mr.GetInt32()  : 200;
+
+		try
+		{
+			var assets = AssetSystem.All
+				.Where( a => query == null || a.Name.Contains( query, StringComparison.OrdinalIgnoreCase ) )
+				.Where( a => typeFilter == null || a.AssetType?.ToString().Contains( typeFilter, StringComparison.OrdinalIgnoreCase ) == true )
+				.Take( maxResults )
+				.Select( a => new
+				{
+					name         = a.Name,
+					path         = a.Path,
+					relativePath = a.RelativePath,
+					assetType    = a.AssetType?.ToString()
+				} )
+				.ToArray();
+
+			return Task.FromResult<object>( new { count = assets.Length, assets } );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to list asset library: {ex.Message}" } );
+		}
+	}
+}
+
+public class TakeScreenshotHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		var path = p.TryGetProperty( "path", out var pt ) ? pt.GetString() : null;
+
+		try
+		{
+			EditorScene.TakeHighResScreenshot( 1920, 1080 );
+			return Task.FromResult<object>( new
+			{
+				taken = true,
+				note  = "Screenshot taken via EditorScene.TakeHighResScreenshot(1920, 1080)",
+				path  = path ?? "<default editor location>"
+			} );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Failed to take screenshot: {ex.Message}" } );
+		}
+	}
+}
+
+public class TriggerHotloadHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+	{
+		return Task.FromResult<object>( new
+		{
+			message = "Hotload is automatic in s&box when files change. Save a .cs file to trigger recompilation.",
+			note    = "No manual hotload API is available. Modify a script file to trigger a hotload."
+		} );
 	}
 }
 
