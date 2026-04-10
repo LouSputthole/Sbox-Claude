@@ -119,6 +119,8 @@ Built by [sboxskins.gg](https://sboxskins.gg) — the s&box community marketplac
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+**GPL-3.0** — see [LICENSE](LICENSE) for details.
 
-Attribution: This project was created by [sboxskins.gg](https://sboxskins.gg). If you use this in your project, please include a link back to https://sboxskins.gg.
+This means you can freely use Claude Bridge in your s&box games (free or commercial). You can modify it for your own use. But if you redistribute a modified version of the bridge itself, you must keep it open source under GPL-3.0 and credit sboxskins.gg.
+
+Copyright (c) 2026 [sboxskins.gg](https://sboxskins.gg)
