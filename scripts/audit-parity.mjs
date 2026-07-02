@@ -9,7 +9,9 @@
  *      (allowlist: "get_bridge_status" — special-cased in dispatcher, not via Register).
  *   4. Every C# handler is referenced by at least one bridge.send().
  *   5. Version lock: package.json, plugin.json, BridgeVersion const, CHANGELOG.md
- *      first "## [X.Y.Z]" heading must all match.
+ *      first "## [X.Y.Z]" heading, marketplace.json plugins[0].version, and the
+ *      plugin .mcp.json npm pin must all match. (marketplace.json drifted to
+ *      v1.16.0 unnoticed for two releases before it joined this set.)
  *
  * Exit 0 on full pass, exit 1 on any failure.
  * Zero npm dependencies — Node built-ins only.
@@ -30,6 +32,8 @@ const CS_FILE        = join(ROOT, "sbox-bridge-addon", "Editor", "MyEditorMenu.c
 const PKG_JSON       = join(ROOT, "sbox-mcp-server", "package.json");
 const PLUGIN_JSON    = join(ROOT, "plugins", "sbox-claude", ".claude-plugin", "plugin.json");
 const CHANGELOG_MD   = join(ROOT, "CHANGELOG.md");
+const MARKETPLACE_JSON = join(ROOT, ".claude-plugin", "marketplace.json");
+const MCP_JSON       = join(ROOT, "plugins", "sbox-claude", ".mcp.json");
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,6 +98,13 @@ const bridgeVersion   = bridgeVerMatch ? bridgeVerMatch[1] : null;
 const changelogMatch  = /^##\s*\[([^\]]+)\]/m.exec(readFile(CHANGELOG_MD));
 const changelogVersion = changelogMatch ? changelogMatch[1] : null;
 
+// marketplace.json plugins[0].version
+const marketplaceVersion = JSON.parse(readFile(MARKETPLACE_JSON)).plugins?.[0]?.version ?? null;
+
+// .mcp.json npm pin: "sbox-mcp-server@X.Y.Z"
+const mcpPinMatch = /sbox-mcp-server@([\d.]+)/.exec(readFile(MCP_JSON));
+const mcpPinVersion = mcpPinMatch ? mcpPinMatch[1] : null;
+
 // ---------------------------------------------------------------------------
 // 4. Run checks, collect failures
 // ---------------------------------------------------------------------------
@@ -136,14 +147,16 @@ if (unsentHandlers.length > 0) {
 
 // 4e. Version lock
 const versions = {
-  "package.json":  pkgVersion,
-  "plugin.json":   pluginVersion,
-  "BridgeVersion": bridgeVersion,
-  "CHANGELOG.md":  changelogVersion,
+  "package.json":     pkgVersion,
+  "plugin.json":      pluginVersion,
+  "BridgeVersion":    bridgeVersion,
+  "CHANGELOG.md":     changelogVersion,
+  "marketplace.json": marketplaceVersion,
+  ".mcp.json pin":    mcpPinVersion,
 };
 const versionValues = Object.values(versions).filter(Boolean);
 const allSame = versionValues.every(v => v === versionValues[0]);
-if (!allSame || versionValues.length < 4) {
+if (!allSame || versionValues.length < 6) {
   const detail = Object.entries(versions)
     .map(([k, v]) => `${k}=${v ?? "(not found)"}`)
     .join(", ");
@@ -155,7 +168,7 @@ if (!allSame || versionValues.length < 4) {
 // ---------------------------------------------------------------------------
 // Compute orphan count: sends unmatched (excluding allowlist) + handlers unsent
 const orphanCount = unmatchedSends.length + unsentHandlers.length;
-const alignedVersion = allSame && versionValues.length === 4 ? versionValues[0] : "MISMATCH";
+const alignedVersion = allSame && versionValues.length === 6 ? versionValues[0] : "MISMATCH";
 
 if (failures.length > 0) {
   console.error("FAIL — parity audit found issues:");

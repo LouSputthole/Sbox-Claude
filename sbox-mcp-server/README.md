@@ -1,6 +1,6 @@
 # sbox-mcp-server
 
-MCP Server for the s&box game engine. Lets Claude Code build s&box games through conversation — **170+ tools** for scenes, scripts, GameObjects, components, assets, materials, audio, physics, UI, networking, publishing, world-gen, lighting & atmosphere, characters, scene layout, navmesh & spatial queries, particles, animation, NPC brains, playable-game scaffolds, networking & scene inspection/lint, save & services queries, self-diagnosis, console/C# execution, live docs search, and type discovery.
+MCP Server for the s&box game engine. Lets Claude Code build s&box games through conversation — **200+ tools** for scenes, scripts, GameObjects, components, assets, materials, audio, physics, UI, networking, publishing, world-gen, lighting & atmosphere, characters, lipsync, scene layout, navmesh & spatial queries, particles, animation, NPC brains, playable-game scaffolds, gameplay playtesting, networking & scene inspection/lint, save & services queries, self-diagnosis, console/C# execution, live docs search, and type discovery.
 
 ## Fastest install — the Claude Code plugin
 
@@ -54,9 +54,9 @@ Claude Code → (stdio) → sbox-mcp-server → (file IPC) → bridge addon → 
 
 Communication uses file-based IPC through `%TEMP%/sbox-bridge-ipc/`. The MCP server writes request JSON files, the bridge addon (running inside s&box) polls and processes on the main editor thread, then writes response files back. WebSocket is not used — s&box's sandboxed C# environment blocks `System.Net`.
 
-## Tools (v1.9.0)
+## Tools
 
-`get_bridge_status` reports the `handlerCount` — that's the C# handlers compiled inside the editor. Six tools run **MCP-server-side** and need no editor handler: `read_log`, `get_compile_errors`, `execute_csharp`, `search_docs`, `get_doc_page`, `list_doc_categories`. They read the log / hotload-eval / fetch docs directly, so they keep working even when the editor has crashed or stalled.
+`get_bridge_status` reports the `handlerCount` — that's the C# handlers compiled inside the editor. A handful of tools run **MCP-server-side** and need no editor handler (`read_log`, `get_compile_errors`, `execute_csharp`, `search_docs`, `get_doc_page`, `list_doc_categories`, `run_self_test`, `screenshot_orbit`). They read the log / hotload-eval / fetch docs / orchestrate other tools directly, so most keep working even when the editor has crashed or stalled.
 
 | Category | Tools |
 |----------|-------|
@@ -100,6 +100,16 @@ Communication uses file-based IPC through `%TEMP%/sbox-bridge-ipc/`. The MCP ser
 | **Object utilities** *(v1.5.0)* | remove_component, get_tags |
 | **Docs search** *(v1.5.0, MCP-server-side)* | search_docs, get_doc_page, list_doc_categories — official `Facepunch/sbox-docs` |
 | **Inspection & validation** *(v1.9.0)* | inspect_networked_object (per-object `Network.*` + every component's `[Sync]` fields/values), networking_lint (static scan for `[Sync]`/RPC footguns), scene_validate (no-camera / stray root Rigidbody / trigger-vs-trace), save_inspect (list/read/diff `FileSystem.Data` saves), services_query (`Sandbox.Services` stats + leaderboards), simulate_input (drive named input actions in play mode) |
+| **Editor & self-test** *(v1.5.1–v1.7)* | restart_editor (self-restart + reconnect — closes the C#-edit loop), list_libraries, recompile_asset, run_self_test (8-check end-to-end health gate), capture_view (**renders the RUNNING play scene** from any camera — the play-mode eyes) |
+| **Animation & verification** *(v1.6.0)* | list_animations, play_animation, set_animgraph_param, get_bounds, screenshot_orbit (multi-angle orbit shots of any object) |
+| **Call & input** *(v1.10.0)* | invoke_method (call a component method **with args**), ensure_input_action (add a `.sbproj` input action), drive_player / drive_player_status (play-mode input driver) |
+| **Gameplay scaffolds** *(v1.7–v1.13)* | set_component_reference, add_component_to_new_object, create_objective_system, create_health_system, create_pickup, create_trigger_zone, create_economy_wallet, create_round_phase_machine, create_day_night_clock, create_interactable, create_weighted_loot_table, create_save_system, create_leaderboard_panel, create_inventory, create_stat_modifier_system, create_placement_mode |
+| **NPC brains** *(v1.7.0)* | create_npc_brain (FSM: Idle/Patrol/Wander/Chase/Search/Flee/Ambush + FOV/LOS/hearing), place_patrol_route, assign_patrol_route, create_npc_spawner, simulate_npc_perception |
+| **Lints & asset utils** *(v1.12.0)* | sandbox_lint (whitelist pre-compile scan), razor_lint (Razor/SCSS transpiler footguns), copy_asset_with_dependencies (asset + full dependency closure) |
+| **Meta & debug-draw** *(v1.14–v1.15)* | set_time_scale (pause/slow-mo/fast-forward), get_profiler_stats (FPS/frame/GPU/allocations), debug_draw_line/ray/box/sphere, debug_clear |
+| **Playtest harness** *(v1.17)* | playtest (scripted gameplay loop in PLAY MODE with **in-frame assertions** — move/look/action/jump/set/wait/capture/assert), playtest_status |
+| **Lipsync** *(v1.18.0)* | add_lipsync — wires `Sandbox.LipSync` (new in the 2026-07-01 engine update) to a citizen/model: `SkinnedModelRenderer` + a `SoundPointComponent` bound to a `.sound` path, facial morphs animating while the sound plays |
+| **Gameplay scaffolds** *(v1.18.0)* | create_round_state_machine (multi-state round manager + abstract `RoundState` lifecycle base, host-authoritative with late-joiner reconcile), add_interaction_station (one-occupant `IPressable` station, host-routed claims, reservation grace window, level gate), create_event_director (weighted-interval pacing/AI director, dedupe, `MaxActive` cap, timed self-destruct), create_save_slots (multi-slot save manager, versioned, optional GUID scene reconciliation — companion to create_save_system) |
 
 ## Working with Claude effectively
 

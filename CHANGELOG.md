@@ -2,6 +2,29 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## [1.18.0] -- 2026-07-02
+
+**+5 tools -- same-week support for s&box's brand-new LipSync component, plus the four remaining Tier-1 community-demand scaffolds. 206 tools / 197 handlers (was 201/192). Additive -- no existing tool contract changed. All five live-verified (handlers compiled first try; every scaffold's generated code compile-verified in the game assembly + TypeLibrary-load-confirmed; add_lipsync wiring property-verified on a live citizen).**
+
+### Added -- new engine feature support
+
+- **`add_lipsync`** -- wire up `Sandbox.LipSync`, the component Facepunch shipped **2026-07-01** (the lipsync/viseme Sound Editor update): drives a `SkinnedModelRenderer`'s facial morphs from a playing sound. One call adds LipSync, wires the renderer (same GameObject or `rendererId`), and optionally binds audio -- an existing sound component, or a new `SoundPointComponent` loaded from a `.sound` path -- plus `morphScale` / `morphSmoothTime` tuning. Morphs animate at runtime while the sound plays (verify in play mode via `capture_view`). New `LipSyncHandlers.cs`; tool lives in `characters.ts`.
+
+### Added -- community-demand scaffolds (the Tier-1 backlog, complete)
+
+Mined demand from the 51-game corpus (`docs/TOOL_BACKLOG.md`); with these four, **every Tier-1 item has shipped**.
+
+- **`create_round_state_machine`** (5x demand -- the top ask) -- the full state-machine beyond `create_round_phase_machine`: a sealed manager singleton (`[Sync(SyncFlags.FromHost)] StateIndex`, index-wrap advancing, `CanEnter()` skip) driving an abstract `RoundState` base (Begin/Tick/OnTimeUp/Finish lifecycle, per-state `[Sync]` `TimeUntil`) plus N sealed named-state stubs that auto-attach on start. Transitions announce via a static event + `[Rpc.Broadcast]` mirror with per-index dedupe (never double-fires; `[Sync]` index is the late-joiner reconcile). New `RoundStateMachineHandlers.cs` + `roundstate.ts`.
+- **`add_interaction_station`** -- a one-occupant `IPressable` station (crafting bench / shop till / arcade cabinet): occupancy held as a `[Sync(FromHost)]` Guid (GameObjects aren't `[Sync]`-able), client `Press()` routed host-side via `[Rpc.Host]`, a reservation grace window (`TimeUntil`) for the last user, an optional unlock-level gate via a static `ResolveUserLevel` hook, and a static `OnStationOpened` event to open your overlay UI. New `InteractionStationHandlers.cs` + `stations.ts`.
+- **`create_event_director`** -- a generalized L4D-style pacing director: interval roll (host-only), cumulative-weight pick over `EventPrefabs` + parallel `Weights`, active-set dedupe, `MaxActive` cap, and a generated `*TimedEvent` companion so every spawned event self-destructs after `EventLifetime`. `RollInterval()` is the documented adaptive-pacing extension point. New `EventDirectorHandlers.cs` + `director.ts`.
+- **`create_save_slots`** -- the multi-slot companion to `create_save_system`: a `saveslots.json` manifest (per-slot Used/Name/SavedAtUnix/PlaytimeSeconds -- the slot-picker read) + per-slot payload files over `FileSystem.Data`, versioned POCO with delete-on-version-mismatch, and optional GUID scene reconciliation (`sceneReconciliation: true` -- tombstone destroyed objects, reposition survivors). New `SaveSlotsHandlers.cs` + `saveslots.ts`.
+
+### Docs
+
+- **`.claude-plugin/marketplace.json` brought current** -- it had drifted to v1.16.0 / stale counts (it sat outside the parity script's version-lock set).
+- Doc-hygiene sweep: `INSTALL.md` no longer claims the dock must stay open (static frame loop since v1.3.0) or hardcodes a stale handler count; `CLAUDE.md`'s contradictory v1.10.0 handler line removed; stale plan-status notes in `docs/plans/` marked shipped; count style unified on "200+".
+- **Engine-watch (researched this release, queued in `docs/TOOL_BACKLOG.md`):** Facepunch merged a **local loopback socket for multi-instance testing** (2026-07-02 -- not in the shipping build yet; a future bridge multiplayer-test harness), and the **MovieMaker/sequencer** system (`MoviePlayer` component, keyframe tooling) remains an uncovered tool-family candidate. Upstream reliability fixes relevant to existing tools: nested-prefab apply no longer wipes instances (#5232), painted-instance collision fixed (#5108), terrain binary data now survives copy/paste/undo (#5156), malformed-packet server-brick fixed (#5151).
+
 ## [1.17.1] -- 2026-06-25
 
 **Playtest-harness polish -- two additions to the `playtest` DSL (no new tools; still 201 tools / 192 handlers). Additive -- no existing contract changed.**

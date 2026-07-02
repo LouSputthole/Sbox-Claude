@@ -97,7 +97,7 @@ cd sbox-mcp-server && npm run build
 
 ## Tool Count in Docs
 
-The tool/handler count drifts every release, so don't hardcode it in docs. Keep the exact number only in CHANGELOG.md entries (per release) and via get_bridge_status (live); elsewhere say 150+ tools or describe it relatively. This avoids a repo-wide doc sweep whenever a tool is added.
+The tool/handler count drifts every release, so don't hardcode it in docs. Keep the exact number only in CHANGELOG.md entries (per release) and via get_bridge_status (live); elsewhere say 200+ tools or describe it relatively. This avoids a repo-wide doc sweep whenever a tool is added.
 
 ## File Path Security
 

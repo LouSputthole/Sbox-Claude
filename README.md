@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v1.17.1</strong> · <strong>201 tools</strong> · <strong>192 handlers</strong> · AGPL-3.0-or-later · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v1.18.0</strong> · <strong>206 tools</strong> · <strong>197 handlers</strong> · AGPL-3.0-or-later · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -52,7 +52,7 @@ Pick the path with the least resistance for you. **Every path needs both halves*
 
 ### A. Claude Code plugin — easiest
 
-The plugin registers the MCP server for you (pinned to `sbox-mcp-server@1.17.1`, fetched via `npx` on first use) and ships the workflow skills, the onboarding wizard, and the specialist agent.
+The plugin registers the MCP server for you (pinned to `sbox-mcp-server@1.18.0`, fetched via `npx` on first use) and ships the workflow skills, the onboarding wizard, and the specialist agent.
 
 1. **Add the marketplace + install the plugin** (in Claude Code):
    ```
@@ -176,7 +176,7 @@ For hacking on the bridge itself, or if you'd rather not use the Asset Library.
 | `list_sounds`, `create_sound_event`, `assign_sound`, `play_sound_preview` | Sound events and playback |
 
 ### Prefabs & templates
-`create_prefab`, `instantiate_prefab`, `list_prefabs`, `get_prefab_info` for prefabs; `create_player_controller`, `create_npc_controller`, `create_game_manager`, `create_trigger_zone` for ready-made gameplay scaffolds.
+`create_prefab`, `instantiate_prefab`, `list_prefabs`, `get_prefab_info` for prefabs; `create_player_controller`, `create_npc_controller`, `create_game_manager`, `create_trigger_zone`, `create_round_state_machine`, `add_interaction_station`, `create_event_director`, `create_save_slots` *(v1.18.0)* for ready-made gameplay scaffolds.
 
 ### Lighting & atmosphere
 | Tool | Does |
@@ -192,6 +192,7 @@ For hacking on the bridge itself, or if you'd rather not use the Asset Library.
 | `spawn_model`, `spawn_citizen` | Any model (with tint); an animated Citizen that idles in-editor |
 | `dress_citizen`, `set_bodygroup`, `equip_model`, `set_expression` | Clothing, bodygroups, attached props, facial morphs |
 | `pose_citizen`, `set_look_at`, `add_ragdoll` | Hold/move/sit/crouch poses, gaze tracking, ragdoll physics |
+| `add_lipsync` *(v1.18.0)* | Wire `Sandbox.LipSync` to a citizen/model — `SkinnedModelRenderer` + a `SoundPointComponent` bound to a `.sound` path; facial morphs animate while the sound plays |
 
 ### Scene layout & environment
 | Tool | Does |
@@ -264,7 +265,7 @@ For hacking on the bridge itself, or if you'd rather not use the Asset Library.
 
 | Piece | What it is |
 |---|---|
-| **MCP server config** | `.mcp.json` pins `sbox-mcp-server@1.17.1` and fetches it via `npx -y` on first use — no manual registration, no version drift |
+| **MCP server config** | `.mcp.json` pins `sbox-mcp-server@1.18.0` and fetches it via `npx -y` on first use — no manual registration, no version drift |
 | **Skill: `sbox-build-feature`** | The screenshot-driven build workflow: confirm the bridge is alive → brainstorm non-trivial features → research the API with `describe_type` → bite-sized edits → hotload + scan the log → **screenshot and read it yourself**. Plus a table of s&box gotchas (`MathF` doesn't exist in the sandbox; Cloud assets aren't persistent; Citizen bone names are case-sensitive; `CitizenAnimationHelper.IkRightHand` drives IK at runtime; `Color` properties want `"r, g, b, a"` strings; etc.) |
 | **Skill: `sbox-api`** | Schema-grounded s&box API knowledge — the Unity→s&box translation table, the Ten Rules, and curated component/UI/networking/physics references, so Claude stops hallucinating Unity patterns |
 | **Skill: `sbox-cookbook`** *(v1.9.0)* | A master **router** indexing code-grounded recipes mined from **27 current (2026) open-source s&box games** plus the modern engine repos. Its `references/` hold **11 engine** references (networking-authority, architecture, components-lifecycle, player-controller, ui-razor, combat-weapons, input-interaction, physics-traces-movement, worldgen-rendering, performance-threading, data-assets), **15 systems** (inventory, economy-currency, shop-vendor, save-persistence, progression-upgrades, gacha-loot, leaderboards-services, idle-offline, building-placement, crafting, dialogue, round-match, spawning-waves, anti-cheat, level-design), and **14 genre recipes** (tycoon-idle, shopkeeper, document-sim, roleplay, sandbox-voxel, social-hub, platformer-obstacle, deathmatch-arena, card-battler, survival-horror, gacha-crawler, puzzle, vehicles, party-microgame). Ask "how do I build a tycoon / an inventory / a save system?" and it routes you to a grounded how-to |

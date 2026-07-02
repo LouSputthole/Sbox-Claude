@@ -351,4 +351,34 @@ export function registerCharacterTools(
       };
     }
   );
+
+  // ── add_lipsync ────────────────────────────────────────────────────
+  server.tool(
+    "add_lipsync",
+    "Add + wire s&box's LipSync component (new in the 2026-07 engine update): drives a SkinnedModelRenderer's facial morphs (visemes) from a playing sound. Wires the renderer on the target GameObject (or rendererId) and, if soundEvent is given, a SoundPointComponent bound to that .sound asset (see list_sounds / create_sound_event). Morphs animate at RUNTIME while the sound plays — verify in play mode with capture_view, not the static editor pose.",
+    {
+      id: z.string().describe("GUID of the GameObject to add LipSync to (e.g. a spawn_citizen)"),
+      rendererId: z
+        .string()
+        .optional()
+        .describe("GUID of a different GameObject holding the SkinnedModelRenderer (default: same as id)"),
+      soundEvent: z
+        .string()
+        .optional()
+        .describe("Path to a .sound event to speak, e.g. 'sounds/dialogue/hello.sound' — creates/reuses a SoundPointComponent. Omit to wire an existing sound component on the GameObject (or wire audio later)."),
+      playOnStart: z.boolean().optional().describe("Play the sound on scene start (default true; only with soundEvent)"),
+      volume: z.number().optional().describe("SoundPointComponent volume (only with soundEvent)"),
+      morphScale: z.number().optional().describe("LipSync.MorphScale — exaggerate/dampen mouth movement (engine default when omitted)"),
+      morphSmoothTime: z.number().optional().describe("LipSync.MorphSmoothTime — morph smoothing seconds (engine default when omitted)"),
+    },
+    async (params) => {
+      const res = await bridge.send("add_lipsync", params);
+      if (!res.success) {
+        return { content: [{ type: "text", text: `Error: ${res.error}` }] };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }],
+      };
+    }
+  );
 }

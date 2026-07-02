@@ -1,7 +1,7 @@
 # Claude Bridge for s&box
 ### Build s&box games by talking to Claude — or any AI.
 
-**200+ tools · 192 handlers** that let an AI work *inside* your s&box editor — writing scripts, creating GameObjects, wiring components, and building whole systems: physics, networking, UI, lighting, characters, terrain, and more. You describe what you want; Claude builds it, screenshots it, and fixes it.
+**200+ tools · 197 handlers** that let an AI work *inside* your s&box editor — writing scripts, creating GameObjects, wiring components, and building whole systems: physics, networking, UI, lighting, characters, terrain, and more. You describe what you want; Claude builds it, screenshots it, and fixes it.
 
 But the tools aren't the real story. **The bridge ships a brain.** The companion plugin now bundles `sbox-cookbook` — a deep, code-grounded knowledge base of how to actually build games in s&box, mined from **real, shipped, open-source s&box games** and the modern engine source. So the AI reaches for *proven, shipped patterns* — real inventories, economies, save systems, shops, gacha, progression, multiplayer netcode, whole genre playbooks — instead of guessing.
 
@@ -116,7 +116,7 @@ Once it's installed and the bridge is connected, you just **talk to Claude in yo
 
 ---
 
-## What it can do (200+ tools · 192 handlers)
+## What it can do (200+ tools · 197 handlers)
 
 **Scene & GameObjects** — create, clone, transform, parent, delete; full hierarchy access + editor selection; find objects by name, component, or tag.
 
@@ -155,6 +155,14 @@ Once it's installed and the bridge is connected, you just **talk to Claude in yo
 ---
 
 ## What's new
+
+### v1.18 — same-week LipSync support + the 4 remaining Tier-1 community scaffolds
+- **`add_lipsync`** — wires s&box's brand-new `Sandbox.LipSync` component (2026-07-01 engine update) to a citizen/model: `SkinnedModelRenderer` + a `SoundPointComponent` bound to a `.sound` path, facial morphs animating while the sound plays.
+- **`create_round_state_machine`** (top corpus demand, 5×) — the full multi-state round system: manager + abstract `RoundState` lifecycle base + named state stubs, `CanEnter()` skip, host-authoritative with late-joiner reconcile.
+- **`add_interaction_station`** — one-occupant `IPressable` station: host-routed claims, reservation grace window, level gate, overlay-open event.
+- **`create_event_director`** — generalized L4D-style pacing/AI director: weighted interval spawns, dedupe, `MaxActive` cap, timed self-destruct.
+- **`create_save_slots`** — multi-slot save manager (companion to `create_save_system`): slot-picker manifest + per-slot payloads, versioned, optional GUID scene reconciliation.
+- **Tier-1 of the mined backlog is now complete.**
 
 ### v1.17 — gameplay verification
 - **`playtest` / `playtest_status`** — run a scripted gameplay loop in play mode (move / look / action / jump / set / wait / capture / assert) and get a pass/fail transcript. Assertions evaluate *in-frame*, so transient state — a jump's airborne frame — is catchable; a `Displacement` read gives a clean facing-independent movement proof, and a `capture` step screenshots the live player POV mid-loop. The first tool that verifies a *playable loop*, not just a static scene. Dogfooded live on Gravehold.
@@ -282,7 +290,7 @@ The MCP server writes request JSON; the addon polls, runs each command on the ed
 
 ## Full tool list
 
-Every tool the bridge exposes, grouped by area (192 editor handlers + a handful of MCP-server-side tools that work even when the editor is down):
+Every tool the bridge exposes, grouped by area (197 editor handlers + a handful of MCP-server-side tools that work even when the editor is down):
 
 **Project, files & scripts (9)** — `get_project_info`, `list_project_files`, `read_file`, `write_file`, `recompile_asset`, `create_script`, `edit_script`, `delete_script`, `trigger_hotload`
 
@@ -296,7 +304,7 @@ Every tool the bridge exposes, grouped by area (192 editor handlers + a handful 
 
 **Lighting, atmosphere & VFX (13)** — `add_light`, `set_fog`, `add_post_process`, `set_skybox`, `add_envmap_probe`, `bake_reflections`, `apply_atmosphere`, `apply_post_fx_look`, `spawn_particle`, `create_particle_effect`, `add_trail`, `add_beam`, `spawn_vpcf`
 
-**Characters & animation (12)** — `spawn_model`, `spawn_citizen`, `dress_citizen`, `set_bodygroup`, `pose_citizen`, `equip_model`, `set_look_at`, `add_ragdoll`, `set_expression`, `list_animations`, `play_animation`, `set_animgraph_param`
+**Characters & animation (13)** — `spawn_model`, `spawn_citizen`, `dress_citizen`, `set_bodygroup`, `pose_citizen`, `equip_model`, `set_look_at`, `add_ragdoll`, `set_expression`, `list_animations`, `play_animation`, `set_animgraph_param`, `add_lipsync`
 
 **Scene layout & environment (8)** — `snap_to_ground`, `align_objects`, `distribute_objects`, `grid_duplicate`, `measure_distance`, `scatter_props`, `randomize_transforms`, `group_objects`
 
@@ -332,7 +340,7 @@ Every tool the bridge exposes, grouped by area (192 editor handlers + a handful 
 
 **NPC AI (5)** — `create_npc_brain`, `place_patrol_route`, `assign_patrol_route`, `create_npc_spawner`, `simulate_npc_perception`
 
-**Gameplay scaffolds (15)** — `create_health_system`, `create_pickup`, `create_objective_system`, `add_component_to_new_object`, `set_component_reference`, `create_economy_wallet`, `create_round_phase_machine`, `create_day_night_clock`, `create_interactable`, `create_weighted_loot_table`, `create_save_system`, `create_leaderboard_panel`, `create_inventory`, `create_stat_modifier_system`, `create_placement_mode`
+**Gameplay scaffolds (19)** — `create_health_system`, `create_pickup`, `create_objective_system`, `add_component_to_new_object`, `set_component_reference`, `create_economy_wallet`, `create_round_phase_machine`, `create_day_night_clock`, `create_interactable`, `create_weighted_loot_table`, `create_save_system`, `create_leaderboard_panel`, `create_inventory`, `create_stat_modifier_system`, `create_placement_mode`, `create_round_state_machine`, `add_interaction_station`, `create_event_director`, `create_save_slots`
 
 **Publishing (5)** — `get_project_config`, `set_project_config`, `validate_project`, `set_project_thumbnail`, `get_package_details`
 
@@ -368,6 +376,6 @@ s&box current SDK · Node.js 18+ · Claude Code (or any MCP client) · Windows, 
 
 ---
 
-**Two pieces, zero ceremony. 200+ tools · 192 handlers + a brain trained on real shipped games. Describe your game — Claude builds it.**
+**Two pieces, zero ceremony. 200+ tools · 197 handlers + a brain trained on real shipped games. Describe your game — Claude builds it.**
 
 *Built by [sboxskins.gg](https://sboxskins.gg), the s&box community marketplace.*

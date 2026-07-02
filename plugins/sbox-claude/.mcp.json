@@ -2,7 +2,7 @@
   "mcpServers": {
     "sbox": {
       "command": "npx",
-      "args": ["-y", "sbox-mcp-server@1.17.1"]
+      "args": ["-y", "sbox-mcp-server@1.18.0"]
     }
   }
 }

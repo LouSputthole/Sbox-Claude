@@ -7,7 +7,7 @@ is a half-step. This wave makes the bridge **verify gameplay**.
 
 > Status: **SHIPPED in v1.17.0** (2026-06-25). Dogfooded live on Gravehold — a full
 > walk → assert-moved → jump → assert-airborne-in-frame → land loop verified PASS and
-> re-ran clean. Queued enhancements (a `capture` step, a displacement assert op) remain.
+> re-ran clean. The queued enhancements (a `capture` step, a `Displacement` assert read) SHIPPED in v1.17.1.
 
 ## What we proved live (the hard, uncertain parts)
 

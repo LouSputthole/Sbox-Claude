@@ -50,6 +50,10 @@ import { registerInputTools } from "./tools/inputs.js";
 import { registerDebugVizTools } from "./tools/debugviz.js";
 import { registerDebugDrawTools } from "./tools/debugdraw.js";
 import { registerPlaytestTools } from "./tools/playtest.js";
+import { registerRoundStateTools } from "./tools/roundstate.js";
+import { registerStationTools } from "./tools/stations.js";
+import { registerDirectorTools } from "./tools/director.js";
+import { registerSaveSlotsTools } from "./tools/saveslots.js";
 
 // ── CLI flags ──────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -215,6 +219,10 @@ registerInputTools(server, bridge);
 registerDebugVizTools(server, bridge);
 registerDebugDrawTools(server, bridge);
 registerPlaytestTools(server, bridge);
+registerRoundStateTools(server, bridge);
+registerStationTools(server, bridge);
+registerDirectorTools(server, bridge);
+registerSaveSlotsTools(server, bridge);
 
 /** Start the MCP server on stdio and attempt initial Bridge connection. */
 async function main(): Promise<void> {

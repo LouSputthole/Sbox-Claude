@@ -1,6 +1,6 @@
 {
   "name": "sbox-mcp-server",
-  "version": "1.17.1",
+  "version": "1.18.0",
   "description": "MCP Server for s&box game engine — enables Claude to build games through conversation",
   "type": "module",
   "main": "dist/index.js",

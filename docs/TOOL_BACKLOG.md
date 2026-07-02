@@ -21,8 +21,19 @@ The 51-game corpus mining (`sbox-lessons/mining-v2/`) surfaced **352 candidate b
 
 **10-tool plan COMPLETE -- 10/10 shipped (v1.12.0: 6, v1.13.0: 4).** See `docs/plans/2026-06-09-next-10-tools.md`.
 
-**Next up (Tier-1 leftovers + Tier 2):** `create_round_state_machine` full variant (5x demand, the complex multi-state version beyond the phase machine), `add_interaction_station` (IPressable prop + occupancy + level gate), `create_event_director` (prefab-discovery AI director), `create_save_slots` (multi-slot storage), then Tier-2 by theme below.
-**Queued:** everything else here, grouped by theme. Full raw list: `sbox-lessons/` mining output.
+**Built in v1.18.0 (2026-07-02), all verify-gated live -- handler count now 197. TIER 1 IS COMPLETE:**
+- `create_round_state_machine` (5x -- the top ask; manager + abstract RoundState lifecycle base + auto-attaching state stubs, CanEnter() skip, static-event + [Rpc.Broadcast] announce w/ late-joiner reconcile; compile-verified)
+- `add_interaction_station` ([Sync(FromHost)] Guid occupancy + [Rpc.Host] claim routing + grace window + ResolveUserLevel gate; compile-verified)
+- `create_event_director` (parallel-list EventPrefabs+Weights -- ISceneMetadata does NOT exist on this SDK; weighted roll + dedupe + MaxActive + *TimedEvent self-destruct companion; compile-verified)
+- `create_save_slots` (saveslots.json manifest + per-slot payloads -- no directory-listing API needed; versioned, optional GUID scene reconciliation; compile-verified)
+- Plus `add_lipsync` (not from this corpus -- same-week support for the engine's new `Sandbox.LipSync` component, shipped upstream 2026-07-01).
+
+**Next up:** Tier-2 by theme below, and the ENGINE-WATCH items:
+- **Loopback multi-instance networking harness** -- Facepunch merged a local loopback socket for multi-instance testing (upstream master 2026-07-02, NOT in the shipping build yet; `search_types "loopback"` returned 0 on 2026-07-02). When it ships: spawn N loopback clients, drive each via `drive_player`/`playtest`, assert sync -- the real multiplayer-test harness.
+- **MovieMaker / cutscene tool family** -- `Sandbox.MovieMaker` (MoviePlayer component, MovieResource, MovieRecorder) is entirely uncovered by the bridge and under active upstream development (keyframe split/join 2026-06-30). Candidates: `add_movie_player`, `play_movie`, maybe record-gameplay-to-clip.
+- **Offline lipsync generation** -- the Sound Editor now bakes visemes offline; if a public API surfaces (only `Editor.VisemeEditor.Visemes` visible now), a `generate_lipsync` tool could produce dialogue-ready audio from the bridge.
+
+**Queued:** everything else here, grouped by theme. Full raw list: `sbox-lessons/` mining output (local corpus at `D:\sbox-lessons`).
 
 Legend: **(Nx)** = independently proposed by N games · `easy`/`medium` = miner-estimated build risk.
 

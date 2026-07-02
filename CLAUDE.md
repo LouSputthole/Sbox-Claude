@@ -2,13 +2,24 @@
 
 > Let non-coders build s&box games through conversation with Claude Code.
 
-## Status: v1.17.1 -- 192 handlers / 201 tools (run `get_bridge_status` for the live tool/handler count)
+## Status: v1.18.0 -- 197 handlers / 206 tools (run `get_bridge_status` for the live tool/handler count)
 
-**Last updated:** 2026-06-25 (v1.17.1)
+**Last updated:** 2026-07-02 (v1.18.0)
 **Bridge:** File-based IPC ✅ working on main thread
 **Tools:** MCP `server.tool()` registrations across `sbox-mcp-server/src/tools/`
-**Handlers:** C# command handlers compiled and registered (verified via the live bridge) — **171 total** as of v1.10.0 (was 166)
+**Handlers:** C# command handlers compiled and registered — see the Status header above / `get_bridge_status` for the live count
 **Why the difference:** several tools are **MCP-server-side** and need no editor handler — `read_log`, `get_compile_errors`, `execute_csharp`, `search_docs`, `get_doc_page`, `list_doc_categories`, `run_self_test`. They read the log file / fetch docs / hotload-eval directly, so they work even when the editor has crashed or stalled.
+
+### What's new in v1.18.0
+
+**+5 tools — same-week LipSync support + the four remaining Tier-1 community scaffolds. 197 handlers / 206 tools (was 192/201).** Additive — no existing tool contract changed. All five live-verified.
+
+- **`add_lipsync`** — wires `Sandbox.LipSync` (NEW in the 2026-07-01 engine update): one call adds LipSync to a citizen/model, wires the `SkinnedModelRenderer` + a `SoundPointComponent` bound to a `.sound` path (or an existing sound component), with `morphScale`/`morphSmoothTime` tuning. Facial morphs animate at runtime while the sound plays — verify via `capture_view` in play mode.
+- **`create_round_state_machine`** (top corpus demand, 5×) — the full multi-state round system: manager singleton + abstract `RoundState` lifecycle base (Begin/Tick/OnTimeUp/Finish, per-state `[Sync]` `TimeUntil`) + named state stubs that auto-attach, `CanEnter()` skip, index-wrap, static-event + `[Rpc.Broadcast]` transition announce with late-joiner reconcile.
+- **`add_interaction_station`** — one-occupant `IPressable` station: `[Sync(FromHost)]` Guid occupancy, `[Rpc.Host]`-routed claims, reservation grace window, optional level gate (`ResolveUserLevel` hook), `OnStationOpened` overlay event.
+- **`create_event_director`** — generalized pacing/AI director: host-only interval roll, weighted pick over `EventPrefabs`+`Weights`, active-set dedupe, `MaxActive` cap, spawned events self-destruct via a generated `*TimedEvent` companion.
+- **`create_save_slots`** — multi-slot saves over `FileSystem.Data`: `saveslots.json` manifest (slot-picker metadata) + per-slot payloads, versioned with delete-on-mismatch, optional GUID scene reconciliation.
+- **Tier-1 of the mined backlog is now COMPLETE** — see `docs/TOOL_BACKLOG.md` for what's next (Tier-2 themes + engine-watch: the upstream loopback multi-instance socket and the MovieMaker system).
 
 ### What's new in v1.17.1
 

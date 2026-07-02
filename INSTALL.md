@@ -89,14 +89,14 @@ claude mcp add sbox -- npx sbox-mcp-server
 ## Verify it's working
 
 1. Start (or restart) s&box and load your project.
-2. **View → Claude Bridge** to open the dock. **The dock must stay visible** — the bridge's frame handler only fires while the dock is on-screen.
+2. **View → Claude Bridge** opens the dock (optional — the bridge's frame handler is static and runs whether or not the dock is open; the dock is just a status readout).
 3. In Claude Code, ask:
 
 ```
 "Check the bridge status."
 ```
 
-You should get back: `connected: true` and a non-zero `handlerCount` (**166** on the current **v1.9.0** addon). (That's the count of C# handlers inside the editor; the MCP server exposes a few more tools total — a handful, like `read_log` / `get_compile_errors` / the docs-search tools, run MCP-server-side and don't need an editor handler.) Then try:
+You should get back: `connected: true` and a non-zero `handlerCount` matching your addon version (`get_bridge_status` reports both and warns on drift). (That's the count of C# handlers inside the editor; the MCP server exposes a few more tools total — a handful, like `read_log` / `get_compile_errors` / the docs-search tools, run MCP-server-side and don't need an editor handler.) Then try:
 
 ```
 "What project is open in s&box?"

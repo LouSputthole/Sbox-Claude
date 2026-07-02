@@ -1,4 +1,4 @@
-# Genetics / Breeding (heritable, mutating procedural variation)
+﻿# Genetics / Breeding (heritable, mutating procedural variation)
 
 Cross two "parents" into a child that **inherits** their stats with controlled randomness, occasionally **mutates** a rare trait, carries a **generation** count that tightens variance over inbred lines, and earns a stable **hash identity** so a best-of registry can track unique strains. The canonical use is a cultivation/breeding tycoon, but the same machine fits any game where things have heritable variation: animal/monster breeding, roguelite item lineages, or a graveyard's haunting/contract/soul traits.
 
@@ -6,10 +6,10 @@ Cross two "parents" into a child that **inherits** their stats with controlled r
 
 Four parts, almost always shipped together:
 
-1. **An immutable genome** — a value struct holding the heritable numeric stats + a few categorical/visual traits. Immutable so a bred genome can't be edited after the fact (anti-cheat + clean equality).
-2. **A cross function** — `child = Cross(parentA, parentB)`: each stat is a Gaussian sample around the parents' mean; rare mutations fire; the child's generation is `max(parents)+1`.
-3. **A variance schedule** — variance shrinks as generation climbs (selfing/IBL "stabilizes" a line), so deep breeding converges and shallow crosses stay wild.
-4. **A hash identity + best-of registry** — a deterministic hash buckets genomes by lineage+mutation so the game can rank "the best Purple Wedding-Cake anyone has bred" without storing every individual.
+1. **An immutable genome** â€” a value struct holding the heritable numeric stats + a few categorical/visual traits. Immutable so a bred genome can't be edited after the fact (anti-cheat + clean equality).
+2. **A cross function** â€” `child = Cross(parentA, parentB)`: each stat is a Gaussian sample around the parents' mean; rare mutations fire; the child's generation is `max(parents)+1`.
+3. **A variance schedule** â€” variance shrinks as generation climbs (selfing/IBL "stabilizes" a line), so deep breeding converges and shallow crosses stay wild.
+4. **A hash identity + best-of registry** â€” a deterministic hash buckets genomes by lineage+mutation so the game can rank "the best Purple Wedding-Cake anyone has bred" without storing every individual.
 
 Reach for it whenever the *fun* is in combining and selecting variation over generations rather than buying a fixed catalog. If your variation is purely cosmetic and non-heritable, you want a simple weighted roll (`gacha-loot.md`), not this.
 
@@ -45,16 +45,16 @@ public struct StrainGenome : IEquatable<StrainGenome>
 
 Verified against klibatocorp.phenodex `Code/Cultivation/StrainGenome.cs` (struct + heritable fields `:15-63`, `CombinedScore` ranking `:60`, hash-based equality `:65-67`, and a library of `static` starter strains `:73+`). Keep starter strains as `static` factory methods so the shop has a known, stabilized (`IsStabilizedIbl = true`, `Generation = 0`) base set to breed from.
 
-### 2. The cross — Gaussian inheritance around the parents' mean
+### 2. The cross â€” Gaussian inheritance around the parents' mean
 
-Each child stat is a Gaussian draw centred on `(a + b) / 2` whose spread grows with how *far apart* the parents are (close parents → tight child; distant parents → wild child), then clamped to the trait's valid range. The child's generation is one past the deeper parent.
+Each child stat is a Gaussian draw centred on `(a + b) / 2` whose spread grows with how *far apart* the parents are (close parents â†’ tight child; distant parents â†’ wild child), then clamped to the trait's valid range. The child's generation is one past the deeper parent.
 
 ```csharp
 public static BreedingResult Cross( StrainGenome a, StrainGenome b )
 {
     var rng = Random.Shared;                                  // swap for a server seed to make it reproducible
     int childGen = Math.Max( a.Generation, b.Generation ) + 1;       // System.Math, not MathF (absent in sandbox)
-    float varianceMult = Math.Max( 0.20f, 1f - childGen * 0.10f );  // F1=100% … F8=30% … floor 20%
+    float varianceMult = Math.Max( 0.20f, 1f - childGen * 0.10f );  // F1=100% â€¦ F8=30% â€¦ floor 20%
 
     var child = new StrainGenome {
         ThcPercent     = Sample( rng, a.ThcPercent,     b.ThcPercent,     1f,  35f,   varianceMult ),
@@ -90,7 +90,7 @@ Verified against klibatocorp.phenodex `Code/Cultivation/Breeding.cs`: `childGen 
 
 ### 3. Hash identity + best-of registry
 
-The hash must bucket by what makes a strain *categorically* distinct (lineage + mutation + a couple of categoricals), NOT by the continuously-varying stats — otherwise every cross is a new bucket and the registry explodes. The varying stats instead feed the **best-of** comparison inside a bucket.
+The hash must bucket by what makes a strain *categorically* distinct (lineage + mutation + a couple of categoricals), NOT by the continuously-varying stats â€” otherwise every cross is a new bucket and the registry explodes. The varying stats instead feed the **best-of** comparison inside a bucket.
 
 ```csharp
 public static string ComputeGenomeHash( StrainGenome g ) =>
@@ -110,14 +110,14 @@ Verified against phenodex `Code/Cultivation/StrainGenome.cs` `ComputeGenomeHash`
 
 ## Notable variations
 
-- **Server-seeded reproducibility.** Swap `Random.Shared` for a host-owned seeded `Random` so a cross is deterministic and replayable across the network (and provably-fair if you commit-reveal the seed — see `anti-cheat.md`). phenodex notes this as the intended upgrade path (`Breeding.cs:20`).
+- **Server-seeded reproducibility.** Swap `Random.Shared` for a host-owned seeded `Random` so a cross is deterministic and replayable across the network (and provably-fair if you commit-reveal the seed â€” see `anti-cheat.md`). phenodex notes this as the intended upgrade path (`Breeding.cs:20`).
 - **Generation-driven stabilization as a goal.** The `varianceMult` shrink turns "stabilize my line to F8" into a real grind: early crosses are lottery, late selfing is precision. Surface `Generation`/`IsStabilizedIbl` in the UI so the player feels the convergence.
-- **Mutation as a separate bucket.** Because the hash includes `MutationType`, a rare Purple/Frosty/Foxtail phenotype lands in its *own* registry bucket — so "best Purple Gelato" and "best standard Gelato" are tracked separately. This is what makes rare mutations feel collectible.
-- **Map onto non-plant domains.** The exact machine fits monster/animal breeding (stats + rare colour morphs), roguelite gear lineages, or — for a graveyard tycoon — a haunting/soul "genome" where contracts inherit + mutate traits across generations. Only the stat names and ranges change.
+- **Mutation as a separate bucket.** Because the hash includes `MutationType`, a rare Purple/Frosty/Foxtail phenotype lands in its *own* registry bucket â€” so "best Purple Gelato" and "best standard Gelato" are tracked separately. This is what makes rare mutations feel collectible.
+- **Map onto non-plant domains.** The exact machine fits monster/animal breeding (stats + rare colour morphs), roguelite gear lineages, or â€” for a graveyard tycoon â€” a haunting/soul "genome" where contracts inherit + mutate traits across generations. Only the stat names and ranges change.
 
 ## Gotchas
 
-- **A `struct` genome is copied by value** — `Cross` returns a *new* genome; never mutate a parent in place. Good (immutability = anti-cheat), but watch for accidental copies in collections (box on interface casts).
+- **A `struct` genome is copied by value** â€” `Cross` returns a *new* genome; never mutate a parent in place. Good (immutability = anti-cheat), but watch for accidental copies in collections (box on interface casts).
 - **Hash on continuous stats explodes the registry.** Bucket by categoricals only; rank by a `CombinedScore`. Mixing the two is the #1 design error here.
 - **Clamp every sampled stat to its real range** or a wild Gaussian draw produces negative THC / 0-yield monsters. Each `Sample` carries explicit `min/max`.
 - **`Random.Shared` is non-deterministic and not host-authoritative.** Fine for a solo/cosmetic breed; for a competitive leaderboard, seed it server-side and validate the submitted genome on the host (don't trust a client-computed `CombinedScore`).
@@ -125,24 +125,24 @@ Verified against phenodex `Code/Cultivation/StrainGenome.cs` `ComputeGenomeHash`
 
 ## Seen in
 
-- **klibatocorp.phenodex** — `Code/Cultivation/StrainGenome.cs` (immutable genome + `CombinedScore` + hash bucket + starter library), `Breeding.cs` (Gaussian `Cross`, variance-by-generation, rare mutation), `BredStrainRegistry.cs` / `StrainLeaderboard.cs` (best-of-bucket), `ProceduralNamer.cs` (lineage names).
-- **thefancylads.farm_land** — `Code/Crop.cs` / `CropMutationRegistry.cs` (lighter "rare variant on harvest" mutation registry, no full genome) — the simpler cousin when you only need rare drops, not heritable lineages.
+- **klibatocorp.phenodex** â€” `Code/Cultivation/StrainGenome.cs` (immutable genome + `CombinedScore` + hash bucket + starter library), `Breeding.cs` (Gaussian `Cross`, variance-by-generation, rare mutation), `BredStrainRegistry.cs` / `StrainLeaderboard.cs` (best-of-bucket), `ProceduralNamer.cs` (lineage names).
+- **thefancylads.farm_land** â€” `Code/Crop.cs` / `CropMutationRegistry.cs` (lighter "rare variant on harvest" mutation registry, no full genome) â€” the simpler cousin when you only need rare drops, not heritable lineages.
 
-Open the cited file under `C:/Users/cargi/sbox-lessons/zips-code/<game>/` to read the real implementation.
+Open the cited file under `D:/sbox-lessons/zips-code/<game>/` to read the real implementation.
 
 ---
-**Verify live:** this system is plain C# (`struct`, `System.Random`, `HashCode.Combine`, `System.Math`) with almost no engine surface, so it's the most SDK-stable recipe here. The source uses **`System.Math`** (`Math.Max`/`Abs`/`Clamp`/`Sqrt`/`Log`/`Cos`) — note **`System.MathF` does NOT exist** in the s&box sandbox, so prefer `System.Math` or `MathX` for any extra helpers. Confirm `Color.Lerp` against the installed SDK (`describe_type Color`, `search_types MathX`). Reflection over memory.
+**Verify live:** this system is plain C# (`struct`, `System.Random`, `HashCode.Combine`, `System.Math`) with almost no engine surface, so it's the most SDK-stable recipe here. The source uses **`System.Math`** (`Math.Max`/`Abs`/`Clamp`/`Sqrt`/`Log`/`Cos`) â€” note **`System.MathF` does NOT exist** in the s&box sandbox, so prefer `System.Math` or `MathX` for any extra helpers. Confirm `Color.Lerp` against the installed SDK (`describe_type Color`, `search_types MathX`). Reflection over memory.
 
 **See also:** `progression-upgrades.md` (data-driven balance tables for the stat ranges), `gacha-loot.md` (weighted rolls when variation is non-heritable), and `anti-cheat.md` (seeded/provably-fair RNG + host-side validation of a submitted genome).
 
 ## Corpus refresh (2026): more reference implementations
 
-### thefancylads.farm_land — interface-based mutation registry with buff-scaled chance
+### thefancylads.farm_land â€” interface-based mutation registry with buff-scaled chance
 
 The existing "Seen in" entry for farm_land understates what's there. `Common/Farming/Mutations/` defines a full **open/closed mutation registry** built on an interface rather than an abstract class. Each mutation is a self-contained object that knows how to calculate its own chance, provide its harvest item, and supply its yield multiplier. The registry is a plain static list; adding a mutation = add one class + one list entry.
 
 ```csharp
-// Code/Common/Farming/Mutations/ — ICropMutation.cs + CropMutationRegistry.cs
+// Code/Common/Farming/Mutations/ â€” ICropMutation.cs + CropMutationRegistry.cs
 public interface ICropMutation
 {
     string Id { get; }
@@ -160,7 +160,7 @@ public static class CropMutationRegistry
         new List<ICropMutation> { new GoldMutation(), new GiantMutation() };
 }
 
-// In Crop.TryMutate() — called on reaching final growth stage:
+// In Crop.TryMutate() â€” called on reaching final growth stage:
 public static ICropMutation? ComputeCropMutation( Crop crop, FarmPlot plot )
 {
     var shuffled = CropMutationRegistry.All.OrderBy( _ => Random.Shared.Float() ).ToList();
@@ -176,16 +176,16 @@ public static ICropMutation? ComputeCropMutation( Crop crop, FarmPlot plot )
 
 Key differences from the phenodex approach:
 - **Shuffle then roll** (not a single rare-mutation branch). Shuffling before iterating means no mutation has ordering priority; the first one that passes wins. This prevents the "always check Gold first" bias you'd get with a fixed list.
-- **Buff-scaled chance.** `BuffManager.GetModifier("farming.mutation.chance")` multiplies the base chance so a player who grinded the right challenges gets genuinely better mutation odds — it wires into the stat-modifier engine (`progression-upgrades.md`).
+- **Buff-scaled chance.** `BuffManager.GetModifier("farming.mutation.chance")` multiplies the base chance so a player who grinded the right challenges gets genuinely better mutation odds â€” it wires into the stat-modifier engine (`progression-upgrades.md`).
 - **Visual swap via `[Sync, Change]`.** The resulting mutation id is `[Sync, Change("OnMutationUpdated")]` on `Crop`, so the model child switch (enabling the `"gold"` or `"giant"` child GameObject) fires on every client without a separate RPC.
 
 Anti-pattern to avoid: farm_land's `TryMutate` is called from an `[Rpc.Owner]` path (owner-authoritative). For a competitive leaderboard, move mutation rolls to the host and validate the submitted item/yield against the stored genome, as noted in the Gotchas section above.
 
-Source: `thefancylads.farm_land` — `Code/Common/Farming/Mutations/ICropMutation.cs`, `CropMutationRegistry.cs`, `MutationModel.cs`; mutation sync in `Crop.cs`.
+Source: `thefancylads.farm_land` â€” `Code/Common/Farming/Mutations/ICropMutation.cs`, `CropMutationRegistry.cs`, `MutationModel.cs`; mutation sync in `Crop.cs`.
 
 ---
 
-### meteorlab.garden — Strategy-pattern trait modifiers as applied Components (closest thing to genetics without a genome)
+### meteorlab.garden â€” Strategy-pattern trait modifiers as applied Components (closest thing to genetics without a genome)
 
 garden has no genome struct or cross function, but its **fertilizer effect system** is the closest thing to heritable trait modification and it shows a different shape worth knowing: instead of a data struct holding floats, trait modifications are **Components applied to an entity at runtime**, each self-describing with an icon and description used directly in the shop UI.
 
@@ -206,27 +206,27 @@ public abstract class FertilizerEffect : Component
 // InfiniteCyclesEffect: plant.MaxCycles = int.MaxValue;
 // ExtraSlotsEffect:   plant.MaxFertilizerUses += ExtraSlots;
 
-// Application — Plant.Fertilize():
+// Application â€” Plant.Fertilize():
 foreach ( var effect in fertilizer.Components.GetAll<FertilizerEffect>() )
     effect.Apply( this );
 // All mutated stats are [Save] so a buffed plant survives server restart
 ```
 
-The key technique: **effects are Components on the fertilizer prefab, not entries in a data table**. This means the shop can surface fertilizer stats by reflecting over the prefab's `FertilizerEffect` children — no separate tooltip data file. `PlantableShopItem.GetStats()` does exactly this.
+The key technique: **effects are Components on the fertilizer prefab, not entries in a data table**. This means the shop can surface fertilizer stats by reflecting over the prefab's `FertilizerEffect` children â€” no separate tooltip data file. `PlantableShopItem.GetStats()` does exactly this.
 
 Stacking rules live on the plant (`Plant.CanFertilize`): not faded, under `MaxFertilizerUses`, under per-fertilizer `MaxUsesPerPlant` (counts `AppliedFertilizers` by fertilizer name). This prevents infinite stacking without a separate rule engine.
 
-This is the right shape when your "traits" are a short, fixed catalog of named modifiers applied once per event (fertilize/breed/level-up), not a continuous genome that you want to cross and mutate — reach for it when the player is *choosing* a modifier rather than *discovering* one through crossing.
+This is the right shape when your "traits" are a short, fixed catalog of named modifiers applied once per event (fertilize/breed/level-up), not a continuous genome that you want to cross and mutate â€” reach for it when the player is *choosing* a modifier rather than *discovering* one through crossing.
 
-Source: `meteorlab.garden` — `Code/Garden/Fertilizer/FertilizerEffect.cs` and subclasses, `Code/Garden/Plant.cs` (`CanFertilize`, `Fertilize`), `Code/Shop/PlantableShopItem.cs` (`GetStats`).
+Source: `meteorlab.garden` â€” `Code/Garden/Fertilizer/FertilizerEffect.cs` and subclasses, `Code/Garden/Plant.cs` (`CanFertilize`, `Fertilize`), `Code/Shop/PlantableShopItem.cs` (`GetStats`).
 
 ---
 
-### facepunch.fair — animal trait persistence stub (ready-to-wire pattern)
+### facepunch.fair â€” animal trait persistence stub (ready-to-wire pattern)
 
 The fair game's zoo animals carry an explicit `GetPersistentMetadata`/`SetPersistentMetadata` stub (`AI/Animals/Animal.Persistence.cs`) with TODO hooks for traits/genetics. While not implemented, the hook placement is instructive: the metadata is gated behind the `escaped`/`tranquilized` state machine so a future genetics layer would attach here, not on the AI controller. If you are building an animal-enclosure or zoo tycoon game and want to add heritable traits, this is the correct seam: persist traits as a blob on `GetPersistentMetadata`, run the cross in the `TranquilizedAction` completion handler (after successful recapture = "contained, ready to breed"), and store the result before `SetPersistentMetadata`. Nothing net-new on the crossing algorithm; useful only for placement guidance.
 
-Source: `facepunch.fair` — `AI/Animals/Animal.Persistence.cs`.
+Source: `facepunch.fair` â€” `AI/Animals/Animal.Persistence.cs`.
 
 ---
 
@@ -237,7 +237,7 @@ None of these three games contain genetics, breeding, mutation inheritance, or g
 ---
 
 **Read these games** for genetics/breeding patterns (updated list):
-- `klibatocorp.phenodex` — canonical: full genome struct + Gaussian cross + variance schedule + hash registry
-- `thefancylads.farm_land` — interface registry + shuffle-roll + buff-scaled chance + `[Sync, Change]` visual swap
-- `meteorlab.garden` — Strategy-pattern component effects as a lightweight alternative when a full genome isn't needed
-- `facepunch.fair` — seam-placement guidance for future animal-trait persistence (stub only)
+- `klibatocorp.phenodex` â€” canonical: full genome struct + Gaussian cross + variance schedule + hash registry
+- `thefancylads.farm_land` â€” interface registry + shuffle-roll + buff-scaled chance + `[Sync, Change]` visual swap
+- `meteorlab.garden` â€” Strategy-pattern component effects as a lightweight alternative when a full genome isn't needed
+- `facepunch.fair` â€” seam-placement guidance for future animal-trait persistence (stub only)

@@ -1,6 +1,6 @@
 ---
 name: sbox-scaffold-game
-description: Use when the user asks for a whole playable game in one go through the s&box Claude Bridge — "make me a first-person game", "scaffold a game", "give me something I can press Play on". Orchestrates the existing bridge tools plus the gameplay scaffolds (objective/health/pickup/interactable/loot-table/save-system + wallet/phase-machine/day-night-clock + set_component_reference + add_component_to_new_object) into a first-person starter you can enter play mode in and move around, see a level, and win or lose. Handles the generate→hotload→place sequencing and the screenshot verify loop.
+description: Use when the user asks for a whole playable game in one go through the s&box Claude Bridge — "make me a first-person game", "scaffold a game", "give me something I can press Play on". Orchestrates the existing bridge tools plus the gameplay scaffolds (objective/health/pickup/interactable/loot-table/save-system + wallet/phase-machine/day-night-clock + round-state-machine/interaction-station/event-director/save-slots + set_component_reference + add_component_to_new_object) into a first-person starter you can enter play mode in and move around, see a level, and win or lose. Handles the generate→hotload→place sequencing and the screenshot verify loop.
 ---
 
 # Scaffold a Playable s&box Game

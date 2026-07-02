@@ -75,12 +75,9 @@ editor. Not worth the dig unless a clear `Scene` tick hook turns up. Skip for no
   clean, parity audit PASS.
 - **`get_profiler_stats` (#3): DRAFTED, offline-verified.** Added to the same files. Parity PASS at
   **194 tools / 185 handlers / 0 orphans @ 1.13.0**.
-- **PENDING live compile-verify** for BOTH (editor was offline at authoring): sync
-  `DebugVizHandlers.cs` + the MyEditorMenu.cs `Register` lines to `<project>/Libraries/claudebridge/
-  Editor/`, `restart_editor`, `get_compile_errors`; then `start_play` → `set_time_scale 0.1` +
-  `get_profiler_stats` to functionally verify. If C# member names are off, `describe_type` and fix.
-- **NOT STARTED (editor-gated):** `debug_draw_*` (#1 — build live; `DrawGizmos` + holder component)
-  and `run_tests` (#4 — `dotnet test` spike first).
+- **RESOLVED:** both live-verified and SHIPPED in v1.14.0 (set_time_scale 0.1↔1.0 + real profiler stats via raw IPC).
+- **RESOLVED:** `debug_draw_*` (#1) SHIPPED in v1.15.0 (both render paths live-verified); `run_tests` (#4)
+  CLOSED as infeasible in v1.16.0 (s&box test projects need the editor's net10 build chain; machine has .NET 8 only).
 - Uncommitted (commit-when-asked). Pre-existing unrelated edits on the branch:
   CONTRIBUTING.md / README.md / package.json — leave them.
 

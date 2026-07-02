@@ -32,7 +32,7 @@ public static class ClaudeBridge
 
 	// Bridge build version — surfaced in status.json + the Status menu so a
 	// marketplace-addon-vs-MCP-server skew is visible at a glance.
-	private const string BridgeVersion = "1.17.1";
+	private const string BridgeVersion = "1.18.0";
 
 	// status.json doubles as a heartbeat. _startedAtIso is stamped once at start;
 	// the heartbeat timestamp is refreshed from the frame loop at most once per
@@ -454,6 +454,13 @@ public static class ClaudeBridge
 		// ── Batch 40: Asset utilities ────────────────────────────────────
 		Register( "copy_asset_with_dependencies", () => new CopyAssetWithDependenciesHandler() );
 
+		// ── Batch 43: v1.18.0 — LipSync (new engine component) + community scaffolds ──
+		Register( "add_lipsync",                  () => new AddLipSyncHandler() );
+		Register( "create_round_state_machine",   () => new CreateRoundStateMachineHandler() );
+		Register( "add_interaction_station",      () => new AddInteractionStationHandler() );
+		Register( "create_event_director",        () => new CreateEventDirectorHandler() );
+		Register( "create_save_slots",            () => new CreateSaveSlotsHandler() );
+
 		Log.Info( $"[SboxBridge] Registered {_handlers.Count} handlers" );
 	}
 
@@ -497,6 +504,7 @@ public static class ClaudeBridge
 		"set_project_config", "set_project_thumbnail",
 		"ensure_input_action",
 		"copy_asset_with_dependencies",
+		"add_lipsync", "create_round_state_machine", "add_interaction_station", "create_event_director", "create_save_slots",
 	};
 
 	internal static bool IsSceneMutating( string command ) => _sceneMutatingCommands.Contains( command );
