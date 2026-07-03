@@ -2,6 +2,10 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## License change -- 2026-07-02
+
+**Relicensed from AGPL-3.0-or-later to the s&box Claude Bridge Source-Available License 1.0 (no redistribution).** No code/tool changes; still 206 tools / 197 handlers. You may use the bridge and modify it locally to build your own s&box games (free or commercial); you may NOT redistribute, fork, mirror, repackage, re-host, or offer it as a service. The "s&box Claude Bridge" / "sboxskins.gg" name and branding are trademarks and not licensed for reuse. Versions published before this change remain available under AGPL-3.0-or-later; this and all later versions are governed by the new license. See `LICENSE` and `NOTICE`.
+
 ## [1.18.0] -- 2026-07-02
 
 **+5 tools -- same-week support for s&box's brand-new LipSync component, plus the four remaining Tier-1 community-demand scaffolds. 206 tools / 197 handlers (was 201/192). Additive -- no existing tool contract changed. All five live-verified (handlers compiled first try; every scaffold's generated code compile-verified in the game assembly + TypeLibrary-load-confirmed; add_lipsync wiring property-verified on a live citizen).**

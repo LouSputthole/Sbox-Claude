@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v1.18.0</strong> · <strong>206 tools</strong> · <strong>197 handlers</strong> · AGPL-3.0-or-later · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v1.18.0</strong> · <strong>206 tools</strong> · <strong>197 handlers</strong> · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -307,12 +307,14 @@ Then ask for the real thing: *"Create a first-person player controller with WASD
 
 ## License
 
-**AGPL-3.0-or-later** — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+**Source-available (no redistribution)** — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-You can freely use the Claude Bridge in your s&box games, free or commercial, and modify it for your own use. If you redistribute a modified version of the bridge itself — or run it as a network/hosted service — keep it open source under AGPL-3.0-or-later, make your modified source available to its users, and credit sboxskins.gg.
+You can freely use the Claude Bridge to build your s&box games — free or commercial — and modify it locally for your own use. You may **not** redistribute, fork, mirror, repackage, or re-host the bridge or its source, publish a derivative of it, or offer it to others as a service. The code you create *with* the bridge (your games and their source) is yours and is not restricted.
 
-> **Branding & trademark.** The code is open under AGPL, but the **"s&box Claude Bridge"** / **"sboxskins.gg"** name and branding are *not* covered by the code license. Don't reuse them to pass a fork off as the original — rename your fork and remove the original branding. See [NOTICE](NOTICE).
+> **Branding & trademark.** The **"s&box Claude Bridge"** / **"sboxskins.gg"** name, logos, and branding are trademarks of sboxskins.gg and are *not* licensed for reuse. See [NOTICE](NOTICE).
 
-Built by **[sboxskins.gg](https://sboxskins.gg)** — the s&box community marketplace. Bridge bootstrap-crash fix by [@FurkanZhlp](https://github.com/FurkanZhlp); early bug reports by [@Jmcasavant](https://github.com/Jmcasavant) and [@dvd900](https://github.com/dvd900).
+> **Prior versions.** Releases before this license took effect were AGPL-3.0-or-later and remain available under that license; this and all later versions are governed by the source-available license above.
+
+Built by **[sboxskins.gg](https://sboxskins.gg)** — the s&box community marketplace.
 
 Copyright © 2026 [sboxskins.gg](https://sboxskins.gg)

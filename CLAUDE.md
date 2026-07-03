@@ -119,7 +119,7 @@
 
 **New skill — `sbox-cookbook`.** A master **router** skill indexing code-grounded recipes mined from **27 current (2026) open-source s&box games** plus the modern engine repos. Its `references/` hold **11 engine** + **15 systems** + **14 genre** recipes; it routes "how do I build a tycoon / an inventory / a save system?" to a grounded how-to. Full bundled skill set: `sbox-api`, `sbox-build-feature`, `sbox-setup`, `sbox-scaffold-game`, `sbox-cookbook`.
 
-**License — relicensed GPL-3.0 → AGPL-3.0-or-later** (LICENSE + all `license` fields). Plus a branding/trademark note (see `NOTICE`): the code is open under AGPL, but the "s&box Claude Bridge" / "sboxskins.gg" name and branding may not be reused to pass a fork off as the original.
+**License — relicensed to a source-available, no-redistribution license** (s&box Claude Bridge Source-Available License 1.0; LICENSE + all `license` fields). Earlier releases were GPL-3.0 then AGPL-3.0-or-later and remain available under AGPL; this and later versions are source-available only. Use + local modification to build your own games is allowed; redistribution/forking/repackaging/re-hosting is not. "s&box Claude Bridge" / "sboxskins.gg" name and branding are trademarks, not licensed for reuse (see `NOTICE`).
 
 ### What's new in v1.5.0
 
@@ -267,8 +267,8 @@ sbox-claude/
 ├── CLAUDE.md                          ← YOU ARE HERE
 ├── README.md                          ← User-facing docs
 ├── INSTALL.md                         ← Installation guide
-├── LICENSE                            ← AGPL-3.0-or-later
-├── NOTICE                             ← AGPL summary + name/branding (no-passing-off) note
+├── LICENSE                            ← Source-Available License 1.0 (no redistribution)
+├── NOTICE                             ← license summary + name/branding (trademark) note
 ├── install.ps1 / install.sh           ← Legacy installers (need updating)
 │
 ├── sbox-mcp-server/                   # MCP Server (TypeScript)
