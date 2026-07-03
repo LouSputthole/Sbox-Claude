@@ -20,3 +20,6 @@ jobs:
 
       - name: Parity audit (TS tools ↔ C# handlers + version lock)
         run: node scripts/audit-parity.mjs
+
+      - name: Codex plugin in sync with Claude plugin
+        run: node scripts/gen-codex-plugin.mjs --check
