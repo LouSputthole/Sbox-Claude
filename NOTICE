@@ -1,26 +1,28 @@
 s&box Claude Bridge
 Copyright (c) 2026 sboxskins.gg
+All rights reserved.
 
-This program is free software: you can redistribute it and/or modify it under
-the terms of the GNU Affero General Public License as published by the Free
-Software Foundation, either version 3 of the License, or (at your option) any
-later version (AGPL-3.0-or-later). See the LICENSE file for the full text.
+This software is SOURCE-AVAILABLE, not open source. See the LICENSE file for
+the full terms (the s&box Claude Bridge Source-Available License 1.0).
 
 In short:
-  - You may use the Claude Bridge in your s&box games, free or commercial.
-  - You may modify it for your own use.
-  - If you redistribute a modified version — OR run a modified version as a
-    network/hosted service — you must release your modified source under
-    AGPL-3.0-or-later to its users, and preserve this notice.
+  - You may download, install, and run the Claude Bridge.
+  - You may use it to build your s&box games, free or commercial, and modify it
+    locally for your own use.
+  - You may NOT redistribute, fork, mirror, repackage, or re-host the Bridge or
+    its source, publish a derivative of it, or offer it to others as a service.
+  - You may NOT remove or alter the copyright, license, or attribution notices.
 
-Branding & trademark (NOT covered by the code license)
-------------------------------------------------------
-The source code is open under AGPL, but the names and branding —
-"s&box Claude Bridge" and "sboxskins.gg" — are not licensed for reuse.
+Names, branding & trademark
+---------------------------
+"s&box Claude Bridge" and "sboxskins.gg", and their logos and branding, are
+trademarks of sboxskins.gg and are not licensed for reuse. You may not present
+anything as being the s&box Claude Bridge or as originating from sboxskins.gg.
 
-You may fork the code under AGPL, but you may NOT reuse the "s&box Claude
-Bridge" or "sboxskins.gg" name, logo, or branding to present a fork as the
-original. If you distribute a fork, give it a different name and remove the
-original branding.
+Prior versions
+--------------
+Versions published before this license took effect were released under
+AGPL-3.0-or-later and remain available under that license. This license governs
+this version and all later versions.
 
 Built by sboxskins.gg — the s&box community marketplace — https://sboxskins.gg

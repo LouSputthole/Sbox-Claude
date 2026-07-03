@@ -137,6 +137,6 @@ The companion plugin's `sbox-build-feature` skill encodes this workflow plus the
 
 ## License
 
-**AGPL-3.0-or-later** — see [LICENSE](../LICENSE) and [NOTICE](../NOTICE) for details. The code is open under AGPL; the "s&box Claude Bridge" / "sboxskins.gg" name and branding may not be reused to pass a fork off as the original.
+**Source-available (no redistribution)** — see [LICENSE](../LICENSE) and [NOTICE](../NOTICE) for details. You may use and locally modify the bridge to build your own games, but you may not redistribute, fork, repackage, or re-host it. The "s&box Claude Bridge" / "sboxskins.gg" name and branding are trademarks and may not be reused.
 
 Copyright (c) 2026 [sboxskins.gg](https://sboxskins.gg)

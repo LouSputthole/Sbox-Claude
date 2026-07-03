@@ -112,7 +112,7 @@ For deeper issues see the main repo's [TROUBLESHOOTING.md](https://github.com/Lo
 
 ## License
 
-AGPL-3.0-or-later. Same as the bridge. The code is open under AGPL, but the "s&box Claude Bridge" / "sboxskins.gg" name and branding may not be reused to pass a fork off as the original — see the repo's [NOTICE](https://github.com/LouSputthole/Sbox-Claude/blob/main/NOTICE).
+Source-available (no redistribution). Same as the bridge. You may use and locally modify it to build your own games, but you may not redistribute, fork, repackage, or re-host it, and the "s&box Claude Bridge" / "sboxskins.gg" name and branding may not be reused — see the repo's [LICENSE](https://github.com/LouSputthole/Sbox-Claude/blob/main/LICENSE) and [NOTICE](https://github.com/LouSputthole/Sbox-Claude/blob/main/NOTICE).
 
 ## Credits
 
