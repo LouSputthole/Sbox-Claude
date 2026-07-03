@@ -50,6 +50,8 @@ There are **two halves**. Both must be installed, and both must be on **matching
 
 Pick the path with the least resistance for you. **Every path needs both halves** — the MCP server *and* the s&box editor addon.
 
+> **Using Codex instead of Claude Code?** There's a first-party **[s&box Codex Bridge](plugins/sbox-codex/)** — the same bridge and the same tools, packaged for the Codex CLI (`codex plugin marketplace add LouSputthole/Sbox-Claude` → `codex plugin add sbox-codex-bridge`). Full steps in its [README](plugins/sbox-codex/README.md).
+
 ### A. Claude Code plugin — easiest
 
 The plugin registers the MCP server for you (pinned to `sbox-mcp-server@1.18.0`, fetched via `npx` on first use) and ships the workflow skills, the onboarding wizard, and the specialist agent.
@@ -252,6 +254,7 @@ For hacking on the bridge itself, or if you'd rather not use the Library Manager
 ## Integrations
 
 - **Claude Code plugin** — bundles the MCP server config, the `sbox-build-feature` workflow skill, the `sbox-api` schema-grounded API skill, the `sbox-cookbook` recipe router, the `sbox-scaffold-game` starter-scene skill, the `sbox-setup` onboarding wizard, and the `sbox-game-dev` specialist agent. (See the next section.)
+- **Codex plugin** — the same bundle packaged for the Codex CLI as the first-party **[s&box Codex Bridge](plugins/sbox-codex/)** (`sbox-codex-bridge`). Generated from the Claude plugin by `scripts/gen-codex-plugin.mjs`, so it never lags behind.
 - **The s&box engine** — the file-IPC editor addon runs inside the editor and executes everything on the main thread.
 - **Installed-library detection & leverage** — `list_libraries` reads your project's `Libraries/` and each `.sbproj`, so Claude can discover and *drive what you already have* rather than reinventing it. If you have the **Shrimple Character Controller** (`fish.scc`) or **`facepunch.playercontroller`**, it can wire up player movement via `add_component_with_properties` instead of writing a controller from scratch. The `sbox-setup` wizard surfaces this on first connect.
 - **s&box Cloud assets** — reference cloud models/textures/sounds (note: Cloud-only assets are ephemeral across restarts — prefer local files for anything permanent).

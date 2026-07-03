@@ -1,0 +1,22 @@
+{
+  "name": "sboxskins",
+  "interface": {
+    "displayName": "sboxskins.gg s&box plugins"
+  },
+  "plugins": [
+    {
+      "name": "sbox-codex-bridge",
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/LouSputthole/Sbox-Claude.git",
+        "path": "./plugins/sbox-codex",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "game-development"
+    }
+  ]
+}
