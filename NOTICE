@@ -1,5 +1,10 @@
 s&box Codex Bridge
 Copyright (c) 2026 LatterDay
+Portions Copyright (c) 2026 sboxskins.gg
+
+s&box Codex Bridge is a fork of the s&box Claude Bridge by sboxskins.gg
+(https://github.com/LouSputthole/Sbox-Claude), used under AGPL-3.0-or-later.
+The upstream copyright notice above is preserved as that license requires.
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU Affero General Public License as published by the Free

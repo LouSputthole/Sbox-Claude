@@ -8,6 +8,8 @@
 
 <p>📖 <strong>Current docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — Codex-specific docs are being migrated into this repo.</p>
 
+> **Fork notice.** s&box Codex Bridge is a fork of the [s&box Claude Bridge](https://github.com/LouSputthole/Sbox-Claude) by [sboxskins.gg](https://sboxskins.gg), used under AGPL-3.0-or-later.
+
 ```
 You:    "Make a horror game where I explore an abandoned hospital with a flashlight."
 Codex: *creates scripts, builds the scene, sets the lighting and fog, adds a player
