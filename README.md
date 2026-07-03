@@ -38,7 +38,7 @@ There are **two halves**. Both must be installed, and both must be on **matching
 | Half | What it is | Where it lives |
 |---|---|---|
 | **MCP server** | TypeScript/Node program that exposes the bridge's full toolset to Claude Code over stdio | npm package `sbox-mcp-server` (or run from source) |
-| **Editor addon** | C# editor library that runs *inside* s&box and actually executes the work | the s&box Asset Library (`sboxskinsgg.claudebridge`) — installed into your **project's `Libraries/` folder** |
+| **Editor addon** | C# editor library that runs *inside* s&box and actually executes the work | installed via the s&box **Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
 
 **Why file IPC and not a socket?** s&box's sandboxed C# blocks `System.Net` (no `HttpListener`, no WebSocket, no TCP). So the MCP server writes request JSON files into a shared temp dir, the addon's editor-frame loop picks them up, runs them on the main editor thread, and writes responses back. The MCP server polls for the reply. Simple, sandbox-safe, and the reason for two of the gotchas below.
 
@@ -59,7 +59,7 @@ The plugin registers the MCP server for you (pinned to `sbox-mcp-server@1.18.0`,
    /plugin marketplace add LouSputthole/Sbox-Claude
    /plugin install sbox-claude
    ```
-2. **Install the editor addon** from the s&box **Asset Library**: search for **`sboxskinsgg.claudebridge`** and install it *into your project*. It lands in `<your-project>/Libraries/`.
+2. **Install the editor addon** via the s&box **Library Manager** — open **Editor → Library Manager** (this is *not* the Asset Browser; the bridge is a **Library**, not a content asset, so it won't show up there), search for **`sboxskinsgg.claudebridge`**, and install it *into your project*. It lands in `<your-project>/Libraries/`.
 3. **Open s&box**, open your project, and open the **View → Claude Bridge** dock. Leave it open (see the note below).
 4. **Verify** in a new Claude Code session: *"Check the bridge status."* You want `connected: true` and a non-zero `handlerCount`.
 
@@ -71,13 +71,13 @@ If you don't use the plugin, register the server yourself.
    ```bash
    claude mcp add sbox -- npx -y sbox-mcp-server@latest
    ```
-2. **Install the editor addon** from the s&box Asset Library (`sboxskinsgg.claudebridge`) into your project — same as path A, step 2.
+2. **Install the editor addon** via the s&box **Library Manager** (`sboxskinsgg.claudebridge`) into your project — same as path A, step 2.
 3. **Open s&box**, open the **View → Claude Bridge** dock, keep it visible.
 4. **Verify:** ask Claude to *"check the bridge status."*
 
 ### C. Fully manual / from source
 
-For hacking on the bridge itself, or if you'd rather not use the Asset Library.
+For hacking on the bridge itself, or if you'd rather not use the Library Manager.
 
 1. **Clone and build the MCP server:**
    ```bash
@@ -107,7 +107,7 @@ For hacking on the bridge itself, or if you'd rather not use the Asset Library.
 
 ### Two install rules that bite everyone
 
-- **The addon must live in your project's `Libraries/` folder — not s&box's global `addons/` folder.** The global folder is built-in-only and silently refuses to compile custom C#. The Asset Library install and the `install` scripts both put it in the right place.
+- **The addon must live in your project's `Libraries/` folder — not s&box's global `addons/` folder.** The global folder is built-in-only and silently refuses to compile custom C#. The Library Manager install and the `install` scripts both put it in the right place.
 - **The Claude Bridge dock must stay open.** The bridge's editor-frame loop (which drains the request queue *and* drives the heartbeat) only fires while the dock is visible. Close it and every tool call times out at 30s.
 
 > **Connection issue / 30s hangs?** The single most common cause is the MCP server and the addon resolving **different** temp dirs (Node reads `TEMP`, C# reads `TMP`). Set **`SBOX_BRIDGE_IPC_DIR`** to the same absolute path on both sides to realign. The addon logs its resolved dir (`[SboxBridge] … IPC at <dir>`) and reports it in `get_bridge_status`.
