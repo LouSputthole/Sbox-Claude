@@ -2,13 +2,26 @@
 
 > Let non-coders build s&box games through conversation with Claude Code.
 
-## Status: v1.19.0 -- 200 handlers / 209 tools (run `get_bridge_status` for the live tool/handler count)
+## Status: v1.20.0 -- 219 handlers / 228 tools (run `get_bridge_status` for the live tool/handler count)
 
-**Last updated:** 2026-07-07 (v1.19.0)
+**Last updated:** 2026-07-08 (v1.20.0)
 **Bridge:** File-based IPC ✅ working on main thread
 **Tools:** MCP `server.tool()` registrations across `sbox-mcp-server/src/tools/`
 **Handlers:** C# command handlers compiled and registered — see the Status header above / `get_bridge_status` for the live count
 **Why the difference:** several tools are **MCP-server-side** and need no editor handler — `read_log`, `get_compile_errors`, `execute_csharp`, `search_docs`, `get_doc_page`, `list_doc_categories`, `run_self_test`. They read the log file / fetch docs / hotload-eval directly, so they work even when the editor has crashed or stalled.
+
+### What's new in v1.20.0
+
+**+19 tools — "Director's Cut", the biggest wave since v1.4.0: `Sandbox.MovieMaker` support (it just reached the shipping build) plus a broad Tier-2 sweep across cinematics, networking, interaction/carry, loot/economy, and UI feedback. 219 handlers / 228 tools (was 200/209).** Six new handler families, all additive — no existing tool contract changed. Verify-gated live on Gravehold (all 15 codegen scaffolds generate → hotload → compile clean → TypeLibrary-load-confirmed; the 4 MovieMaker tools live-verified end to end).
+
+- **MovieMaker / cutscene playback** (`list_movies`, `add_movie_player`, `play_movie`, `stop_movie`) — first bridge coverage of `Sandbox.MovieMaker`, which landed in the shipping build (verified via `search_types` 2026-07-08; absent 2026-07-02). Wire a `MoviePlayer` + `.movie` `MovieResource`, play/stop/seek; clips advance in play mode. **Movies are authored in the editor's Movie Maker dock** — the bridge wires and plays them, it doesn't author keyframes. New `MovieMakerHandlers.cs` + `moviemaker.ts`.
+- **Cinematics & dialogue** (`create_cutscene_director`, `create_dialogue_system`) — the hand-authored, zero-asset cinematic path. Cutscene director: inspector-authored camera-shot list, smoothstep blends, `Scene.Camera` takeover in `OnPreRender` with exact-restore, skip action, input lock, optional letterbox, `OnCutsceneFinished`. Dialogue: typewriter Razor HUD, `"Speaker: text"` lines, `OnLineShown` (pair with `add_lipsync`) + `OnDialogueFinished`. New `CinematicsHandlers.cs` + `cinematics.ts`.
+- **Networking primitives** (`create_host_rpc_action`, `add_targeted_rpc`, `create_local_player_resolver`, `add_host_migration_recovery`) — a validated + rate-limited `[Rpc.Host]` action (caller re-resolved, per-`SteamId` cooldown; folds `add_rate_limited_rpc`), `Rpc.FilterInclude` unicast, proxy-safe local-player resolution (online + offline), and a proxy→authority host-migration recovery hook. New `NetPrimitivesHandlers.cs` + `netprimitives.ts`.
+- **Interaction + carry** (`add_interaction_prompt`, `create_hold_to_confirm`, `create_carry_system`) — an eye-traced "Press E" HUD for `IPressable` targets, a hold-to-fill confirm action (`OnConfirmed`), and first-person pickup/carry/throw with host-routed ownership (`Network.AssignOwnership`) + `MotionEnabled=false` while held. New `InteractionPackHandlers.cs` + `interactionpack.ts`.
+- **Loot / economy** (`create_gacha_drop_table`, `create_currency_pickup`, `create_offline_progress`) — a host-auth gacha roller (rarity weights + pity + dup detection), a networked coin (optional magnet, one-line `Grant` seam into `EconomyWallet.AddMoney`), and offline/idle progress (`LastSeenUtc` delta, clamp, deterministic `SimulateOffline` replay). New `LootEconomyHandlers.cs` + `looteconomy.ts`.
+- **UI / feedback** (`create_worldpanel_ui`, `create_proxy_nametag`, `create_combo_meter`) — a diegetic clickable `WorldPanel` UI (`WorldInput` prerequisite documented), a `TextRenderer` owner nametag shown only on proxies with distance fade, and a combo meter (static `Bump()`, decay, multiplier tiers) with a pulsing Razor HUD. New `UiFeedbackHandlers.cs` + `uifeedback.ts`.
+- **The verify-gate caught a real SDK bug:** generated code called `.IsValid` on `Sandbox.Connection`, which has no `IsValid` member on this SDK (3 sites). Fixed to null checks, regenerated, all 15 scaffolds then compiled clean. See the API-differences list below.
+- **Engine-watch:** MovieMaker is now SHIPPED + covered; the **loopback multi-instance socket is still absent** from the shipping build (queued for v1.21.0), as are record-to-clip (`MovieRecorder`) and offline lipsync generation. See `docs/TOOL_BACKLOG.md`.
 
 ### What's new in v1.19.0
 
@@ -234,6 +247,7 @@ for the full doc-inclusive graph. See `docs/graph/README.md`.
 - `Game.TypeLibrary.GetTypes<Component>()` — list all component types
 - `MeshCollider` does NOT exist — use `HullCollider` instead
 - `Rotation.Pitch()`, `.Yaw()`, `.Roll()` are methods, not properties
+- **`Sandbox.Connection` has NO `IsValid` member on this SDK** — null-check a `Connection` (`caller is null` / `?.`), do NOT call `.IsValid` on it. The v1.20.0 verify-gate caught generated code doing exactly this at 3 sites (host-rpc-action ×2, targeted-rpc, gacha); regenerated with null checks and all 15 scaffolds then compiled clean. `GameObject`/`Component` `.IsValid()` is a different, valid API — the confusion is easy, so reflect (`describe_type "Connection"`) before assuming.
 
 ### Math & Events (s&box sandbox specifics)
 - **UPDATE (verified live 2026-06-09):** `System.Math` and `System.MathF` now COMPILE in game code on the current SDK — the old "MathX only" rule is stale. `MathX` remains fine/preferred for s&box helpers. `Array.Clone()` is STILL whitelist-blocked ("System.Array.Clone() is not allowed when whitelist is enabled", confirmed live) — use `.ToArray()`. `GameObject.Clone()` is unrelated and fine. `sandbox_lint` reflects this.
@@ -314,6 +328,13 @@ sbox-claude/
 │   │       ├── docs.ts                # search_docs, get_doc_page, list_doc_categories (MCP-server-side)
 │   │       ├── inspection.ts          # inspect_networked_object, networking_lint, scene_validate, save_inspect, services_query, simulate_input (Batch 37)
 │   │       ├── playtest.ts            # playtest, playtest_status (gameplay-verification harness)
+│   │       ├── gamefeel.ts            # create_camera_shake, add_flicker_light, create_floating_combat_text (v1.19.0)
+│   │       ├── moviemaker.ts          # list_movies, add_movie_player, play_movie, stop_movie (v1.20.0)
+│   │       ├── cinematics.ts          # create_cutscene_director, create_dialogue_system (v1.20.0)
+│   │       ├── netprimitives.ts       # create_host_rpc_action, add_targeted_rpc, create_local_player_resolver, add_host_migration_recovery (v1.20.0)
+│   │       ├── interactionpack.ts     # add_interaction_prompt, create_hold_to_confirm, create_carry_system (v1.20.0)
+│   │       ├── looteconomy.ts         # create_gacha_drop_table, create_currency_pickup, create_offline_progress (v1.20.0)
+│   │       ├── uifeedback.ts          # create_worldpanel_ui, create_proxy_nametag, create_combo_meter (v1.20.0)
 │   │       └── status.ts              # get_bridge_status
 │   └── dist/                          # Compiled JS
 │

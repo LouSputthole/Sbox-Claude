@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v1.19.0</strong> · <strong>209 tools</strong> · <strong>200 handlers</strong> · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v1.20.0</strong> · <strong>228 tools</strong> · <strong>219 handlers</strong> · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -52,7 +52,7 @@ Pick the path with the least resistance for you. **Every path needs both halves*
 
 ### A. Claude Code plugin — easiest
 
-The plugin registers the MCP server for you (pinned to `sbox-mcp-server@1.19.0`, fetched via `npx` on first use) and ships the workflow skills, the onboarding wizard, and the specialist agent.
+The plugin registers the MCP server for you (pinned to `sbox-mcp-server@1.20.0`, fetched via `npx` on first use) and ships the workflow skills, the onboarding wizard, and the specialist agent.
 
 1. **Add the marketplace + install the plugin** (in Claude Code):
    ```
@@ -152,12 +152,15 @@ For hacking on the bridge itself, or if you'd rather not use the Library Manager
 ### UI
 `create_razor_ui` (Razor `.razor` panel + scss), `add_screen_panel`, `add_world_panel` — screen-space HUDs and in-world panels.
 
+*(v1.20.0 feedback pack)* `add_interaction_prompt` (eye-traced "Press E" HUD bound to `IPressable` targets), `create_worldpanel_ui` (diegetic clickable `WorldPanel` UI — needs a `Sandbox.WorldInput` in the scene for clicks), `create_proxy_nametag` (billboarded owner name, shown only on other clients' copies, distance fade), `create_combo_meter` (combo count + decay window + multiplier tiers + a pulsing Razor HUD). All razor_lint-safe by construction.
+
 ### Networking
 | Tool | Does |
 |---|---|
 | `add_network_helper`, `configure_network`, `get_network_status`, `network_spawn`, `set_ownership` | Stand up multiplayer, spawn networked objects, transfer ownership |
 | `add_sync_property`, `add_rpc_method` | Annotate a property `[Sync]`; generate an RPC stub *(honest schemas — they do exactly this)* |
 | `create_networked_player`, `create_lobby_manager`, `create_network_events` | Scaffolds for networked play |
+| `create_host_rpc_action`, `add_targeted_rpc`, `create_local_player_resolver`, `add_host_migration_recovery` *(v1.20.0)* | The correctness primitives every networked game hand-rolls: a validated + rate-limited `[Rpc.Host]` action, a `Rpc.FilterInclude` unicast RPC, a proxy-safe "who is MY player" resolver (online + offline), and a proxy→authority host-migration recovery hook |
 
 ### Inspection & validation *(v1.9.0)*
 | Tool | Does |
@@ -176,7 +179,14 @@ For hacking on the bridge itself, or if you'd rather not use the Library Manager
 | `list_sounds`, `create_sound_event`, `assign_sound`, `play_sound_preview` | Sound events and playback |
 
 ### Prefabs & templates
-`create_prefab`, `instantiate_prefab`, `list_prefabs`, `get_prefab_info` for prefabs; `create_player_controller`, `create_npc_controller`, `create_game_manager`, `create_trigger_zone`, `create_round_state_machine`, `add_interaction_station`, `create_event_director`, `create_save_slots` *(v1.18.0)* for ready-made gameplay scaffolds.
+`create_prefab`, `instantiate_prefab`, `list_prefabs`, `get_prefab_info` for prefabs; `create_player_controller`, `create_npc_controller`, `create_game_manager`, `create_trigger_zone`, `create_round_state_machine`, `add_interaction_station`, `create_event_director`, `create_save_slots` *(v1.18.0)*, and `create_carry_system`, `create_hold_to_confirm`, `create_gacha_drop_table`, `create_currency_pickup`, `create_offline_progress` *(v1.20.0)* for ready-made gameplay scaffolds.
+
+### Cinematics, dialogue & movies *(v1.20.0)*
+| Tool | Does |
+|---|---|
+| `list_movies`, `add_movie_player`, `play_movie`, `stop_movie` | First coverage of `Sandbox.MovieMaker` (now in the shipping build) — wire a `MoviePlayer` to a `.movie` clip and play/stop/seek it (clips advance in play mode). Movies are authored in the editor's **Movie Maker** dock; the bridge wires and plays them |
+| `create_cutscene_director` | Hand-authored, zero-asset cutscene player — inspector camera-shot list, smoothstep blends, `Scene.Camera` takeover with exact-restore, skip + input-lock, optional letterbox, `OnCutsceneFinished` |
+| `create_dialogue_system` | Typewriter Razor dialogue HUD — `"Speaker: text"` lines, `OnLineShown` (pairs with `add_lipsync`) + `OnDialogueFinished` |
 
 ### Lighting & atmosphere
 | Tool | Does |
@@ -265,7 +275,7 @@ For hacking on the bridge itself, or if you'd rather not use the Library Manager
 
 | Piece | What it is |
 |---|---|
-| **MCP server config** | `.mcp.json` pins `sbox-mcp-server@1.18.0` and fetches it via `npx -y` on first use — no manual registration, no version drift |
+| **MCP server config** | `.mcp.json` pins `sbox-mcp-server@1.20.0` and fetches it via `npx -y` on first use — no manual registration, no version drift |
 | **Skill: `sbox-build-feature`** | The screenshot-driven build workflow: confirm the bridge is alive → brainstorm non-trivial features → research the API with `describe_type` → bite-sized edits → hotload + scan the log → **screenshot and read it yourself**. Plus a table of s&box gotchas (`MathF` doesn't exist in the sandbox; Cloud assets aren't persistent; Citizen bone names are case-sensitive; `CitizenAnimationHelper.IkRightHand` drives IK at runtime; `Color` properties want `"r, g, b, a"` strings; etc.) |
 | **Skill: `sbox-api`** | Schema-grounded s&box API knowledge — the Unity→s&box translation table, the Ten Rules, and curated component/UI/networking/physics references, so Claude stops hallucinating Unity patterns |
 | **Skill: `sbox-cookbook`** *(v1.9.0)* | A master **router** indexing code-grounded recipes mined from **27 current (2026) open-source s&box games** plus the modern engine repos. Its `references/` hold **11 engine** references (networking-authority, architecture, components-lifecycle, player-controller, ui-razor, combat-weapons, input-interaction, physics-traces-movement, worldgen-rendering, performance-threading, data-assets), **15 systems** (inventory, economy-currency, shop-vendor, save-persistence, progression-upgrades, gacha-loot, leaderboards-services, idle-offline, building-placement, crafting, dialogue, round-match, spawning-waves, anti-cheat, level-design), and **14 genre recipes** (tycoon-idle, shopkeeper, document-sim, roleplay, sandbox-voxel, social-hub, platformer-obstacle, deathmatch-arena, card-battler, survival-horror, gacha-crawler, puzzle, vehicles, party-microgame). Ask "how do I build a tycoon / an inventory / a save system?" and it routes you to a grounded how-to |

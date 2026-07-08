@@ -2,6 +2,69 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## [1.20.0] -- 2026-07-08
+
+**+19 tools -- "Director's Cut", the biggest single wave since v1.4.0: same-week support for `Sandbox.MovieMaker` (it just landed in the shipping build) plus a broad Tier-2 sweep -- cinematics & dialogue, networking primitives, interaction & carry, loot/economy, and UI feedback. 228 tools / 219 handlers (was 209/200). Six new handler families, all additive -- no existing tool contract changed. Verify-gated live on Gravehold: all 15 codegen scaffolds generated -> hotloaded -> compile-checked clean -> TypeLibrary-load-confirmed (the gate caught a real SDK bug first -- see below), and the 4 MovieMaker tools live-verified end to end.**
+
+### Added -- MovieMaker / cutscene playback (the headline; Batch 45)
+
+`Sandbox.MovieMaker` reached the **shipping** engine build (confirmed via `search_types` 2026-07-08 -- it was absent 2026-07-02), so the bridge gets its first coverage of the sequencer. New `MovieMakerHandlers.cs` + `moviemaker.ts`.
+
+- **`list_movies`** -- enumerate the project's `.movie` resources (authored in the editor's **Movie Maker** dock): asset-relative path, whether each loads via `ResourceLibrary`, and whether it has a compiled clip. Start here -- an empty list means the movie has to be authored in the dock first.
+- **`add_movie_player`** -- wire a `Sandbox.MovieMaker.MoviePlayer` (+ an optional `.movie` `MovieResource`) onto an object, or spawn a new "Movie Player" object; `isLooping` / `timeScale` / `playOnStart` map straight onto the component. Scene-mutating (refused in play mode).
+- **`play_movie`** / **`stop_movie`** -- start/stop playback on a given player (or the first in the scene); `play_movie` can load-and-play a different clip and seek via `positionSeconds`, `stop_movie` optionally rewinds. Clips genuinely advance in **play mode** (the response says so in edit mode); both stay callable during play mode.
+- **Live-verified end to end on Gravehold:** `add_movie_player` creates + wires a `MoviePlayer`, `play_movie` correctly errors with no movie wired, `stop_movie` + delete clean up. **Honest limitation:** movies are AUTHORED in the Movie Maker dock -- the bridge wires and plays them, it does not author keyframes; real playback verification needs an authored `.movie` clip (the project had none). A record-to-clip tool (`MovieRecorder`) stays queued.
+
+### Added -- Cinematics & Dialogue (hand-authored, engine-proof -- zero assets)
+
+The no-asset cinematic path -- full C# control, works on today's engine with no MovieMaker dependency. New `CinematicsHandlers.cs` + `cinematics.ts`.
+
+- **`create_cutscene_director`** -- a hand-authored camera-shot player: author shots in the inspector as parallel lists (`ShotPositions` / `ShotAngles` / `ShotHoldSeconds` / `ShotBlendSeconds`, optional per-shot `ShotLookAt`), and at runtime it takes over `Scene.Camera` in `OnPreRender` **only while playing** -- hand-rolled smoothstep ease between shots -- capturing the prior transform and restoring it exactly when finished (the same un-apply discipline as `create_camera_shake`). Static `Play()` / `Play("name")`, static `OnCutsceneFinished`, `IsCutscenePlaying` gate; `LockInput` freezes input via `Input.ClearActions()` while still reading the skip action first (a locked cutscene stays skippable); optional razor_lint-safe letterbox overlay.
+- **`create_dialogue_system`** -- a sealed state+data component paired with a razor_lint-safe typewriter Razor HUD: lines authored as `"Speaker: text"`, a `TimeSince`-driven reveal folded into `BuildHash`, advance/skip on one input, static `OnLineShown(index, speaker)` (pair with `add_lipsync` to drive morphs/audio per line) + `OnDialogueFinished`. Pairs with `create_interactable` to trigger dialogue on use.
+
+### Added -- Networking primitives (Track B)
+
+The correctness primitives every networked s&box game hand-rolls -- and usually gets wrong. New `NetPrimitivesHandlers.cs` + `netprimitives.ts`.
+
+- **`create_host_rpc_action`** -- the SAFE skeleton for "a client asks the host to DO something": a client-callable `Request()` forwards to an `[Rpc.Host] SubmitRequest()` that re-resolves identity via `Rpc.Caller` (never trusting client args), enforces a per-`SteamId` cooldown (`Dictionary<ulong, TimeSince>`), runs your authoritative TODO, and fires the static `OnActionExecuted(Connection)`. The answer to the #1 exploit class -- `[Rpc.Host]` is callable by any client with forged args, so identity + rate-limit + validation live *inside* the host body. Folds the backlog's `add_rate_limited_rpc`.
+- **`add_targeted_rpc`** -- the unicast pattern: a host-side `SendTo(Connection, msg)` wraps its `[Rpc.Broadcast]` in `using ( Rpc.FilterInclude( target ) )` so only the target executes the body (`OnReceived`). The right way to send to one player -- a private prompt, a personal reward -- instead of broadcasting to everyone and filtering client-side.
+- **`create_local_player_resolver`** -- the corpus footgun-killer: a static `Local` that finds THIS machine's player (`Network.Owner == Connection.Local` online, the only tagged player offline), cached + revalidated so a respawn re-resolves, plus a static `IsLocal(go)`. Works identically online and offline -- no `if (Network.IsOwner)` guard that silently disables everything in a solo playtest.
+- **`add_host_migration_recovery`** -- a proxy->authority transition detector: when `IsProxy` flips true->false (this client is promoted to host), it fires the static `OnBecameHost(GameObject)` + a rebuild TODO, then a deferred `SettleSeconds` validation pass -- the recommended shape for s&box's known host-migration state loss. Inert offline; needs a real migration to fire.
+
+### Added -- Interaction + carry (Tracks E/F)
+
+New `InteractionPackHandlers.cs` + `interactionpack.ts`.
+
+- **`add_interaction_prompt`** -- an eye-traced "Press E" HUD (`.razor` + `.razor.scss`, razor_lint-safe): each frame traces from `Scene.Camera` out to `Range`, and when the crosshair is on a `Component.IPressable` shows a centered pill (its `GetTooltip()` or a default from the action). The visible half of the interaction loop -- pairs with `create_interactable` / `add_interaction_station`, which handle the press. LOCAL/visual-only.
+- **`create_hold_to_confirm`** -- a hold-to-fill action: `Progress` fills 0..1 over `HoldSeconds` while an input is `Input.Down`, snaps back (or drains, `DecayOnRelease`) on early release, fires the static `OnConfirmed(GameObject)` at full then cools down. The "hold E to disarm/revive" primitive; read `Progress` for your own radial/bar. Owner-only (`IsProxy`-guarded), single-player safe.
+- **`create_carry_system`** -- first-person pickup/carry/throw for physics props: eye-traces `Scene.Camera` for a `Rigidbody` tagged `CarryTag`, routes an `[Rpc.Host]` grab that re-validates and hands network ownership to the carrier (`GameObject.Network.AssignOwnership(Rpc.Caller)`), disables the rigidbody's `MotionEnabled` while held, follows a `HoldOffset` each `FixedUpdate`, and throws with an impulse. Held id is `[Sync(SyncFlags.FromHost)]` so proxies see the carry; `OnPickedUp` / `OnDropped` events. Single-player safe.
+
+### Added -- Loot / economy (Track D)
+
+New `LootEconomyHandlers.cs` + `looteconomy.ts`.
+
+- **`create_gacha_drop_table`** -- a host-authoritative two-level roller: parallel `RarityNames` / `RarityWeights` pick a rarity by cumulative weight, a flat `"Rarity:Item"` list picks the item, a pity counter (`PityAfter`) guarantees the rarest tier, and duplicate detection fires an `OnDuplicate` hook. The roll routes through `[Rpc.Host]` (caller re-validated -- NetFlags is not security) and fans out via `[Rpc.Broadcast]` (`OnRolled`). Folds `create_pity_loot_roll`; pairs with `create_economy_wallet` + `create_inventory`.
+- **`create_currency_pickup`** -- a networked coin (`Component.ITriggerListener`): the HOST validates a `PlayerTag` entry, grants `Value` into the player's wallet, then destroys the pickup network-wide (host `Destroy()` replicates -- there's no `NetworkDestroy` on this SDK); an optional magnet accelerates it toward the nearest player. The deposit is a one-line **`Grant` seam** wired to `player.Components.Get<EconomyWallet>()?.AddMoney(...)` -- compiles standalone with no hard reference to a wallet class. Pairs with `create_economy_wallet` + `create_floating_combat_text` (spawn a "+N" popup).
+- **`create_offline_progress`** -- the idle-game staple: persists `LastSeenUtc` to `FileSystem.Data`, on enable computes the elapsed time since `LastSeenUtc` (clock-rollback guard, clamped to `MaxOfflineHours`) and replays it through a `SimulateOffline(seconds)` TODO in fixed `TickSeconds` chunks (deterministic, frame-rate independent), then fires the static `OnOfflineProgressApplied(seconds)`. `IsProxy`-guarded so a client can't author their own earnings.
+
+### Added -- UI / feedback (Track C)
+
+razor_lint-safe by construction, modeled on `create_leaderboard_panel`. New `UiFeedbackHandlers.cs` + `uifeedback.ts`.
+
+- **`create_worldpanel_ui`** -- a diegetic, clickable world-space UI: a `PanelComponent` (+ scss) meant to share a GameObject with a `Sandbox.WorldPanel` (the render surface), with example buttons raising a static `OnButtonPressed(id)` so game code reacts without editing the panel. **Scene prerequisite documented:** clicks only fire when a `Sandbox.WorldInput` exists in the scene (on the camera/player) with its `LeftMouseAction` set -- without it `@onclick` never fires.
+- **`create_proxy_nametag`** -- a `TextRenderer`-billboarded owner name above a networked player: reads `Network.Owner.DisplayName`, renders only when `Network.IsProxy` (so you never see a tag over your own head), spawns a child object so billboarding doesn't rotate the model, and fades out past `MaxDistance`.
+- **`create_combo_meter`** -- a combo system: a headless authoritative component (static `Bump()`, a `ComboWindowSeconds` decay window tracked with `TimeSince`, multiplier tiers) + a pulsing Razor HUD subscribed to the static `OnComboChanged`. Pairs with `create_health_system` / `create_floating_combat_text`.
+
+### Notes -- the verify-gate earned its keep again
+
+- **All 15 codegen scaffolds were generated into the live Gravehold project, hotloaded, and compile-checked** before shipping; every generated component then loaded as a `Component` in the `TypeLibrary`. **The gate caught a real SDK bug:** the generated code called `.IsValid` on `Sandbox.Connection`, which has **no `IsValid` member** on this SDK (3 sites -- `create_host_rpc_action` x2, `add_targeted_rpc`, `create_gacha_drop_table`). Fixed to null checks, regenerated, all 15 then compiled clean. Reflection over folklore -- lesson added to `CLAUDE.md` ("`Connection` has no `IsValid` -- null-check it").
+- The 19 new tools need both the updated MCP server (`sbox-mcp-server@1.20.0`) and the republished addon (`BridgeVersion` `1.20.0`). **No breaking changes** to existing tool contracts.
+
+### Roadmap / engine-watch
+
+- **MovieMaker SHIPPED** -- the sequencer's `MoviePlayer` / `MovieResource` are now in the shipping build and covered (above). Still queued: **record-gameplay-to-clip** (`MovieRecorder`) and **offline lipsync generation** (only `Editor.VisemeEditor.Visemes` is public so far).
+- **Loopback multi-instance socket is still absent from the shipping build** (`search_types "loopback"` = 0 on 2026-07-08) -- the local-loopback multiplayer-test harness (spawn N clients, drive each via `playtest`, assert sync) stays queued for **v1.21.0**. See `docs/TOOL_BACKLOG.md`.
+
 ## [1.19.0] -- 2026-07-07
 
 **+3 tools -- the Game Feel pack. Camera shake, flickering lights, floating damage numbers: the "juice" layer that makes a mechanically-working game feel alive. 209 tools / 200 handlers (was 206/197) -- the bridge crosses 200 editor handlers. Additive -- no existing tool contract changed. All three live-verified (handlers compiled + every scaffold's generated code compile-verified in the game assembly + TypeLibrary-load-confirmed).**

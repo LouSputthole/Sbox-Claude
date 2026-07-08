@@ -55,6 +55,12 @@ import { registerStationTools } from "./tools/stations.js";
 import { registerDirectorTools } from "./tools/director.js";
 import { registerSaveSlotsTools } from "./tools/saveslots.js";
 import { registerGameFeelTools } from "./tools/gamefeel.js";
+import { registerMovieMakerTools } from "./tools/moviemaker.js";
+import { registerNetPrimitivesTools } from "./tools/netprimitives.js";
+import { registerInteractionPackTools } from "./tools/interactionpack.js";
+import { registerLootEconomyTools } from "./tools/looteconomy.js";
+import { registerUiFeedbackTools } from "./tools/uifeedback.js";
+import { registerCinematicsTools } from "./tools/cinematics.js";
 
 // ── CLI flags ──────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -225,6 +231,12 @@ registerStationTools(server, bridge);
 registerDirectorTools(server, bridge);
 registerSaveSlotsTools(server, bridge);
 registerGameFeelTools(server, bridge);
+registerMovieMakerTools(server, bridge);
+registerNetPrimitivesTools(server, bridge);
+registerInteractionPackTools(server, bridge);
+registerLootEconomyTools(server, bridge);
+registerUiFeedbackTools(server, bridge);
+registerCinematicsTools(server, bridge);
 
 /** Start the MCP server on stdio and attempt initial Bridge connection. */
 async function main(): Promise<void> {

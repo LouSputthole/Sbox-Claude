@@ -32,7 +32,7 @@ public static class ClaudeBridge
 
 	// Bridge build version — surfaced in status.json + the Status menu so a
 	// marketplace-addon-vs-MCP-server skew is visible at a glance.
-	private const string BridgeVersion = "1.19.0";
+	private const string BridgeVersion = "1.20.0";
 
 	// status.json doubles as a heartbeat. _startedAtIso is stamped once at start;
 	// the heartbeat timestamp is refreshed from the frame loop at most once per
@@ -466,6 +466,37 @@ public static class ClaudeBridge
 		Register( "add_flicker_light",            () => new AddFlickerLightHandler() );
 		Register( "create_floating_combat_text",  () => new CreateFloatingCombatTextHandler() );
 
+		// ── Batch 45: v1.20.0 — MovieMaker / cutscene family ────────────
+		Register( "list_movies",                  () => new ListMoviesHandler() );
+		Register( "add_movie_player",             () => new AddMoviePlayerHandler() );
+		Register( "play_movie",                   () => new PlayMovieHandler() );
+		Register( "stop_movie",                   () => new StopMovieHandler() );
+
+		// ── Batch 46: v1.20.0 — Networking primitives pack (Track B) ────
+		Register( "create_host_rpc_action",       () => new CreateHostRpcActionHandler() );
+		Register( "add_targeted_rpc",             () => new AddTargetedRpcHandler() );
+		Register( "create_local_player_resolver", () => new CreateLocalPlayerResolverHandler() );
+		Register( "add_host_migration_recovery",  () => new AddHostMigrationRecoveryHandler() );
+
+		// ── Batch 47: v1.20.0 — Interaction + carry pack (Tracks E/F) ───
+		Register( "add_interaction_prompt",       () => new AddInteractionPromptHandler() );
+		Register( "create_hold_to_confirm",       () => new CreateHoldToConfirmHandler() );
+		Register( "create_carry_system",          () => new CreateCarrySystemHandler() );
+
+		// ── Batch 48: v1.20.0 — Loot / Economy variants (Track D) ───────
+		Register( "create_gacha_drop_table",      () => new CreateGachaDropTableHandler() );
+		Register( "create_currency_pickup",       () => new CreateCurrencyPickupHandler() );
+		Register( "create_offline_progress",      () => new CreateOfflineProgressHandler() );
+
+		// ── Batch 49: v1.20.0 — UI / feedback pack (Track C) ────────────
+		Register( "create_worldpanel_ui",         () => new CreateWorldPanelUiHandler() );
+		Register( "create_proxy_nametag",         () => new CreateProxyNametagHandler() );
+		Register( "create_combo_meter",           () => new CreateComboMeterHandler() );
+
+		// ── Batch 50: v1.20.0 — Cinematics & Dialogue (hand-authored) ───
+		Register( "create_cutscene_director",     () => new CreateCutsceneDirectorHandler() );
+		Register( "create_dialogue_system",       () => new CreateDialogueSystemHandler() );
+
 		Log.Info( $"[SboxBridge] Registered {_handlers.Count} handlers" );
 	}
 
@@ -511,6 +542,12 @@ public static class ClaudeBridge
 		"copy_asset_with_dependencies",
 		"add_lipsync", "create_round_state_machine", "add_interaction_station", "create_event_director", "create_save_slots",
 		"create_camera_shake", "add_flicker_light", "create_floating_combat_text",
+		"add_movie_player",
+		"create_host_rpc_action", "add_targeted_rpc", "create_local_player_resolver", "add_host_migration_recovery",
+		"add_interaction_prompt", "create_hold_to_confirm", "create_carry_system",
+		"create_gacha_drop_table", "create_currency_pickup", "create_offline_progress",
+		"create_worldpanel_ui", "create_proxy_nametag", "create_combo_meter",
+		"create_cutscene_director", "create_dialogue_system",
 	};
 
 	internal static bool IsSceneMutating( string command ) => _sceneMutatingCommands.Contains( command );

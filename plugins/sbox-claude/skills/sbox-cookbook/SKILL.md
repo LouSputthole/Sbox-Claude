@@ -62,6 +62,7 @@ Each `references/systems/<x>.md` = what it is + the canonical modern approach + 
 | Building / placement (grid snap, footprint, modular) | `references/systems/building-placement.md` |
 | Crafting (recipes, refine, mill/smelt) | `references/systems/crafting.md` |
 | Dialogue / quest / VN | `references/systems/dialogue.md` |
+| Cutscene / cinematic / Movie Maker / dialogue / conversation / story / NPC dialogue (bridge scaffolds) | `references/systems/cutscenes-dialogue.md` |
 | Round / match / gamemode flow (phase machines) | `references/systems/round-match.md` |
 | Spawning / waves / NPC | `references/systems/spawning-waves.md` |
 | Anti-cheat / validation (clamp, sanitize, sign, provably-fair) | `references/systems/anti-cheat.md` |
