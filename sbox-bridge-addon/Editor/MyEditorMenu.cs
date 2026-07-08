@@ -32,7 +32,7 @@ public static class ClaudeBridge
 
 	// Bridge build version — surfaced in status.json + the Status menu so a
 	// marketplace-addon-vs-MCP-server skew is visible at a glance.
-	private const string BridgeVersion = "1.18.0";
+	private const string BridgeVersion = "1.19.0";
 
 	// status.json doubles as a heartbeat. _startedAtIso is stamped once at start;
 	// the heartbeat timestamp is refreshed from the frame loop at most once per
@@ -461,6 +461,11 @@ public static class ClaudeBridge
 		Register( "create_event_director",        () => new CreateEventDirectorHandler() );
 		Register( "create_save_slots",            () => new CreateSaveSlotsHandler() );
 
+		// ── Batch 44: v1.19.0 — Game Feel pack (juice scaffolds) ────────
+		Register( "create_camera_shake",          () => new CreateCameraShakeHandler() );
+		Register( "add_flicker_light",            () => new AddFlickerLightHandler() );
+		Register( "create_floating_combat_text",  () => new CreateFloatingCombatTextHandler() );
+
 		Log.Info( $"[SboxBridge] Registered {_handlers.Count} handlers" );
 	}
 
@@ -505,6 +510,7 @@ public static class ClaudeBridge
 		"ensure_input_action",
 		"copy_asset_with_dependencies",
 		"add_lipsync", "create_round_state_machine", "add_interaction_station", "create_event_director", "create_save_slots",
+		"create_camera_shake", "add_flicker_light", "create_floating_combat_text",
 	};
 
 	internal static bool IsSceneMutating( string command ) => _sceneMutatingCommands.Contains( command );

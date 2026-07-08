@@ -2,6 +2,22 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## [1.19.0] -- 2026-07-07
+
+**+3 tools -- the Game Feel pack. Camera shake, flickering lights, floating damage numbers: the "juice" layer that makes a mechanically-working game feel alive. 209 tools / 200 handlers (was 206/197) -- the bridge crosses 200 editor handlers. Additive -- no existing tool contract changed. All three live-verified (handlers compiled + every scaffold's generated code compile-verified in the game assembly + TypeLibrary-load-confirmed).**
+
+### Added -- game-feel scaffolds (Tier-2 of the mined backlog begins)
+
+All three generate LOCAL/visual-only components (no `[Sync]`) -- the nextSteps note the multiplayer pattern (call from an `[Rpc.Broadcast]` so every client gets the juice).
+
+- **`create_camera_shake`** -- the corpus-standard trauma model: events add `Trauma` (0..1), shake magnitude is `Trauma²` (footsteps barely register, explosions slam), offsets are smooth Perlin noise -- not white-noise jitter -- and trauma decays every frame. Fire from anywhere via the static `CameraShake.Shake(0.4f)`. Applies in `OnPreRender` AFTER controllers position the camera, with an un-apply guard (only subtract our own last write) so it neither fights a controller-driven camera nor accumulates on a static one, and restores the camera exactly at trauma zero. New `GameFeelHandlers.cs` + `gamefeel.ts`.
+- **`add_flicker_light`** -- a light-flicker animator attached to an existing PointLight / SpotLight / DirectionalLight (pass `lightId`): five presets -- Candle (soft organic sway), Fluorescent (steady with random dips), Faulty (hard on/off cuts), Pulse (sine breathing), Lightning (dim baseline, rare bright flashes) -- modulating `LightColor` around the color captured on enable and restoring it exactly on disable. `Intensity` sets flicker depth, `Speed` scales the pattern, output smoothed so hard styles read as a light, not strobe noise. The single biggest atmosphere win per call for horror/night scenes -- pairs with `apply_atmosphere`.
+- **`create_floating_combat_text`** -- rising, fading, camera-billboarded damage popups over `TextRenderer`: no Razor, no WorldPanel, zero UI setup. Nothing to place -- the generated class carries a static factory (`FloatingCombatText.Spawn(pos, "-25", Color.Red)`) that spawns a popup which rises, fades over `Lifetime`, and destroys itself. Pairs with `create_health_system`: call it from the damage path and every hit prints its number.
+
+### Roadmap
+
+- **Next (v1.20.0): the MovieMaker/cutscene tool family** -- `Sandbox.MovieMaker` (MoviePlayer component, MovieResource, keyframe tooling) is under active upstream development and entirely uncovered by the bridge; same-week engine support is the play that worked for `add_lipsync`. If Facepunch's local loopback socket for multi-instance testing reaches the shipping build first, the multiplayer-test harness takes the slot instead. See `docs/TOOL_BACKLOG.md`.
+
 ## License change -- 2026-07-02
 
 **Relicensed from AGPL-3.0-or-later to the s&box Claude Bridge Source-Available License 1.0 (no redistribution).** No code/tool changes; still 206 tools / 197 handlers. You may use the bridge and modify it locally to build your own s&box games (free or commercial); you may NOT redistribute, fork, mirror, repackage, re-host, or offer it as a service. The "s&box Claude Bridge" / "sboxskins.gg" name and branding are trademarks and not licensed for reuse. Versions published before this change remain available under AGPL-3.0-or-later; this and all later versions are governed by the new license. See `LICENSE` and `NOTICE`.

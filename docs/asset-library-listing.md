@@ -1,7 +1,7 @@
 # Claude Bridge for s&box
 ### Build s&box games by talking to Claude — or any AI.
 
-**200+ tools · 197 handlers** that let an AI work *inside* your s&box editor — writing scripts, creating GameObjects, wiring components, and building whole systems: physics, networking, UI, lighting, characters, terrain, and more. You describe what you want; Claude builds it, screenshots it, and fixes it.
+**200+ tools · 200 handlers** that let an AI work *inside* your s&box editor — writing scripts, creating GameObjects, wiring components, and building whole systems: physics, networking, UI, lighting, characters, terrain, and more. You describe what you want; Claude builds it, screenshots it, and fixes it.
 
 But the tools aren't the real story. **The bridge ships a brain.** The companion plugin now bundles `sbox-cookbook` — a deep, code-grounded knowledge base of how to actually build games in s&box, mined from **real, shipped, open-source s&box games** and the modern engine source. So the AI reaches for *proven, shipped patterns* — real inventories, economies, save systems, shops, gacha, progression, multiplayer netcode, whole genre playbooks — instead of guessing.
 
@@ -116,7 +116,7 @@ Once it's installed and the bridge is connected, you just **talk to Claude in yo
 
 ---
 
-## What it can do (200+ tools · 197 handlers)
+## What it can do (200+ tools · 200 handlers)
 
 **Scene & GameObjects** — create, clone, transform, parent, delete; full hierarchy access + editor selection; find objects by name, component, or tag.
 
@@ -376,6 +376,6 @@ s&box current SDK · Node.js 18+ · Claude Code (or any MCP client) · Windows, 
 
 ---
 
-**Two pieces, zero ceremony. 200+ tools · 197 handlers + a brain trained on real shipped games. Describe your game — Claude builds it.**
+**Two pieces, zero ceremony. 200+ tools · 200 handlers + a brain trained on real shipped games. Describe your game — Claude builds it.**
 
 *Built by [sboxskins.gg](https://sboxskins.gg), the s&box community marketplace.*

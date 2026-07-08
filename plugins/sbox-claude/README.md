@@ -8,7 +8,7 @@ This plugin bundles:
 
 | Component | What it does |
 |---|---|
-| **MCP server registration** (`sbox` from npm) | 206 tools to drive the s&box editor — GameObjects, scripts, scenes, components, physics, networking, UI, world-gen, lighting & atmosphere, characters, lipsync, scene layout, navmesh & spatial queries, particles, animation, NPC brains, playable-game scaffolds, networking & scene inspection/lint, save & services queries, scatter & object utilities, self-diagnosis, console/C# execution, live docs search, type discovery, debug-draw visualization, play-mode time-scale & profiler, and a playtest harness that runs a scripted gameplay loop and asserts the result in-frame |
+| **MCP server registration** (`sbox` from npm) | 209 tools to drive the s&box editor — GameObjects, scripts, scenes, components, physics, networking, UI, world-gen, lighting & atmosphere, characters, lipsync, scene layout, navmesh & spatial queries, particles, animation, NPC brains, playable-game scaffolds, game-feel juice (camera shake / flicker lights / floating combat text), networking & scene inspection/lint, save & services queries, scatter & object utilities, self-diagnosis, console/C# execution, live docs search, type discovery, debug-draw visualization, play-mode time-scale & profiler, and a playtest harness that runs a scripted gameplay loop and asserts the result in-frame |
 | **Skill: `sbox-build-feature`** | Codifies the screenshot-driven iteration workflow — bridge check, brainstorm gate, API research, hotload verify, screenshot read. Prevents the "guess and check" loop |
 | **Skill: `sbox-api`** | Schema-grounded s&box API knowledge — Unity→s&box translation table, the Ten Rules, and curated component/UI/networking/physics references. Stops Unity-pattern hallucination; repointed to verify signatures via the bridge's live `describe_type`. Adapted from [claude-sbox](https://github.com/gavogavogavo/claude-sbox) (MIT © David Ryan) |
 | **Skill: `sbox-cookbook`** | A master **router** of code-grounded recipes mined from 51 current (2026) open-source s&box games + the modern engine repos -- **11 engine**, **18 system**, and **20 genre** references. Ask "how do I build a tycoon / an inventory / a save system?" and it routes to a grounded how-to |
@@ -95,7 +95,7 @@ The agent runs the `sbox-build-feature` skill as its default workflow.
 
 ## Version compatibility
 
-- This plugin is **v1.18.0**. **The MCP server version is pinned in the plugin's `.mcp.json`** (currently `sbox-mcp-server@1.18.0`) so the addon/server pair can't silently drift. Keep the bridge **addon** at a matching `1.18.x` (`BridgeVersion` `1.18.0`) -- `get_bridge_status` warns if the server and addon versions diverge.
+- This plugin is **v1.19.0**. **The MCP server version is pinned in the plugin's `.mcp.json`** (currently `sbox-mcp-server@1.19.0`) so the addon/server pair can't silently drift. Keep the bridge **addon** at a matching `1.19.x` (`BridgeVersion` `1.19.0`) -- `get_bridge_status` warns if the server and addon versions diverge.
 - The bridge addon and MCP server are major-version-compatible — a `1.x` addon works with a `1.x` MCP server. If you upgrade one, upgrade both.
 
 ## Troubleshooting

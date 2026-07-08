@@ -54,6 +54,7 @@ import { registerRoundStateTools } from "./tools/roundstate.js";
 import { registerStationTools } from "./tools/stations.js";
 import { registerDirectorTools } from "./tools/director.js";
 import { registerSaveSlotsTools } from "./tools/saveslots.js";
+import { registerGameFeelTools } from "./tools/gamefeel.js";
 
 // ── CLI flags ──────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -223,6 +224,7 @@ registerRoundStateTools(server, bridge);
 registerStationTools(server, bridge);
 registerDirectorTools(server, bridge);
 registerSaveSlotsTools(server, bridge);
+registerGameFeelTools(server, bridge);
 
 /** Start the MCP server on stdio and attempt initial Bridge connection. */
 async function main(): Promise<void> {

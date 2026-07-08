@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v1.18.0</strong> · <strong>206 tools</strong> · <strong>197 handlers</strong> · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v1.19.0</strong> · <strong>209 tools</strong> · <strong>200 handlers</strong> · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -52,7 +52,7 @@ Pick the path with the least resistance for you. **Every path needs both halves*
 
 ### A. Claude Code plugin — easiest
 
-The plugin registers the MCP server for you (pinned to `sbox-mcp-server@1.18.0`, fetched via `npx` on first use) and ships the workflow skills, the onboarding wizard, and the specialist agent.
+The plugin registers the MCP server for you (pinned to `sbox-mcp-server@1.19.0`, fetched via `npx` on first use) and ships the workflow skills, the onboarding wizard, and the specialist agent.
 
 1. **Add the marketplace + install the plugin** (in Claude Code):
    ```

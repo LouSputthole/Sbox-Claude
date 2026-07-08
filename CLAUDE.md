@@ -2,13 +2,22 @@
 
 > Let non-coders build s&box games through conversation with Claude Code.
 
-## Status: v1.18.0 -- 197 handlers / 206 tools (run `get_bridge_status` for the live tool/handler count)
+## Status: v1.19.0 -- 200 handlers / 209 tools (run `get_bridge_status` for the live tool/handler count)
 
-**Last updated:** 2026-07-02 (v1.18.0)
+**Last updated:** 2026-07-07 (v1.19.0)
 **Bridge:** File-based IPC ✅ working on main thread
 **Tools:** MCP `server.tool()` registrations across `sbox-mcp-server/src/tools/`
 **Handlers:** C# command handlers compiled and registered — see the Status header above / `get_bridge_status` for the live count
 **Why the difference:** several tools are **MCP-server-side** and need no editor handler — `read_log`, `get_compile_errors`, `execute_csharp`, `search_docs`, `get_doc_page`, `list_doc_categories`, `run_self_test`. They read the log file / fetch docs / hotload-eval directly, so they work even when the editor has crashed or stalled.
+
+### What's new in v1.19.0
+
+**+3 tools — the Game Feel pack: camera shake, flickering lights, floating damage numbers. 200 handlers / 209 tools (was 197/206).** Additive — no existing tool contract changed. All three generate LOCAL/visual-only components (no `[Sync]`); wrap the calls in an `[Rpc.Broadcast]` for multiplayer juice.
+
+- **`create_camera_shake`** — trauma-based shake (magnitude = `Trauma²`, smooth Perlin offsets, per-frame decay) applied in `OnPreRender` with an un-apply guard so it neither fights a controller-driven camera nor accumulates on a static one. Static API: `CameraShake.Shake(0.4f)` from any game code. New `GameFeelHandlers.cs` + `gamefeel.ts`.
+- **`add_flicker_light`** — flicker animator for an existing light (pass `lightId`): Candle / Fluorescent / Faulty / Pulse / Lightning presets, modulates `LightColor` around the captured base color, restores it exactly on disable.
+- **`create_floating_combat_text`** — rising/fading/billboarded damage popups via `TextRenderer` (no Razor, no panels). Static factory: `FloatingCombatText.Spawn(pos, "-25", Color.Red)`; self-destructs after `Lifetime`. Pairs with `create_health_system`.
+- **Tier-2 of the mined backlog has begun** — next up (v1.20.0): the `Sandbox.MovieMaker` cutscene family, or the loopback multiplayer-test harness if it ships first. See `docs/TOOL_BACKLOG.md`.
 
 ### What's new in v1.18.0
 

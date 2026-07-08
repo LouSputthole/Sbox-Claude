@@ -28,7 +28,12 @@ The 51-game corpus mining (`sbox-lessons/mining-v2/`) surfaced **352 candidate b
 - `create_save_slots` (saveslots.json manifest + per-slot payloads -- no directory-listing API needed; versioned, optional GUID scene reconciliation; compile-verified)
 - Plus `add_lipsync` (not from this corpus -- same-week support for the engine's new `Sandbox.LipSync` component, shipped upstream 2026-07-01).
 
-**Next up:** Tier-2 by theme below, and the ENGINE-WATCH items:
+**Built in v1.19.0 (2026-07-07) -- the Game Feel pack (Tier-2 begins), all verify-gated live -- handler count now 200:**
+- `create_camera_shake` (trauma model: Trauma^2 magnitude, Perlin offsets, OnPreRender un-apply guard so it neither fights a controller nor accumulates on a static camera; static Shake() API)
+- `add_flicker_light` (Candle/Fluorescent/Faulty/Pulse/Lightning presets; modulates LightColor around the captured base, restores on disable)
+- `create_floating_combat_text` (TextRenderer popups -- rise/fade/billboard/self-destruct via a static Spawn() factory; covers add_value_floater + add_damage_popups too)
+
+**Next up (v1.20.0):** Tier-2 by theme below, and the ENGINE-WATCH items:
 - **Loopback multi-instance networking harness** -- Facepunch merged a local loopback socket for multi-instance testing (upstream master 2026-07-02, NOT in the shipping build yet; `search_types "loopback"` returned 0 on 2026-07-02). When it ships: spawn N loopback clients, drive each via `drive_player`/`playtest`, assert sync -- the real multiplayer-test harness.
 - **MovieMaker / cutscene tool family** -- `Sandbox.MovieMaker` (MoviePlayer component, MovieResource, MovieRecorder) is entirely uncovered by the bridge and under active upstream development (keyframe split/join 2026-06-30). Candidates: `add_movie_player`, `play_movie`, maybe record-gameplay-to-clip.
 - **Offline lipsync generation** -- the Sound Editor now bakes visemes offline; if a public API surfaces (only `Editor.VisemeEditor.Visemes` visible now), a `generate_lipsync` tool could produce dialogue-ready audio from the bridge.
@@ -70,9 +75,9 @@ Legend: **(Nx)** = independently proposed by N games · `easy`/`medium` = miner-
 
 **Vehicles / seats / carry:** `make_drivable`/`add_seat`, `tune_vehicle` (arcade/sim/drift/offroad Pacejka presets), `create_seat_system` (SeatState + MoveMode freeze + safe-exit trace), `create_carry_system` (rigidbody-disable + Pickup/Drop/Throw RPCs + hand-IK), `create_physics_grab_tool` (physgun spring + FixedJoint + ownership takeover).
 
-**World / render / atmosphere:** `add_water_body` + `create_water_profile` (Gerstner `.wtdef`), `create_daynight_cycle` (synced + gradient sun→moon), `add_render_target_camera` / `create_render_to_texture_screen` (CCTV/portal/mirror), `add_flicker_light` (Style presets), `create_camera_shake` (trauma/Perlin + GameResource), `create_grass_streamer` (LOD GPU-instanced chunks), `create_primitive_builder` (Build.Box/Ball — instant visible no-art).
+**World / render / atmosphere:** `add_water_body` + `create_water_profile` (Gerstner `.wtdef`), `create_daynight_cycle` (synced + gradient sun→moon), `add_render_target_camera` / `create_render_to_texture_screen` (CCTV/portal/mirror), `add_flicker_light` ✅ v1.19.0, `create_camera_shake` ✅ v1.19.0, `create_grass_streamer` (LOD GPU-instanced chunks), `create_primitive_builder` (Build.Box/Ball — instant visible no-art).
 
-**UI / feedback:** `override_build_hash` / `add_panel_buildhash` (auto-fold synced props), `create_worldpanel_ui` (diegetic clickable WorldPanel + WorldInput modal gate), `add_value_floater` / `create_floating_combat_text` / `add_damage_popups`, `create_combo_meter`, `create_proxy_nametag`.
+**UI / feedback:** `override_build_hash` / `add_panel_buildhash` (auto-fold synced props), `create_worldpanel_ui` (diegetic clickable WorldPanel + WorldInput modal gate), `add_value_floater` / `create_floating_combat_text` / `add_damage_popups` ✅ v1.19.0 (one tool covers all three), `create_combo_meter`, `create_proxy_nametag`.
 
 **Networking primitives:** `add_sync_from_host_property`, `add_rate_limited_rpc` (per-Connection cooldown), `add_targeted_rpc` (`Rpc.FilterInclude` single-client side-effect), `create_host_rpc_action` (caller-resolve + re-validate skeleton), `add_host_migration_recovery` (proxy→authority detector + rebuild), `add_network_visible_cull` (`INetworkVisible` distance), `create_local_player_resolver` (proxy-safe Local, online+offline).
 
