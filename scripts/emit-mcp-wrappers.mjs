@@ -58,6 +58,7 @@ const MODULE_TOOLSET = {
   audit: "bridge_validation",
   batch: "bridge_batch",
   workflow: "bridge_workflow",
+  vehicles: "bridge_vehicle",
   audio: "bridge_audio",
   characters: "bridge_character",
   cinematics: "bridge_scaffold_polish",
@@ -242,6 +243,11 @@ const TOOLSET_META = {
     class: "BridgeMovieMakerTools",
     description:
       "Wire and control Sandbox.MovieMaker cutscene playback: list .movie clips, add MoviePlayer components, play and stop clips.",
+  },
+  bridge_vehicle: {
+    class: "BridgeVehicleTools",
+    description:
+      "Make things drivable: generate raycast-car controllers with built-in driver seats, standalone enter/exit seats, and physgun-style grab tools; apply arcade/drift/offroad/race handling presets to any vehicle component. Attach the generated components with batch_add_component; verify by driving in play mode.",
   },
   bridge_workflow: {
     class: "BridgeWorkflowTools",

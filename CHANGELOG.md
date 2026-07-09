@@ -17,6 +17,13 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 - **`scripts/verify-native-mcp.mjs`** — live verify-gate over streamable HTTP: toolset inventory, search discovery, read-only spot-runs, nullable-binding check, mutating GUID round-trip, inline-image check, error semantics.
 - **`docs/ADDING-A-TOOL.md`** — the new-tool factory: template, checklist, naming conventions, regeneration workflow.
 
+### Added — wave-4 tools (Batch 54: vehicles — NEW bridge_vehicle toolset)
+
+- **`create_vehicle_controller`** — make any Rigidbody prop drivable: 4-corner raycast suspension (spring/damper via ApplyForceAt), mass-scaled engine, speed-scaled yaw steering, lateral grip (low = drift), and a BUILT-IN driver seat (press E; the host assigns the driver network ownership; controller input auto-disabled/restored). Physics APIs verified live via describe_type before generation. Honest limit: compiles + drives is gate-verified; FEEL needs a human playtest.
+- **`create_seat_system`** — standalone networked one-occupant seat: host-routed claims, occupant parented with input disabled, exit tries each ExitOffsets entry for the first clear spot. Chairs, benches, turret mounts.
+- **`tune_vehicle`** — arcade / drift / offroad / race handling presets applied by property name via reflection: targets the generated controller out of the box, partially tunes anything exposing the same names, reports applied+missing. Live gate e2e: drift preset applied to a compiled controller and read back (GripFactor 0.85 → 0.35).
+- **`create_physics_grab_tool`** — physgun-lite: eye-trace grab of Rigidbody props, velocity-set spring follow (physics stays LIVE — collides and swings, unlike the parented carry system), throw on attack1, host-routed ownership.
+
 ### Added — wave-3 tools (Batch 53: scene checkpoints, scene orientation, idle/team scaffolds)
 
 - **NEW `bridge_workflow` toolset — the agent-side undo.** `checkpoint_scene` snapshots every root GameObject (full serialization) to temp storage outside the project; `restore_checkpoint` replaces the scene contents from a snapshot (explicit id required — destructive, never guesses; the scene FILE stays untouched until save_scene); `list_checkpoints` browses them. Checkpoint before risky batch edits, roll back if they go wrong — the practical answer to the engine's addon-inaccessible undo (see Known limitations).

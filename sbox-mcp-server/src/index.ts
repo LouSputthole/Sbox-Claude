@@ -64,6 +64,7 @@ import { registerCinematicsTools } from "./tools/cinematics.js";
 import { registerAuditTools } from "./tools/audit.js";
 import { registerBatchTools } from "./tools/batch.js";
 import { registerWorkflowTools } from "./tools/workflow.js";
+import { registerVehicleTools } from "./tools/vehicles.js";
 
 // ── CLI flags ──────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -104,7 +105,7 @@ ENVIRONMENT VARIABLES
 CONNECT TO CLAUDE CODE
   claude mcp add sbox -- node /path/to/sbox-mcp-server/dist/index.js
 
-TOOLS (241 total / 233 editor handlers · v2: the native editor MCP server at http://127.0.0.1:7269/mcp is the primary path — this stdio server is the full-surface fallback; --lifeline exposes just the editor-down diagnostics)
+TOOLS (245 total / 237 editor handlers · v2: the native editor MCP server at http://127.0.0.1:7269/mcp is the primary path — this stdio server is the full-surface fallback; --lifeline exposes just the editor-down diagnostics)
   Project:     get_project_info, list_project_files, read_file, write_file
   Scripts:     create_script, edit_script, delete_script, trigger_hotload
   Scenes:      list_scenes, load_scene, save_scene, create_scene
@@ -262,6 +263,7 @@ registerCinematicsTools(server, bridge);
 registerAuditTools(server, bridge);
 registerBatchTools(server, bridge);
 registerWorkflowTools(server, bridge);
+registerVehicleTools(server, bridge);
 
 /** Start the MCP server on stdio and attempt initial Bridge connection. */
 async function main(): Promise<void> {

@@ -291,27 +291,56 @@ try {
     check("checkpoint/restore round-trip", false, e.message.slice(0, 200));
   }
 
-  // wave 3: scaffolds — generate → hotload → compile clean → cleanup.
+  // waves 3+4: all five scaffolds — generate → ONE hotload → compile clean →
+  // tune_vehicle e2e on the compiled controller → cleanup.
   try {
-    const ta = await callTool("create_team_assigner", { name: "__GateTeamAssigner" });
-    const ii = await callTool("create_idle_income", { name: "__GateIdleIncome" });
-    const genOk = /"created": true/.test(ta.text) && /"created": true/.test(ii.text);
-    check("wave-3 scaffolds generate", genOk, genOk ? "both .cs written" : (ta.text + ii.text).slice(0, 120));
+    const gens = [
+      ["create_team_assigner", { name: "__GateTeamAssigner" }],
+      ["create_idle_income", { name: "__GateIdleIncome" }],
+      ["create_vehicle_controller", { name: "__GateVehicle" }],
+      ["create_seat_system", { name: "__GateSeat" }],
+      ["create_physics_grab_tool", { name: "__GateGrab" }],
+    ];
+    let genOk = true;
+    for (const [tool, args] of gens) {
+      const r = await callTool(tool, args);
+      if (!/"created": true/.test(r.text)) { genOk = false; check(`scaffold ${tool}`, false, r.text.slice(0, 100)); }
+    }
+    check("wave-3/4 scaffolds generate (5)", genOk, genOk ? "all .cs written" : "see above");
+
     await callTool("trigger_hotload", {});
     let compiled = false, lastStatus = "";
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 24; i++) {
       await new Promise((r) => setTimeout(r, 5000));
       const cs = await rpc("tools/call", { name: "call_tool", arguments: { name: "compile_status", arguments: {} } });
       lastStatus = (cs.content ?? []).map((c) => c.text).join(" ");
       if (/Failed|error CS/i.test(lastStatus)) { compiled = false; break; }
-      if (/success|compiled|ok|idle|complete/i.test(lastStatus)) { compiled = true; break; }
+      if (/"IsBuilding":false/.test(lastStatus) && /"Success":true/.test(lastStatus)) { compiled = true; break; }
     }
-    check("wave-3 scaffolds compile clean", compiled, lastStatus.replace(/\s+/g, " ").slice(0, 100));
-    await callTool("delete_script", { path: "Code/__GateTeamAssigner.cs" });
-    await callTool("delete_script", { path: "Code/__GateIdleIncome.cs" });
+    check("wave-3/4 scaffolds compile clean (5)", compiled, lastStatus.replace(/\s+/g, " ").slice(0, 100));
+
+    // tune_vehicle e2e: attach the compiled controller, apply drift, read back grip.
+    if (compiled) {
+      try {
+        const veh = (await callTool("create_gameobject", { name: "__gate_vehicle", position: "0,0,7100" })).text.match(/[0-9a-f-]{36}/i)[0];
+        await callTool("add_component_with_properties", { id: veh, component: "Rigidbody" });
+        const attach = await callTool("add_component_with_properties", { id: veh, component: "__GateVehicle" });
+        const tune = await callTool("tune_vehicle", { id: veh, preset: "drift" });
+        const grip = await callTool("get_property", { id: veh, component: "__GateVehicle", property: "GripFactor" });
+        const tuned = /"tuned": true/.test(tune.text) && /0\.35/.test(grip.text);
+        check("tune_vehicle e2e (drift preset applied + read back)", tuned,
+          tuned ? "GripFactor 0.85 → 0.35" : (tune.text.slice(0, 80) + " | " + grip.text.slice(0, 60)).replace(/\n/g, " "));
+        await callTool("delete_gameobject", { id: veh });
+      } catch (e) {
+        check("tune_vehicle e2e", false, e.message.slice(0, 160));
+      }
+    }
+
+    for (const f of ["__GateTeamAssigner", "__GateIdleIncome", "__GateVehicle", "__GateSeat", "__GateGrab"])
+      await callTool("delete_script", { path: `Code/${f}.cs` });
     await callTool("trigger_hotload", {});
   } catch (e) {
-    check("wave-3 scaffolds", false, e.message.slice(0, 200));
+    check("wave-3/4 scaffolds", false, e.message.slice(0, 200));
   }
 } catch (e) {
   console.error(`FATAL: ${e.message}`);

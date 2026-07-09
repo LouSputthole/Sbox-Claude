@@ -197,6 +197,12 @@ public static class ClaudeBridge
 		Register( "describe_scene",         () => new DescribeSceneHandler() );
 		Register( "create_team_assigner",   () => new CreateTeamAssignerHandler() );
 		Register( "create_idle_income",     () => new CreateIdleIncomeHandler() );
+
+		// ── Batch 54: bridge_vehicle — the corpus vehicles theme (v2 wave 4) ──
+		Register( "create_vehicle_controller", () => new CreateVehicleControllerHandler() );
+		Register( "create_seat_system",         () => new CreateSeatSystemHandler() );
+		Register( "tune_vehicle",               () => new TuneVehicleHandler() );
+		Register( "create_physics_grab_tool",   () => new CreatePhysicsGrabToolHandler() );
 		Register( "list_project_files",  () => new ListProjectFilesHandler() );
 		Register( "read_file",           () => new ReadFileHandler() );
 		Register( "write_file",          () => new WriteFileHandler() );
@@ -526,7 +532,7 @@ public static class ClaudeBridge
 	private static readonly HashSet<string> _sceneMutatingCommands = new()
 	{
 		"batch_set_property", "batch_delete", "batch_add_component", "batch_reparent",
-		"restore_checkpoint",
+		"restore_checkpoint", "tune_vehicle",
 		"add_light", "set_fog", "add_post_process", "set_skybox", "apply_atmosphere", "apply_post_fx_look", "add_envmap_probe",
 		"spawn_particle", "add_trail", "add_beam", "create_particle_effect",
 		"spawn_model", "spawn_citizen", "dress_citizen", "set_bodygroup", "pose_citizen",
