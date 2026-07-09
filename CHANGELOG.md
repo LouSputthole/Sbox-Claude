@@ -2,7 +2,7 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
-## [Unreleased] -- 2.0.0 "Native" (in progress)
+## [2.0.0] -- 2026-07-09 "Native"
 
 **The bridge migrates onto s&box's NATIVE editor MCP server (`http://127.0.0.1:7269/mcp`, shipped in the editor since 2026-07-06). The full tool surface becomes `[McpTool]` static methods discovered by the engine's ToolRegistry — streamable HTTP instead of 50 ms file polling, inline PNG screenshots instead of temp-file paths, XML docs as the schema, `[McpTool.ReadOnly]` permission hints, and hotload = live tool re-registration. All 219 handlers stay; a generated wrapper layer (`Editor/Mcp/`) delegates to the existing dispatch through one gate. Plan + Phase 0/1 live-verification results: `docs/plans/2026-07-08-native-mcp-migration.md`.**
 
@@ -16,6 +16,13 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 - **`scripts/audit-mcp-quality.mjs`** — surface quality gate: built-in name/toolset collisions (hard fail), vague descriptions, missing param docs, missing next-step/limit notes.
 - **`scripts/verify-native-mcp.mjs`** — live verify-gate over streamable HTTP: toolset inventory, search discovery, read-only spot-runs, nullable-binding check, mutating GUID round-trip, inline-image check, error semantics.
 - **`docs/ADDING-A-TOOL.md`** — the new-tool factory: template, checklist, naming conventions, regeneration workflow.
+
+### Added — wave-2 tools (Batch 52: real prefabs, batch buildout, playtest control)
+
+- **Prefabs are REAL now.** `create_prefab` writes a FULL engine serialization (every component with its property values, all children — the same JSON the editor writes; the old handler wrote a minimal descriptor that dropped both). `instantiate_prefab` actually recreates the tree: engine `GameObject.Clone` for registered prefabs, with a guid-remapped deserialize fallback for freshly-written files (repeat instantiations never collide). `get_prefab_info` returns a structured tree summary (per-node component types, referenced prefabs, depth) instead of a raw JSON dump.
+- **`batch_delete` / `batch_add_component` / `batch_reparent`** (bridge_batch) — the batch family rounds out, all with the `dryRun:true` validate-first convention. batch_delete reports names + child counts before you commit; batch_add_component skips already-equipped objects; batch_reparent guards against cycles.
+- **`playtest_abort`** (bridge_playtest) — stop a stuck/wrong playtest immediately with input state restored; the partial transcript stays readable via playtest_status.
+- **`find_broken_references` round 2** — now also scans every `.scene`/`.prefab` FILE for prefab references to deleted/renamed files (`missing_prefab_file`), the break class scene-level checks can't see. `scanFiles:false` to skip.
 
 ### Added — wave-1 tools (Batch 51: audit & batch operations)
 

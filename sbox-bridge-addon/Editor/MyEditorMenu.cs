@@ -32,7 +32,7 @@ public static class ClaudeBridge
 
 	// Bridge build version — surfaced in status.json + the Status menu so a
 	// marketplace-addon-vs-MCP-server skew is visible at a glance.
-	internal const string BridgeVersion = "1.20.0";
+	internal const string BridgeVersion = "2.0.0";
 
 	// status.json doubles as a heartbeat. _startedAtIso is stamped once at start;
 	// the heartbeat timestamp is refreshed from the frame loop at most once per
@@ -183,6 +183,12 @@ public static class ClaudeBridge
 		Register( "find_broken_references", () => new FindBrokenReferencesHandler() );
 		Register( "batch_set_property",     () => new BatchSetPropertyHandler() );
 		Register( "describe_project",       () => new DescribeProjectHandler() );
+
+		// ── Batch 52: bridge_batch buildout + playtest_abort (v2 wave 2) ──
+		Register( "batch_delete",           () => new BatchDeleteHandler() );
+		Register( "batch_add_component",    () => new BatchAddComponentHandler() );
+		Register( "batch_reparent",         () => new BatchReparentHandler() );
+		Register( "playtest_abort",         () => new PlaytestAbortHandler() );
 		Register( "list_project_files",  () => new ListProjectFilesHandler() );
 		Register( "read_file",           () => new ReadFileHandler() );
 		Register( "write_file",          () => new WriteFileHandler() );
@@ -511,7 +517,7 @@ public static class ClaudeBridge
 	// Commands that mutate the scene/disk — refused while in play mode to avoid save corruption
 	private static readonly HashSet<string> _sceneMutatingCommands = new()
 	{
-		"batch_set_property",
+		"batch_set_property", "batch_delete", "batch_add_component", "batch_reparent",
 		"add_light", "set_fog", "add_post_process", "set_skybox", "apply_atmosphere", "apply_post_fx_look", "add_envmap_probe",
 		"spawn_particle", "add_trail", "add_beam", "create_particle_effect",
 		"spawn_model", "spawn_citizen", "dress_citizen", "set_bodygroup", "pose_citizen",
@@ -2663,22 +2669,34 @@ public class CreatePrefabHandler : IBridgeHandler
 
 		Directory.CreateDirectory( Path.GetDirectoryName( fullPath ) );
 
-		// Serialize a minimal prefab descriptor referencing the GameObject
-		var prefabJson = JsonSerializer.Serialize( new
+		// FULL engine serialization (v2): the same JSON the editor writes — every component
+		// property, every child, ready for real instantiation. (The pre-v2 handler wrote a
+		// minimal descriptor that dropped component values and children.)
+		try
 		{
-			__version  = 0,
-			RootObject = new
-			{
-				Id         = go.Id.ToString(),
-				Name       = go.Name,
-				Enabled    = go.Enabled,
-				Components = go.Components.GetAll().Select( c => new { Type = c.GetType().Name } ).ToArray()
-			}
-		}, new JsonSerializerOptions { WriteIndented = true } );
+			var node = go.Serialize( new GameObject.SerializeOptions() );
+			var file = new System.Text.Json.Nodes.JsonObject { ["RootObject"] = node };
+			// JsonSerializer.Serialize, NOT node.ToJsonString(options): ToJsonString with fresh
+			// options throws "must specify a TypeInfoResolver" in the editor's serializer context.
+			File.WriteAllText( fullPath, JsonSerializer.Serialize( file, new JsonSerializerOptions { WriteIndented = true } ) );
 
-		File.WriteAllText( fullPath, prefabJson );
-		var relativePath = Path.GetRelativePath( rootPath, fullPath ).Replace( '\\', '/' );
-		return Task.FromResult<object>( new { created = true, path = relativePath, sourceId = id } );
+			int compCount = node["Components"] is System.Text.Json.Nodes.JsonArray ca ? ca.Count : 0;
+			int childCount = node["Children"] is System.Text.Json.Nodes.JsonArray ch ? ch.Count : 0;
+			var relativePath = Path.GetRelativePath( rootPath, fullPath ).Replace( '\\', '/' );
+			return Task.FromResult<object>( new
+			{
+				created = true,
+				path = relativePath,
+				sourceId = id,
+				components = compCount,
+				children = childCount,
+				note = "Full serialization (components + children). Instantiate copies with instantiate_prefab; inspect with get_prefab_info."
+			} );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Prefab serialization failed: {ex.Message}" } );
+		}
 	}
 }
 
@@ -2699,37 +2717,71 @@ public class InstantiatePrefabHandler : IBridgeHandler
 
 		try
 		{
-			// Read the prefab to get the name
-			var json      = File.ReadAllText( fullPath );
-			using var doc = JsonDocument.Parse( json );
-			var prefabName = doc.RootElement
-				.TryGetProperty( "RootObject", out var ro ) &&
-				ro.TryGetProperty( "Name", out var nm )
-				? nm.GetString()
-				: Path.GetFileNameWithoutExtension( prefabPath );
+			// Path 1 — engine-blessed: GameObject.Clone(prefabPath) resolves through the
+			// asset system, recreates the full tree, and handles guid remapping. Works for
+			// any REGISTERED .prefab. Try both the given path and the Assets/-stripped form.
+			GameObject go = null;
+			string method = null;
+			foreach ( var candidate in new[] { prefabPath, StripAssetsPrefix( prefabPath ) }.Distinct() )
+			{
+				try { go = GameObject.Clone( candidate ); } catch { /* fall through */ }
+				if ( go != null ) { method = "engine (GameObject.Clone)"; break; }
+			}
 
-			// Create a new GO mirroring the prefab descriptor
-			var go = scene.CreateObject( true );
-			go.Name = prefabName;
+			// Path 2 — fallback for freshly-written prefabs the asset system hasn't
+			// registered yet: deserialize the file directly, remapping EVERY guid
+			// consistently (old→new map) so internal component references stay wired and
+			// repeat instantiations can't collide. The all-zero guid means "none" — kept.
+			if ( go == null )
+			{
+				var text = File.ReadAllText( fullPath );
+				var map = new Dictionary<string, string>();
+				text = System.Text.RegularExpressions.Regex.Replace( text,
+					"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+					m =>
+					{
+						if ( m.Value == "00000000-0000-0000-0000-000000000000" ) return m.Value;
+						if ( !map.TryGetValue( m.Value, out var nv ) ) { nv = Guid.NewGuid().ToString(); map[m.Value] = nv; }
+						return nv;
+					} );
 
+				var rootNode = System.Text.Json.Nodes.JsonNode.Parse( text )?["RootObject"]?.AsObject();
+				if ( rootNode == null )
+					return Task.FromResult<object>( new { error = "Prefab has no RootObject — not a valid .prefab file" } );
+
+				go = scene.CreateObject( true );
+				go.Deserialize( rootNode );
+				method = "deserialize (fresh prefab, guids remapped)";
+			}
+
+			if ( p.TryGetProperty( "name", out var nameEl ) && !string.IsNullOrWhiteSpace( nameEl.GetString() ) )
+				go.Name = nameEl.GetString();
 			if ( p.TryGetProperty( "position", out var pos ) )
 				go.WorldPosition = ClaudeBridge.ParseVector3( pos );
-
 			if ( p.TryGetProperty( "rotation", out var rot ) )
 				go.WorldRotation = ClaudeBridge.ParseRotation( rot );
 
 			return Task.FromResult<object>( new
 			{
 				instantiated = true,
-				prefab       = prefabPath,
-				gameObject   = ClaudeBridge.SerializeGo( go ),
-				note         = "Basic instantiation — full prefab resource loading requires s&box prefab asset pipeline"
+				prefab = prefabPath,
+				method,
+				gameObject = ClaudeBridge.SerializeGo( go ),
+				components = go.Components.GetAll().Select( c => c.GetType().Name ).ToArray(),
+				childCount = go.Children.Count,
+				note = "Full instantiation — components and children recreated. Position/inspect via the returned id."
 			} );
 		}
 		catch ( Exception ex )
 		{
 			return Task.FromResult<object>( new { error = $"Failed to instantiate prefab: {ex.Message}" } );
 		}
+	}
+
+	static string StripAssetsPrefix( string path )
+	{
+		var norm = path.Replace( '\\', '/' );
+		return norm.StartsWith( "Assets/", StringComparison.OrdinalIgnoreCase ) ? norm.Substring( 7 ) : norm;
 	}
 }
 
@@ -2757,16 +2809,68 @@ public class GetPrefabInfoHandler : IBridgeHandler
 		if ( !File.Exists( fullPath ) )
 			return Task.FromResult<object>( new { error = $"Prefab not found: {prefabPath}" } );
 
-		var content = File.ReadAllText( fullPath );
-		var info    = new FileInfo( fullPath );
-		return Task.FromResult<object>( new
+		// Structured summary (v2) — the raw JSON is available via read_file; this reports
+		// what an agent needs to decide whether/where to instantiate.
+		try
 		{
-			path     = prefabPath,
-			name     = info.Name,
-			size     = info.Length,
-			modified = info.LastWriteTimeUtc.ToString( "o" ),
-			content
-		} );
+			var info = new FileInfo( fullPath );
+			using var doc = JsonDocument.Parse( File.ReadAllText( fullPath ) );
+			if ( !doc.RootElement.TryGetProperty( "RootObject", out var root ) )
+				return Task.FromResult<object>( new { error = "Prefab has no RootObject — not a valid .prefab file" } );
+
+			var prefabRefs = new HashSet<string>();
+			int totalObjects = 0, maxDepth = 0;
+
+			object Walk( JsonElement el, int depth )
+			{
+				totalObjects++;
+				if ( depth > maxDepth ) maxDepth = depth;
+
+				var comps = new List<string>();
+				if ( el.TryGetProperty( "Components", out var cs ) && cs.ValueKind == JsonValueKind.Array )
+					foreach ( var c in cs.EnumerateArray() )
+					{
+						if ( c.TryGetProperty( "__type", out var t ) )
+							comps.Add( t.GetString()?.Split( '.' ).Last() );
+						// nested { "_type": "gameobject", "prefab": "..." } references
+						foreach ( var prop in c.EnumerateObject() )
+							if ( prop.Value.ValueKind == JsonValueKind.Object &&
+							     prop.Value.TryGetProperty( "prefab", out var pr ) && pr.ValueKind == JsonValueKind.String )
+								prefabRefs.Add( pr.GetString() );
+					}
+
+				var children = new List<object>();
+				if ( el.TryGetProperty( "Children", out var ch ) && ch.ValueKind == JsonValueKind.Array )
+					foreach ( var child in ch.EnumerateArray() )
+						children.Add( Walk( child, depth + 1 ) );
+
+				return new
+				{
+					name = el.TryGetProperty( "Name", out var n ) ? n.GetString() : null,
+					components = comps,
+					children = children.Count > 8 ? children.Take( 8 ).ToList() : children,
+					childrenTruncated = children.Count > 8 ? children.Count - 8 : 0
+				};
+			}
+
+			var tree = Walk( root, 0 );
+			return Task.FromResult<object>( new
+			{
+				path = prefabPath,
+				name = info.Name,
+				size = info.Length,
+				modified = info.LastWriteTimeUtc.ToString( "o" ),
+				totalObjects,
+				maxDepth,
+				referencedPrefabs = prefabRefs.ToArray(),
+				tree,
+				note = "Instantiate with instantiate_prefab (pass this path). Raw JSON via read_file if needed."
+			} );
+		}
+		catch ( JsonException )
+		{
+			return Task.FromResult<object>( new { error = "Prefab file is not valid JSON" } );
+		}
 	}
 }
 

@@ -88,6 +88,28 @@ internal static class PlaytestRunner
 	internal static object ConsumeSummary() { lock ( _lock ) { return _lastSummary; } }
 	internal static bool IsActive() { lock ( _lock ) { return _job != null; } }
 
+	/// <summary>Stop the running job NOW: teardown (restore input state) + summarize as aborted.</summary>
+	internal static object Abort()
+	{
+		lock ( _lock )
+		{
+			if ( _job == null )
+				return new { aborted = false, note = "No playtest job is running. playtest_status shows the last summary." };
+			var j = _job;
+			Teardown( j );
+			_lastSummary = Summarize( j, "aborted via playtest_abort" );
+			_job = null;
+			return new
+			{
+				aborted = true,
+				stepsRun = j.Index,
+				passed = j.Passed,
+				failed = j.Failed,
+				note = "Job stopped, input state restored. The partial transcript is available via playtest_status."
+			};
+		}
+	}
+
 	internal static object LiveSnapshot()
 	{
 		lock ( _lock )
@@ -809,4 +831,14 @@ public class PlaytestStatusHandler : IBridgeHandler
 
 		return Task.FromResult<object>( new { active = false, finished = false, note = "No playtest has run yet." } );
 	}
+}
+
+/// <summary>
+/// playtest_abort — stop the running playtest immediately, restoring input state.
+/// The partial transcript stays available via playtest_status.
+/// </summary>
+public class PlaytestAbortHandler : IBridgeHandler
+{
+	public Task<object> Execute( JsonElement p )
+		=> Task.FromResult<object>( PlaytestRunner.Abort() );
 }

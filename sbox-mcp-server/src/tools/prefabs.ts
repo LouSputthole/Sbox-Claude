@@ -13,7 +13,7 @@ export function registerPrefabTools(
   // ── create_prefab ─────────────────────────────────────────────────
   server.tool(
     "create_prefab",
-    "Save an existing GameObject as a .prefab file. NOTE: this writes a minimal descriptor (name, enabled flag, component TYPE names) — component property values and children are NOT serialized, so it is a lightweight template rather than a full s&box prefab asset. Returns { created, path, sourceId } — pass path to instantiate_prefab or get_prefab_info.",
+    "Save an existing GameObject as a real .prefab file — FULL engine serialization: every component with its property values, and all children, in the same JSON format the editor writes. Returns { created, path, sourceId, components, children } — pass path to instantiate_prefab to spawn copies or get_prefab_info to inspect. Errors if the source GameObject is missing; overwrites an existing file at path.",
     {
       id: z.string().describe("GUID of the GameObject to save as prefab"),
       path: z
@@ -36,13 +36,17 @@ export function registerPrefabTools(
   // ── instantiate_prefab ────────────────────────────────────────────
   server.tool(
     "instantiate_prefab",
-    "Spawn a prefab instance into the active scene at an optional position and rotation. NOTE: basic instantiation — it creates a new GameObject named after the prefab; components are NOT recreated from the file (the full s&box prefab pipeline isn't wired), so re-add them with add_component_with_properties. Returns { instantiated, prefab, gameObject, note } — gameObject.id is the new GUID for follow-up calls.",
+    "Spawn a FULL prefab instance into the active scene — components and children recreated. Uses the engine's GameObject.Clone for registered prefabs, with a guid-remapped deserialize fallback for freshly-written files (repeat instantiations never collide). Returns { instantiated, prefab, method, gameObject, components, childCount } — gameObject.id is the new GUID for set_transform/set_property follow-ups. Optional name/position/rotation override the spawned root.",
     {
       path: z
         .string()
         .describe(
           "Path to the .prefab file (e.g. 'prefabs/enemies/grunt.prefab')"
         ),
+      name: z
+        .string()
+        .optional()
+        .describe("Rename the spawned root (defaults to the prefab's root name)"),
       position: z
         .union([
           z.object({
@@ -110,7 +114,7 @@ export function registerPrefabTools(
   // ── get_prefab_info ───────────────────────────────────────────────
   server.tool(
     "get_prefab_info",
-    "Get detailed information about a prefab file. Returns { path, name, size, modified, content } — content is the prefab's full raw JSON, so use this to inspect what a prefab actually contains before instantiate_prefab (find prefabs with list_prefabs).",
+    "Inspect a prefab file as a structured summary: { path, name, size, modified, totalObjects, maxDepth, referencedPrefabs, tree } — tree is the object hierarchy with per-node component type lists (children capped at 8 per node with a truncation count). referencedPrefabs lists other .prefab files this one links to. Use before instantiate_prefab; find prefabs with list_prefabs; raw JSON via read_file if needed.",
     {
       path: z
         .string()

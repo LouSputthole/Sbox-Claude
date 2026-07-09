@@ -47,8 +47,15 @@ export function registerPlaytestTools(server: McpServer, bridge: BridgeClient): 
 
   server.tool(
     "playtest_status",
-    "Poll the playtest started by the playtest tool. While running: { active:true, step, totalSteps, passed, failed }. When done: { finished:true, reason, verdict:'PASS'|'FAIL', passed, failed, stepsRun, totalSteps, controller, controllerResolved, transcript:[...] } — the full per-step pass/fail record, including any capture PNG paths; the finished summary stays readable until the next playtest starts. If none has run yet: { active:false, finished:false }.",
+    "Poll the playtest started by the playtest tool. While running: { active:true, step, totalSteps, passed, failed }. When done: { finished:true, reason, verdict:'PASS'|'FAIL', passed, failed, stepsRun, totalSteps, controller, controllerResolved, transcript:[...] } — the full per-step pass/fail record, including any capture PNG paths; the finished summary stays readable until the next playtest starts. If none has run yet: { active:false, finished:false }. Stop a stuck/wrong run early with playtest_abort.",
     {},
     async () => reply(await bridge.send("playtest_status", {}))
+  );
+
+  server.tool(
+    "playtest_abort",
+    "Stop the RUNNING playtest immediately: releases held input actions, restores UseInputControls, and finalizes the partial transcript (reason 'aborted'). Returns { aborted, stepsRun, passed, failed } — or aborted:false if no job is running. The partial transcript stays readable via playtest_status. Use when a step list is clearly stuck or targeting the wrong object",
+    {},
+    async () => reply(await bridge.send("playtest_abort", {}))
   );
 }

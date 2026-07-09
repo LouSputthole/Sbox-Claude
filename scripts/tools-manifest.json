@@ -1,5 +1,5 @@
 {
-  "toolCount": 231,
+  "toolCount": 235,
   "tools": [
     {
       "module": "assets",
@@ -307,7 +307,7 @@
     {
       "module": "audit",
       "name": "find_broken_references",
-      "description": "Scan every GameObject in the open scene for broken references: renderers with no Model assigned (missing_model), component properties pointing at DESTROYED GameObjects/Components (dead_gameobject_ref / dead_component_ref), and null component entries whose type no longer exists (missing_component). Returns { total, showing, truncated, objectsScanned, issues } — each issue has { id, name, component, kind, detail }. Fix missing models with assign_model; clear dead refs with set_property or set_component_reference. Read-only; safe any time. Results cap at `limit` (default 100, max 500) with truncated:true when more exist",
+      "description": "Scan the project for broken references, two layers in one call: (1) every GameObject in the open scene — renderers with no Model (missing_model), component properties pointing at DESTROYED GameObjects/Components (dead_gameobject_ref / dead_component_ref), null component entries whose type no longer exists (missing_component); (2) every .scene/.prefab FILE — prefab references to deleted/renamed files (missing_prefab_file). Returns { total, showing, truncated, objectsScanned, filesScanned, issues } — each issue has { id, name, component, kind, detail } (file-level issues carry the file path in name). Fix missing models with assign_model, dead refs with set_property/set_component_reference, missing prefab files by fixing the path or recreating via create_prefab. Read-only; safe any time. Results cap at `limit` (default 100, max 500)",
       "params": [
         {
           "name": "limit",
@@ -315,6 +315,124 @@
           "optional": true,
           "type": {
             "kind": "integer"
+          }
+        },
+        {
+          "name": "scanFiles",
+          "description": "Include the .scene/.prefab file scan for missing prefab references. Default true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "batch",
+      "name": "batch_add_component",
+      "description": "Add one component type to MANY GameObjects in one call (e.g. BoxCollider on every crate). Skips objects that already have the component unless skipExisting:false. dryRun:true validates the type and reports per-object alreadyHas WITHOUT adding. Returns { total, succeeded, failed, skipped, dryRun, results }. Follow with batch_set_property to configure the new components. Scene-mutating: refused during play mode",
+      "params": [
+        {
+          "name": "ids",
+          "description": "GUIDs of the target GameObjects (from find_objects or get_selected_objects)",
+          "optional": false,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "component",
+          "description": "Component type name to add, e.g. 'BoxCollider', 'PointLight' (search with list_available_components)",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "skipExisting",
+          "description": "Skip objects that already have this component type. Default true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "dryRun",
+          "description": "true = validate and report without adding anything. Default false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "batch",
+      "name": "batch_delete",
+      "description": "Delete MANY GameObjects (and their entire subtrees) in one call. ALWAYS pass dryRun:true first — it reports each object's name and child count WITHOUT deleting, so you can confirm the target list. Returns { total, succeeded, failed, dryRun, results } with per-object ok/error. Destructive and NOT undoable — get ids from find_objects or get_selected_objects and verify the dry-run before applying. Scene-mutating: refused during play mode",
+      "params": [
+        {
+          "name": "ids",
+          "description": "GUIDs of the GameObjects to delete (subtrees included)",
+          "optional": false,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "dryRun",
+          "description": "true = report names/child counts without deleting anything. Default false — but run a dry pass first",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "batch",
+      "name": "batch_reparent",
+      "description": "Move MANY GameObjects under a new parent (or to the scene root) in one call — organize scattered props into a folder object, or regroup a level section. dryRun:true reports each object's current parent and destination WITHOUT moving. Returns { total, succeeded, failed, dryRun, keepWorldPosition, results }. Errors if parent is among ids (no cycles). Scene-mutating: refused during play mode",
+      "params": [
+        {
+          "name": "ids",
+          "description": "GUIDs of the GameObjects to move",
+          "optional": false,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "parent",
+          "description": "GUID of the new parent GameObject. Omit (or empty) to move to the scene root",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "keepWorldPosition",
+          "description": "Preserve each object's world position while reparenting. Default true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "dryRun",
+          "description": "true = report current parents and the destination without moving anything. Default false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
           }
         }
       ]
@@ -6049,14 +6167,20 @@
     },
     {
       "module": "playtest",
+      "name": "playtest_abort",
+      "description": "Stop the RUNNING playtest immediately: releases held input actions, restores UseInputControls, and finalizes the partial transcript (reason 'aborted'). Returns { aborted, stepsRun, passed, failed } — or aborted:false if no job is running. The partial transcript stays readable via playtest_status. Use when a step list is clearly stuck or targeting the wrong object",
+      "params": []
+    },
+    {
+      "module": "playtest",
       "name": "playtest_status",
-      "description": "Poll the playtest started by the playtest tool. While running: { active:true, step, totalSteps, passed, failed }. When done: { finished:true, reason, verdict:'PASS'|'FAIL', passed, failed, stepsRun, totalSteps, controller, controllerResolved, transcript:[...] } — the full per-step pass/fail record, including any capture PNG paths; the finished summary stays readable until the next playtest starts. If none has run yet: { active:false, finished:false }.",
+      "description": "Poll the playtest started by the playtest tool. While running: { active:true, step, totalSteps, passed, failed }. When done: { finished:true, reason, verdict:'PASS'|'FAIL', passed, failed, stepsRun, totalSteps, controller, controllerResolved, transcript:[...] } — the full per-step pass/fail record, including any capture PNG paths; the finished summary stays readable until the next playtest starts. If none has run yet: { active:false, finished:false }. Stop a stuck/wrong run early with playtest_abort.",
       "params": []
     },
     {
       "module": "prefabs",
       "name": "create_prefab",
-      "description": "Save an existing GameObject as a .prefab file. NOTE: this writes a minimal descriptor (name, enabled flag, component TYPE names) — component property values and children are NOT serialized, so it is a lightweight template rather than a full s&box prefab asset. Returns { created, path, sourceId } — pass path to instantiate_prefab or get_prefab_info.",
+      "description": "Save an existing GameObject as a real .prefab file — FULL engine serialization: every component with its property values, and all children, in the same JSON format the editor writes. Returns { created, path, sourceId, components, children } — pass path to instantiate_prefab to spawn copies or get_prefab_info to inspect. Errors if the source GameObject is missing; overwrites an existing file at path.",
       "params": [
         {
           "name": "id",
@@ -6079,7 +6203,7 @@
     {
       "module": "prefabs",
       "name": "get_prefab_info",
-      "description": "Get detailed information about a prefab file. Returns { path, name, size, modified, content } — content is the prefab's full raw JSON, so use this to inspect what a prefab actually contains before instantiate_prefab (find prefabs with list_prefabs).",
+      "description": "Inspect a prefab file as a structured summary: { path, name, size, modified, totalObjects, maxDepth, referencedPrefabs, tree } — tree is the object hierarchy with per-node component type lists (children capped at 8 per node with a truncation count). referencedPrefabs lists other .prefab files this one links to. Use before instantiate_prefab; find prefabs with list_prefabs; raw JSON via read_file if needed.",
       "params": [
         {
           "name": "path",
@@ -6094,12 +6218,20 @@
     {
       "module": "prefabs",
       "name": "instantiate_prefab",
-      "description": "Spawn a prefab instance into the active scene at an optional position and rotation. NOTE: basic instantiation — it creates a new GameObject named after the prefab; components are NOT recreated from the file (the full s&box prefab pipeline isn't wired), so re-add them with add_component_with_properties. Returns { instantiated, prefab, gameObject, note } — gameObject.id is the new GUID for follow-up calls.",
+      "description": "Spawn a FULL prefab instance into the active scene — components and children recreated. Uses the engine's GameObject.Clone for registered prefabs, with a guid-remapped deserialize fallback for freshly-written files (repeat instantiations never collide). Returns { instantiated, prefab, method, gameObject, components, childCount } — gameObject.id is the new GUID for set_transform/set_property follow-ups. Optional name/position/rotation override the spawned root.",
       "params": [
         {
           "name": "path",
           "description": "Path to the .prefab file (e.g. 'prefabs/enemies/grunt.prefab')",
           "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "name",
+          "description": "Rename the spawned root (defaults to the prefab's root name)",
+          "optional": true,
           "type": {
             "kind": "string"
           }

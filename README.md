@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v2.0.0</strong> · <strong>218 native tools</strong> · <strong>26 toolsets</strong> (+ 7 lifeline tools) · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v2.0.0</strong> · <strong>222 native tools</strong> · <strong>26 toolsets</strong> (+ 7 lifeline tools) · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -49,7 +49,7 @@ Upgrading from v1.x? **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)** is the mig
 | Piece | What it is | Where it lives |
 |---|---|---|
 | **Native MCP server** | Facepunch's editor-hosted MCP server — streamable HTTP, loopback-only, on by default (**Editor → Preferences → MCP Server**, port 7269) | ships with s&box |
-| **Editor addon** | The bridge: a C# editor library whose 218 tools are `[McpTool]` methods the engine auto-discovers, each dispatching into the bridge's handler layer on the main editor thread | installed via the s&box **Asset Library / Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
+| **Editor addon** | The bridge: a C# editor library whose 222 tools are `[McpTool]` methods the engine auto-discovers, each dispatching into the bridge's handler layer on the main editor thread | installed via the s&box **Asset Library / Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
 | **Lifeline server** *(optional)* | A slim stdio server for editor-down diagnostics — the native server dies with the editor; the lifeline doesn't | npm package `sbox-mcp-server@2`, run with `--lifeline` |
 
 **Invocation pattern.** The native server exposes a handful of entry points — `search_tools`, `call_tool`, `call_tools`, `list_toolsets`, `describe_toolset` — and discovers everything else live from the addon:
@@ -88,7 +88,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 
 ## Tools & features
 
-**218 native tools across 26 `bridge_*` toolsets**, plus the **7 lifeline tools**. The full generated inventory — every tool, its toolset, and its read-only status — is **[docs/TOOLSETS.md](docs/TOOLSETS.md)**. Upgraders: **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)**.
+**222 native tools across 26 `bridge_*` toolsets**, plus the **7 lifeline tools**. The full generated inventory — every tool, its toolset, and its read-only status — is **[docs/TOOLSETS.md](docs/TOOLSETS.md)**. Upgraders: **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)**.
 
 | Toolset | What it covers |
 |---|---|

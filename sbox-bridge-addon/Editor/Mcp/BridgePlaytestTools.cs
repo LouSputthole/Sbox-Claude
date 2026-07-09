@@ -75,11 +75,22 @@ public static class BridgePlaytestTools
 		=> McpGate.Run( "playtest", McpGate.Args( ( "steps", steps ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
+	/// Stop the RUNNING playtest immediately: releases held input actions, restores UseInputControls,
+	/// and finalizes the partial transcript (reason 'aborted'). Returns { aborted, stepsRun, passed,
+	/// failed } — or aborted:false if no job is running. The partial transcript stays readable via
+	/// playtest_status. Use when a step list is clearly stuck or targeting the wrong object.
+	/// </summary>
+	[McpTool( "playtest_abort" )]
+	public static Task<object> PlaytestAbort()
+		=> McpGate.Run( "playtest_abort", McpGate.Args() );
+
+	/// <summary>
 	/// Poll the playtest started by the playtest tool. While running: { active:true, step, totalSteps,
 	/// passed, failed }. When done: { finished:true, reason, verdict:'PASS'|'FAIL', passed, failed,
 	/// stepsRun, totalSteps, controller, controllerResolved, transcript:[...] } — the full per-step
 	/// pass/fail record, including any capture PNG paths; the finished summary stays readable until the
-	/// next playtest starts. If none has run yet: { active:false, finished:false }.
+	/// next playtest starts. If none has run yet: { active:false, finished:false }. Stop a stuck/wrong
+	/// run early with playtest_abort.
 	/// </summary>
 	[McpTool.ReadOnly( "playtest_status" )]
 	public static Task<object> PlaytestStatus()

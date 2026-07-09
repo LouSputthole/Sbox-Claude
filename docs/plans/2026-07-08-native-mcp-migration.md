@@ -1,9 +1,15 @@
 # v2.0.0 — Migrate onto the native s&box MCP server
 
-**Status:** PHASE 1 COMPLETE (89ec14c) · DESCRIPTION SWEEP COMPLETE, 156→0 warnings
-(a944a81) · AUTO-UNDO PARKED, engine-inert (084e691) · WAVE-1 TOOLS IN VERIFY
-(find_broken_references, batch_set_property+dryRun, describe_project — Batch 51,
-231 tools / 223 handlers / 26 native toolsets incl. new bridge_batch)
+**Status:** RELEASE CANDIDATE 2.0.0 (2026-07-09) — all phases + wave 1 + wave 2 complete,
+gate 28/28, versions bumped + .mcp.json flipped, awaiting the two 👤 gates (npm publish,
+Asset Library republish). 235 tools / 227 handlers / **222 native across 26 toolsets** +
+7 lifeline. Wave 2 (Batch 52): REAL prefab round-trip (full engine serialization via
+GameObject.Serialize; instantiation via GameObject.Clone with a guid-remapped deserialize
+fallback for fresh files — gotcha: JsonNode.ToJsonString(options) throws "must specify a
+TypeInfoResolver" in the editor context, use JsonSerializer.Serialize), batch_delete /
+batch_add_component / batch_reparent (dryRun convention), playtest_abort, and
+find_broken_references file-level missing_prefab_file scan (found a REAL broken ref in
+Gravehold on first run).
 
 ## Description sweep + hardening (2026-07-09, iteration 2)
 

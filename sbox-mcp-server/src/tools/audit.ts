@@ -13,13 +13,17 @@ export function registerAuditTools(
   // ── find_broken_references ───────────────────────────────────────
   server.tool(
     "find_broken_references",
-    "Scan every GameObject in the open scene for broken references: renderers with no Model assigned (missing_model), component properties pointing at DESTROYED GameObjects/Components (dead_gameobject_ref / dead_component_ref), and null component entries whose type no longer exists (missing_component). Returns { total, showing, truncated, objectsScanned, issues } — each issue has { id, name, component, kind, detail }. Fix missing models with assign_model; clear dead refs with set_property or set_component_reference. Read-only; safe any time. Results cap at `limit` (default 100, max 500) with truncated:true when more exist",
+    "Scan the project for broken references, two layers in one call: (1) every GameObject in the open scene — renderers with no Model (missing_model), component properties pointing at DESTROYED GameObjects/Components (dead_gameobject_ref / dead_component_ref), null component entries whose type no longer exists (missing_component); (2) every .scene/.prefab FILE — prefab references to deleted/renamed files (missing_prefab_file). Returns { total, showing, truncated, objectsScanned, filesScanned, issues } — each issue has { id, name, component, kind, detail } (file-level issues carry the file path in name). Fix missing models with assign_model, dead refs with set_property/set_component_reference, missing prefab files by fixing the path or recreating via create_prefab. Read-only; safe any time. Results cap at `limit` (default 100, max 500)",
     {
       limit: z
         .number()
         .int()
         .optional()
         .describe("Max issues to return (default 100, max 500). total still counts everything"),
+      scanFiles: z
+        .boolean()
+        .optional()
+        .describe("Include the .scene/.prefab file scan for missing prefab references. Default true"),
     },
     async (params) => {
       const res = await bridge.send("find_broken_references", params);

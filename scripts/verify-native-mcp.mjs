@@ -207,11 +207,57 @@ try {
     const dryOk = /"dryRun": true/.test(dry.text) && /"succeeded": 2/.test(dry.text);
     const wet = await callTool("batch_set_property", { ids: [g1, g2], component: "ModelRenderer", property: "Tint", value: "1,0,0,1" });
     const wetOk = /"succeeded": 2/.test(wet.text);
-    await callTool("delete_gameobject", { id: g1 });
-    await callTool("delete_gameobject", { id: g2 });
+
+    // wave 2: batch_add_component dry + apply, batch_reparent, batch_delete dry + apply
+    const addDry = await callTool("batch_add_component", { ids: [g1, g2], component: "BoxCollider", dryRun: true });
+    const addWet = await callTool("batch_add_component", { ids: [g1, g2], component: "BoxCollider" });
+    const addOk = /"dryRun": true/.test(addDry.text) && /"succeeded": 2/.test(addWet.text);
+    check("batch_add_component dry-run + apply", addOk, addOk ? "2 BoxColliders added" : addWet.text.slice(0, 80));
+
+    const parent = (await callTool("create_gameobject", { name: "__batch_parent", position: "0,0,6300" })).text.match(/[0-9a-f-]{36}/i)[0];
+    const rep = await callTool("batch_reparent", { ids: [g1, g2], parent });
+    check("batch_reparent", /"succeeded": 2/.test(rep.text), rep.text.slice(0, 60).replace(/\n/g, " "));
+
+    // wave 2: prefab round-trip — full serialize → structured info → full instantiate
+    const pf = await callTool("create_prefab", { id: g1, path: "prefabs/__bridge_verify.prefab" });
+    const pfOk = /"created": true/.test(pf.text) && /"components": [1-9]/.test(pf.text);
+    check("create_prefab full serialization", pfOk, pf.text.match(/"components": \d+/)?.[0] ?? pf.text.slice(0, 80));
+    const info = await callTool("get_prefab_info", { path: "prefabs/__bridge_verify.prefab" });
+    check("get_prefab_info structured tree", /"totalObjects"/.test(info.text) && /ModelRenderer/.test(info.text),
+      info.text.match(/"totalObjects": \d+/)?.[0] ?? info.text.slice(0, 80));
+    const inst = await callTool("instantiate_prefab", { path: "prefabs/__bridge_verify.prefab", name: "__prefab_clone", position: "0,0,6400" });
+    const instOk = /"instantiated": true/.test(inst.text) && /ModelRenderer/.test(inst.text);
+    check("instantiate_prefab recreates components", instOk,
+      (inst.text.match(/"method": "[^"]+"/)?.[0] ?? "") + (instOk ? "" : " | " + inst.text.slice(0, 120)));
+    const cloneId = instOk ? inst.text.match(/"id": "([0-9a-f-]{36})"/i)?.[1] : null;
+
+    const delDry = await callTool("batch_delete", { ids: [g1, g2, parent, cloneId].filter(Boolean), dryRun: true });
+    const delWet = await callTool("batch_delete", { ids: [g1, g2, parent, cloneId].filter(Boolean) });
+    // g1/g2 are children of parent — deleting parent removes them; per-id results may
+    // report already-gone ids as failures, so assert on the dry-run + parent deletion.
+    check("batch_delete dry-run + apply", /"dryRun": true/.test(delDry.text) && /"deleted"/.test(delWet.text),
+      delWet.text.match(/"succeeded": \d+/)?.[0] ?? delWet.text.slice(0, 60));
+
     check("batch_set_property dry-run + apply", dryOk && wetOk, `dry:${dryOk} apply:${wetOk}`);
   } catch (e) {
-    check("batch_set_property dry-run + apply", false, e.message.slice(0, 140));
+    check("wave-2 batch/prefab chain", false, e.message.slice(0, 200));
+  }
+
+  // wave 2: playtest_abort with no job running
+  try {
+    const ab = await callTool("playtest_abort", {});
+    check("playtest_abort (no job)", /"aborted": false/.test(ab.text), ab.text.slice(0, 60).replace(/\n/g, " "));
+  } catch (e) {
+    check("playtest_abort (no job)", false, e.message.slice(0, 120));
+  }
+
+  // wave 2: find_broken_references file scan
+  try {
+    const br2 = await callTool("find_broken_references", { limit: 5 });
+    check("find_broken_references file scan", /"filesScanned": [1-9]/.test(br2.text),
+      br2.text.match(/"filesScanned": \d+/)?.[0] ?? br2.text.slice(0, 80));
+  } catch (e) {
+    check("find_broken_references file scan", false, e.message.slice(0, 120));
   }
 } catch (e) {
   console.error(`FATAL: ${e.message}`);

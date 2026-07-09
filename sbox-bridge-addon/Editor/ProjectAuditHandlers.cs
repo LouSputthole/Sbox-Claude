@@ -81,16 +81,55 @@ public class FindBrokenReferencesHandler : IBridgeHandler
 			}
 		}
 
+		// v2 round 2: scan .scene/.prefab FILES for prefab references to files that no
+		// longer exist ({"_type":"gameobject","prefab":"prefabs/x.prefab"} with x deleted
+		// or renamed) — the break class scene-level checks can't see.
+		int filesScanned = 0;
+		bool scanFiles = !( p.TryGetProperty( "scanFiles", out var sf ) && sf.ValueKind == JsonValueKind.False );
+		if ( scanFiles )
+		{
+			try
+			{
+				var root = Project.Current?.GetRootPath();
+				if ( root != null )
+				{
+					var rx = new System.Text.RegularExpressions.Regex( "\"prefab\":\\s*\"([^\"]+)\"" );
+					var files = Directory.GetFiles( root, "*.scene", SearchOption.AllDirectories )
+						.Concat( Directory.GetFiles( root, "*.prefab", SearchOption.AllDirectories ) )
+						.Where( f => { var r = Path.GetRelativePath( root, f ).Replace( '\\', '/' ); return !r.StartsWith( "Libraries/" ) && !r.StartsWith( ".sbox/" ); } );
+					foreach ( var file in files )
+					{
+						filesScanned++;
+						var rel = Path.GetRelativePath( root, file ).Replace( '\\', '/' );
+						foreach ( System.Text.RegularExpressions.Match m in rx.Matches( File.ReadAllText( file ) ) )
+						{
+							var refPath = m.Groups[1].Value;
+							bool exists = File.Exists( Path.Combine( root, refPath ) )
+								|| File.Exists( Path.Combine( root, "Assets", refPath ) );
+							if ( !exists )
+							{
+								total++;
+								if ( issues.Count < limit )
+									issues.Add( new { id = (string)null, name = rel, component = "(file)", kind = "missing_prefab_file", detail = $"references '{refPath}' which does not exist in the project" } );
+							}
+						}
+					}
+				}
+			}
+			catch { /* file scan is best-effort — scene checks above already reported */ }
+		}
+
 		return Task.FromResult<object>( new
 		{
 			total,
 			showing = issues.Count,
 			truncated = total > issues.Count,
 			objectsScanned,
+			filesScanned,
 			issues,
 			note = total == 0
 				? "No broken references found."
-				: "Fix missing_model with assign_model; clear dead refs with set_property (value null) or set_component_reference to a live target."
+				: "Fix missing_model with assign_model; clear dead refs with set_property (value null) or set_component_reference to a live target; missing_prefab_file means a .scene/.prefab references a deleted/renamed prefab — fix the path or recreate it with create_prefab."
 		} );
 	}
 }

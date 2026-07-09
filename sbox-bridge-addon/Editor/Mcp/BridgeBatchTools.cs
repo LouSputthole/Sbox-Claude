@@ -14,6 +14,49 @@ using Editor.Mcp;
 public static class BridgeBatchTools
 {
 	/// <summary>
+	/// Add one component type to MANY GameObjects in one call (e.g. BoxCollider on every crate). Skips
+	/// objects that already have the component unless skipExisting:false. dryRun:true validates the
+	/// type and reports per-object alreadyHas WITHOUT adding. Returns { total, succeeded, failed,
+	/// skipped, dryRun, results }. Follow with batch_set_property to configure the new components.
+	/// Scene-mutating: refused during play mode.
+	/// </summary>
+	/// <param name="ids">GUIDs of the target GameObjects (from find_objects or get_selected_objects).</param>
+	/// <param name="component">Component type name to add, e.g. 'BoxCollider', 'PointLight' (search with list_available_components).</param>
+	/// <param name="skipExisting">Skip objects that already have this component type. Default true.</param>
+	/// <param name="dryRun">true = validate and report without adding anything. Default false.</param>
+	[McpTool( "batch_add_component" )]
+	public static Task<object> BatchAddComponent( string[] ids, string component, bool? skipExisting = null, bool? dryRun = null )
+		=> McpGate.Run( "batch_add_component", McpGate.Args( ( "ids", ids ), ( "component", component ), ( "skipExisting", skipExisting ), ( "dryRun", dryRun ) ) );
+
+	/// <summary>
+	/// Delete MANY GameObjects (and their entire subtrees) in one call. ALWAYS pass dryRun:true first —
+	/// it reports each object's name and child count WITHOUT deleting, so you can confirm the target
+	/// list. Returns { total, succeeded, failed, dryRun, results } with per-object ok/error.
+	/// Destructive and NOT undoable — get ids from find_objects or get_selected_objects and verify the
+	/// dry-run before applying. Scene-mutating: refused during play mode.
+	/// </summary>
+	/// <param name="ids">GUIDs of the GameObjects to delete (subtrees included).</param>
+	/// <param name="dryRun">true = report names/child counts without deleting anything. Default false — but run a dry pass first.</param>
+	[McpTool( "batch_delete" )]
+	public static Task<object> BatchDelete( string[] ids, bool? dryRun = null )
+		=> McpGate.Run( "batch_delete", McpGate.Args( ( "ids", ids ), ( "dryRun", dryRun ) ) );
+
+	/// <summary>
+	/// Move MANY GameObjects under a new parent (or to the scene root) in one call — organize scattered
+	/// props into a folder object, or regroup a level section. dryRun:true reports each object's
+	/// current parent and destination WITHOUT moving. Returns { total, succeeded, failed, dryRun,
+	/// keepWorldPosition, results }. Errors if parent is among ids (no cycles). Scene-mutating: refused
+	/// during play mode.
+	/// </summary>
+	/// <param name="ids">GUIDs of the GameObjects to move.</param>
+	/// <param name="parent">GUID of the new parent GameObject. Omit (or empty) to move to the scene root.</param>
+	/// <param name="keepWorldPosition">Preserve each object's world position while reparenting. Default true.</param>
+	/// <param name="dryRun">true = report current parents and the destination without moving anything. Default false.</param>
+	[McpTool( "batch_reparent" )]
+	public static Task<object> BatchReparent( string[] ids, string parent = null, bool? keepWorldPosition = null, bool? dryRun = null )
+		=> McpGate.Run( "batch_reparent", McpGate.Args( ( "ids", ids ), ( "parent", parent ), ( "keepWorldPosition", keepWorldPosition ), ( "dryRun", dryRun ) ) );
+
+	/// <summary>
 	/// Set ONE component property to the same value across MANY GameObjects in a single call (e.g. Tint
 	/// on 40 props, Enabled on every light). Pass dryRun:true first to validate — it reports each
 	/// object's current value and what would change WITHOUT applying anything. Returns { total,

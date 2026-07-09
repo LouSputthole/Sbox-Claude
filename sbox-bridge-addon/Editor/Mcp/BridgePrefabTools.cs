@@ -14,10 +14,11 @@ using Editor.Mcp;
 public static class BridgePrefabTools
 {
 	/// <summary>
-	/// Save an existing GameObject as a .prefab file. NOTE: this writes a minimal descriptor (name,
-	/// enabled flag, component TYPE names) — component property values and children are NOT serialized,
-	/// so it is a lightweight template rather than a full s&amp;box prefab asset. Returns { created,
-	/// path, sourceId } — pass path to instantiate_prefab or get_prefab_info.
+	/// Save an existing GameObject as a real .prefab file — FULL engine serialization: every component
+	/// with its property values, and all children, in the same JSON format the editor writes. Returns {
+	/// created, path, sourceId, components, children } — pass path to instantiate_prefab to spawn
+	/// copies or get_prefab_info to inspect. Errors if the source GameObject is missing; overwrites an
+	/// existing file at path.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to save as prefab.</param>
 	/// <param name="path">Path for the prefab file relative to project root (e.g. 'prefabs/enemies/grunt.prefab').</param>
@@ -26,9 +27,11 @@ public static class BridgePrefabTools
 		=> McpGate.Run( "create_prefab", McpGate.Args( ( "id", id ), ( "path", path ) ) );
 
 	/// <summary>
-	/// Get detailed information about a prefab file. Returns { path, name, size, modified, content } —
-	/// content is the prefab's full raw JSON, so use this to inspect what a prefab actually contains
-	/// before instantiate_prefab (find prefabs with list_prefabs).
+	/// Inspect a prefab file as a structured summary: { path, name, size, modified, totalObjects,
+	/// maxDepth, referencedPrefabs, tree } — tree is the object hierarchy with per-node component type
+	/// lists (children capped at 8 per node with a truncation count). referencedPrefabs lists other
+	/// .prefab files this one links to. Use before instantiate_prefab; find prefabs with list_prefabs;
+	/// raw JSON via read_file if needed.
 	/// </summary>
 	/// <param name="path">Path to the .prefab file (e.g. 'prefabs/enemies/grunt.prefab').</param>
 	[McpTool.ReadOnly( "get_prefab_info" )]
@@ -36,20 +39,22 @@ public static class BridgePrefabTools
 		=> McpGate.Run( "get_prefab_info", McpGate.Args( ( "path", path ) ) );
 
 	/// <summary>
-	/// Spawn a prefab instance into the active scene at an optional position and rotation. NOTE: basic
-	/// instantiation — it creates a new GameObject named after the prefab; components are NOT recreated
-	/// from the file (the full s&amp;box prefab pipeline isn't wired), so re-add them with
-	/// add_component_with_properties. Returns { instantiated, prefab, gameObject, note } —
-	/// gameObject.id is the new GUID for follow-up calls.
+	/// Spawn a FULL prefab instance into the active scene — components and children recreated. Uses the
+	/// engine's GameObject.Clone for registered prefabs, with a guid-remapped deserialize fallback for
+	/// freshly-written files (repeat instantiations never collide). Returns { instantiated, prefab,
+	/// method, gameObject, components, childCount } — gameObject.id is the new GUID for
+	/// set_transform/set_property follow-ups. Optional name/position/rotation override the spawned
+	/// root.
 	/// </summary>
 	/// <param name="path">Path to the .prefab file (e.g. 'prefabs/enemies/grunt.prefab').</param>
+	/// <param name="name">Rename the spawned root (defaults to the prefab's root name).</param>
 	/// <param name="position">World position to spawn at — object {x,y,z} or comma string "x,y,z". Defaults to origin. As "x,y,z" (or JSON {x,y,z}).</param>
 	/// <param name="rotation">Rotation as euler angles. Defaults to identity. As "pitch,yaw,roll" degrees.</param>
 	/// <param name="scale">Uniform scale multiplier. Defaults to 1.0.</param>
 	/// <param name="parent">GUID of parent GameObject to attach to.</param>
 	[McpTool( "instantiate_prefab" )]
-	public static Task<object> InstantiatePrefab( string path, string position = null, string rotation = null, double? scale = null, string parent = null )
-		=> McpGate.Run( "instantiate_prefab", McpGate.Args( ( "path", path ), ( "position", position ), ( "rotation", rotation ), ( "scale", scale ), ( "parent", parent ) ) );
+	public static Task<object> InstantiatePrefab( string path, string name = null, string position = null, string rotation = null, double? scale = null, string parent = null )
+		=> McpGate.Run( "instantiate_prefab", McpGate.Args( ( "path", path ), ( "name", name ), ( "position", position ), ( "rotation", rotation ), ( "scale", scale ), ( "parent", parent ) ) );
 
 	/// <summary>
 	/// List all .prefab files in the project. Filter by name or path.

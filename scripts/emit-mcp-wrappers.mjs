@@ -56,6 +56,7 @@ const HAND_WRITTEN = new Set([
 const MODULE_TOOLSET = {
   assets: "bridge_asset",
   audit: "bridge_validation",
+  batch: "bridge_batch",
   audio: "bridge_audio",
   characters: "bridge_character",
   cinematics: "bridge_scaffold_polish",
