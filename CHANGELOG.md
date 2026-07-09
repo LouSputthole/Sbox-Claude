@@ -17,9 +17,16 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 - **`scripts/verify-native-mcp.mjs`** — live verify-gate over streamable HTTP: toolset inventory, search discovery, read-only spot-runs, nullable-binding check, mutating GUID round-trip, inline-image check, error semantics.
 - **`docs/ADDING-A-TOOL.md`** — the new-tool factory: template, checklist, naming conventions, regeneration workflow.
 
+### Added — wave-1 tools (Batch 51: audit & batch operations)
+
+- **`find_broken_references`** (bridge_validation, read-only) — scene-wide broken-reference scan: renderers with no Model, component properties referencing DESTROYED GameObjects/Components, null component entries whose type no longer compiles. Returns `{ total, showing, truncated, objectsScanned, issues[] }` with fix hints.
+- **`batch_set_property`** (bridge_batch — new toolset, the batch_operations home) — one property, same value, many objects, in one call; **`dryRun:true` validates and reports current values without applying** (the relaunch's dry-run safety convention, first landing). Per-object ok/error results with previous values. Scene-mutating (play-mode guarded).
+- **`describe_project`** (bridge_project, read-only) — one-call orientation: identity, open scene + object count, scene/prefab file lists, code footprint, custom Component types, installed libraries, with next-tool hints.
+
 ### Changed
 
-- `get_bridge_status` and `set_prefab_ref` were inline dispatch special cases invisible to the wrapper gate — both are now registered handlers (`Editor/CoreCommandHandlers.cs`; the dormant `SetPrefabRefHandler` finally registered), one dispatch path for both transports. **221 handlers** (was 219).
+- `get_bridge_status` and `set_prefab_ref` were inline dispatch special cases invisible to the wrapper gate — both are now registered handlers (`Editor/CoreCommandHandlers.cs`; the dormant `SetPrefabRefHandler` finally registered), one dispatch path for both transports. **223 handlers** (was 219).
+- `audit-parity.mjs` version lock now skips a top `[Unreleased]` CHANGELOG section (keep-a-changelog practice) and locks on the first released heading.
 
 ### Known limitations
 

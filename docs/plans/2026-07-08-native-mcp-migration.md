@@ -1,7 +1,9 @@
 # v2.0.0 — Migrate onto the native s&box MCP server
 
-**Status:** PHASE 1 COMPLETE (verify-gate 16/16 live, commit 89ec14c) · DESCRIPTION SWEEP
-COMPLETE (2026-07-09, 156 quality warnings → 0) — undo-convention verification in flight
+**Status:** PHASE 1 COMPLETE (89ec14c) · DESCRIPTION SWEEP COMPLETE, 156→0 warnings
+(a944a81) · AUTO-UNDO PARKED, engine-inert (084e691) · WAVE-1 TOOLS IN VERIFY
+(find_broken_references, batch_set_property+dryRun, describe_project — Batch 51,
+231 tools / 223 handlers / 26 native toolsets incl. new bridge_batch)
 
 ## Description sweep + hardening (2026-07-09, iteration 2)
 

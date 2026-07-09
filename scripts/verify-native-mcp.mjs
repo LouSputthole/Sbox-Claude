@@ -88,7 +88,7 @@ try {
   const ts = await rpc("tools/call", { name: "list_toolsets", arguments: {} });
   const tsText = (ts.content ?? []).map((c) => c.text).join("\n");
   const expected = [
-    "bridge_asset", "bridge_audio", "bridge_character", "bridge_component", "bridge_debug",
+    "bridge_asset", "bridge_audio", "bridge_batch", "bridge_character", "bridge_component", "bridge_debug",
     "bridge_discovery", "bridge_gameobject", "bridge_material", "bridge_moviemaker",
     "bridge_navigation", "bridge_networking", "bridge_npc", "bridge_physics",
     "bridge_playmode", "bridge_playtest", "bridge_prefab", "bridge_project",
@@ -96,8 +96,8 @@ try {
     "bridge_ui", "bridge_validation", "bridge_visuals", "bridge_world",
   ];
   const missing = expected.filter((e) => !tsText.includes(e));
-  check("list_toolsets has all 25 bridge_* toolsets", missing.length === 0,
-    missing.length ? `missing: ${missing.join(", ")}` : "25/25");
+  check(`list_toolsets has all ${expected.length} bridge_* toolsets`, missing.length === 0,
+    missing.length ? `missing: ${missing.join(", ")}` : `${expected.length}/${expected.length}`);
 
   // 3. search
   const st = await rpc("tools/call", {
@@ -183,6 +183,36 @@ try {
   // live 2026-07-09; built-in tools use an internal undo mechanism addons can't reach).
   // Re-enable a real check here when Facepunch exposes the per-edit undo hook.
   console.log("SKIP  auto-undo convention — engine API inert on this build (see McpGate.cs note)");
+
+  // 10. Wave-1 tools (Batch 51): describe_project, find_broken_references,
+  // batch_set_property dry-run → apply → verify → cleanup.
+  try {
+    const dp = await callTool("describe_project", {});
+    check("describe_project", /customComponents/.test(dp.text), dp.text.slice(0, 60).replace(/\n/g, " "));
+  } catch (e) {
+    check("describe_project", false, e.message.slice(0, 120));
+  }
+  try {
+    const br = await callTool("find_broken_references", { limit: 5 });
+    check("find_broken_references", /objectsScanned/.test(br.text), br.text.slice(0, 80).replace(/\n/g, " "));
+  } catch (e) {
+    check("find_broken_references", false, e.message.slice(0, 120));
+  }
+  try {
+    const g1 = (await callTool("create_gameobject", { name: "__batch_a", position: "0,0,6100" })).text.match(/[0-9a-f-]{36}/i)[0];
+    const g2 = (await callTool("create_gameobject", { name: "__batch_b", position: "0,0,6200" })).text.match(/[0-9a-f-]{36}/i)[0];
+    await callTool("add_component_with_properties", { id: g1, component: "ModelRenderer" });
+    await callTool("add_component_with_properties", { id: g2, component: "ModelRenderer" });
+    const dry = await callTool("batch_set_property", { ids: [g1, g2], component: "ModelRenderer", property: "Tint", value: "1,0,0,1", dryRun: true });
+    const dryOk = /"dryRun": true/.test(dry.text) && /"succeeded": 2/.test(dry.text);
+    const wet = await callTool("batch_set_property", { ids: [g1, g2], component: "ModelRenderer", property: "Tint", value: "1,0,0,1" });
+    const wetOk = /"succeeded": 2/.test(wet.text);
+    await callTool("delete_gameobject", { id: g1 });
+    await callTool("delete_gameobject", { id: g2 });
+    check("batch_set_property dry-run + apply", dryOk && wetOk, `dry:${dryOk} apply:${wetOk}`);
+  } catch (e) {
+    check("batch_set_property dry-run + apply", false, e.message.slice(0, 140));
+  }
 } catch (e) {
   console.error(`FATAL: ${e.message}`);
   process.exit(2);

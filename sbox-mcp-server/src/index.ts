@@ -61,6 +61,7 @@ import { registerInteractionPackTools } from "./tools/interactionpack.js";
 import { registerLootEconomyTools } from "./tools/looteconomy.js";
 import { registerUiFeedbackTools } from "./tools/uifeedback.js";
 import { registerCinematicsTools } from "./tools/cinematics.js";
+import { registerAuditTools } from "./tools/audit.js";
 
 // ── CLI flags ──────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -256,6 +257,7 @@ registerInteractionPackTools(server, bridge);
 registerLootEconomyTools(server, bridge);
 registerUiFeedbackTools(server, bridge);
 registerCinematicsTools(server, bridge);
+registerAuditTools(server, bridge);
 
 /** Start the MCP server on stdio and attempt initial Bridge connection. */
 async function main(): Promise<void> {

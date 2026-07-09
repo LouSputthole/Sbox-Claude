@@ -1,5 +1,5 @@
 {
-  "toolCount": 228,
+  "toolCount": 231,
   "tools": [
     {
       "module": "assets",
@@ -244,6 +244,77 @@
           "optional": true,
           "type": {
             "kind": "number"
+          }
+        }
+      ]
+    },
+    {
+      "module": "audit",
+      "name": "batch_set_property",
+      "description": "Set ONE component property to the same value across MANY GameObjects in a single call (e.g. Tint on 40 props, Enabled on every light). Pass dryRun:true first to validate — it reports each object's current value and what would change WITHOUT applying anything. Returns { total, succeeded, failed, dryRun, results } with per-object ok/error and the previous value on success. Get ids from find_objects or get_selected_objects. Scene-mutating: refused during play mode. Value coercion matches set_property (numbers, bools, enums, 'x,y,z' vectors, colors, asset paths)",
+      "params": [
+        {
+          "name": "ids",
+          "description": "GUIDs of the GameObjects to modify (from find_objects, get_scene_hierarchy, or get_selected_objects)",
+          "optional": false,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "component",
+          "description": "Component type name present on each object, e.g. 'ModelRenderer', 'PointLight'",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "property",
+          "description": "Property name to set, e.g. 'Tint', 'Enabled', 'LightColor' (see get_all_properties)",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "value",
+          "description": "New value — number, bool, string, enum name, 'x,y,z' vector, color, or asset path",
+          "optional": false,
+          "type": {
+            "kind": "any"
+          }
+        },
+        {
+          "name": "dryRun",
+          "description": "true = validate and report current values without changing anything. Default false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "audit",
+      "name": "describe_project",
+      "description": "One-call project orientation: identity (name/ident/org/type), the open scene with object count, scene and prefab file lists (capped at 50 each, Libraries/.sbox excluded), code footprint (.cs/.razor counts), custom Component types (up to 100, engine types excluded), and installed libraries. Returns a structured summary — orient here first, then get_scene_hierarchy for the scene, describe_type for components, find_broken_references for project health. Read-only",
+      "params": []
+    },
+    {
+      "module": "audit",
+      "name": "find_broken_references",
+      "description": "Scan every GameObject in the open scene for broken references: renderers with no Model assigned (missing_model), component properties pointing at DESTROYED GameObjects/Components (dead_gameobject_ref / dead_component_ref), and null component entries whose type no longer exists (missing_component). Returns { total, showing, truncated, objectsScanned, issues } — each issue has { id, name, component, kind, detail }. Fix missing models with assign_model; clear dead refs with set_property or set_component_reference. Read-only; safe any time. Results cap at `limit` (default 100, max 500) with truncated:true when more exist",
+      "params": [
+        {
+          "name": "limit",
+          "description": "Max issues to return (default 100, max 500). total still counts everything",
+          "optional": true,
+          "type": {
+            "kind": "integer"
           }
         }
       ]

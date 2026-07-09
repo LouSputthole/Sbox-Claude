@@ -55,6 +55,7 @@ const HAND_WRITTEN = new Set([
 // with the built-in toolset names (asset, component, editor, log, package, play, scene).
 const MODULE_TOOLSET = {
   assets: "bridge_asset",
+  audit: "bridge_validation",
   audio: "bridge_audio",
   characters: "bridge_character",
   cinematics: "bridge_scaffold_polish",
@@ -113,6 +114,8 @@ const TOOL_TOOLSET = {
   add_component_to_new_object: "bridge_component",
   set_component_reference: "bridge_component",
   ensure_input_action: "bridge_project",
+  batch_set_property: "bridge_batch",
+  describe_project: "bridge_project",
 };
 
 const TOOLSET_META = {
@@ -234,6 +237,11 @@ const TOOLSET_META = {
     class: "BridgeMovieMakerTools",
     description:
       "Wire and control Sandbox.MovieMaker cutscene playback: list .movie clips, add MoviePlayer components, play and stop clips.",
+  },
+  bridge_batch: {
+    class: "BridgeBatchTools",
+    description:
+      "Bulk operations across many GameObjects in one call, with dry-run validation before applying. Get target ids from find_objects or get_selected_objects.",
   },
 };
 

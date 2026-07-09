@@ -15,6 +15,20 @@ using Editor.Mcp;
 public static class BridgeValidationTools
 {
 	/// <summary>
+	/// Scan every GameObject in the open scene for broken references: renderers with no Model assigned
+	/// (missing_model), component properties pointing at DESTROYED GameObjects/Components
+	/// (dead_gameobject_ref / dead_component_ref), and null component entries whose type no longer
+	/// exists (missing_component). Returns { total, showing, truncated, objectsScanned, issues } — each
+	/// issue has { id, name, component, kind, detail }. Fix missing models with assign_model; clear
+	/// dead refs with set_property or set_component_reference. Read-only; safe any time. Results cap at
+	/// `limit` (default 100, max 500) with truncated:true when more exist.
+	/// </summary>
+	/// <param name="limit">Max issues to return (default 100, max 500). total still counts everything.</param>
+	[McpTool.ReadOnly( "find_broken_references" )]
+	public static Task<object> FindBrokenReferences( int? limit = null )
+		=> McpGate.Run( "find_broken_references", McpGate.Args( ( "limit", limit ) ) );
+
+	/// <summary>
 	/// Inspect the live networking contract of a GameObject. Returns {id, name, network: {active,
 	/// isProxy, isOwner, isCreator, ownerId, ownerSteamId, ownerTransfer, orphaned, flags}, components:
 	/// [{component, fields: [{name, type, isSync, syncFlags, value}]}]} — by default only [Sync]-marked

@@ -41,6 +41,17 @@ public static class BridgeProjectTools
 		=> McpGate.Run( "delete_script", McpGate.Args( ( "path", path ) ) );
 
 	/// <summary>
+	/// One-call project orientation: identity (name/ident/org/type), the open scene with object count,
+	/// scene and prefab file lists (capped at 50 each, Libraries/.sbox excluded), code footprint
+	/// (.cs/.razor counts), custom Component types (up to 100, engine types excluded), and installed
+	/// libraries. Returns a structured summary — orient here first, then get_scene_hierarchy for the
+	/// scene, describe_type for components, find_broken_references for project health. Read-only.
+	/// </summary>
+	[McpTool.ReadOnly( "describe_project" )]
+	public static Task<object> DescribeProject()
+		=> McpGate.Run( "describe_project", McpGate.Args() );
+
+	/// <summary>
 	/// Edit an existing C# script in place via exact-text find/replace or a full-content overwrite.
 	/// Errors if the file or the find text isn't found (find/replace replaces ALL occurrences). Returns
 	/// { path, edited, operation } where operation is 'find_replace' or 'overwrite' — follow with

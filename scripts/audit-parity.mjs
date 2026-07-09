@@ -94,8 +94,10 @@ const pluginVersion   = JSON.parse(readFile(PLUGIN_JSON)).version;
 const bridgeVerMatch  = /BridgeVersion\s*=\s*"([^"]+)"/.exec(csSrc);
 const bridgeVersion   = bridgeVerMatch ? bridgeVerMatch[1] : null;
 
-// First "## [X.Y.Z]" heading in CHANGELOG.md
-const changelogMatch  = /^##\s*\[([^\]]+)\]/m.exec(readFile(CHANGELOG_MD));
+// First "## [X.Y.Z]" heading in CHANGELOG.md. An "[Unreleased]" section on top is
+// standard keep-a-changelog practice mid-cycle — skip it and lock on the first
+// released version heading.
+const changelogMatch = /^##\s*\[(?!Unreleased\b)([^\]]+)\]/m.exec(readFile(CHANGELOG_MD));
 const changelogVersion = changelogMatch ? changelogMatch[1] : null;
 
 // marketplace.json plugins[0].version

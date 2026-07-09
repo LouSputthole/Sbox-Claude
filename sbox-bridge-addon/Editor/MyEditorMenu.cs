@@ -178,6 +178,11 @@ public static class ClaudeBridge
 		// ── Batch 1: File / project basics ──────────────────────────────
 		Register( "get_project_info",    () => new GetProjectInfoHandler() );
 		Register( "get_bridge_status",   () => new GetBridgeStatusHandler() );
+
+		// ── Batch 51: Project audit & batch operations (v2 wave 1) ──────
+		Register( "find_broken_references", () => new FindBrokenReferencesHandler() );
+		Register( "batch_set_property",     () => new BatchSetPropertyHandler() );
+		Register( "describe_project",       () => new DescribeProjectHandler() );
 		Register( "list_project_files",  () => new ListProjectFilesHandler() );
 		Register( "read_file",           () => new ReadFileHandler() );
 		Register( "write_file",          () => new WriteFileHandler() );
@@ -506,6 +511,7 @@ public static class ClaudeBridge
 	// Commands that mutate the scene/disk — refused while in play mode to avoid save corruption
 	private static readonly HashSet<string> _sceneMutatingCommands = new()
 	{
+		"batch_set_property",
 		"add_light", "set_fog", "add_post_process", "set_skybox", "apply_atmosphere", "apply_post_fx_look", "add_envmap_probe",
 		"spawn_particle", "add_trail", "add_beam", "create_particle_effect",
 		"spawn_model", "spawn_citizen", "dress_citizen", "set_bodygroup", "pose_citizen",
