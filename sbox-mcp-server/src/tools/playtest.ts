@@ -47,7 +47,7 @@ export function registerPlaytestTools(server: McpServer, bridge: BridgeClient): 
 
   server.tool(
     "playtest_status",
-    "Poll the running/finished playtest. While running: { active:true, step, totalSteps, passed, failed }. When done: { finished:true, verdict:'PASS'|'FAIL', passed, failed, transcript:[...] } — the full per-step pass/fail record.",
+    "Poll the playtest started by the playtest tool. While running: { active:true, step, totalSteps, passed, failed }. When done: { finished:true, reason, verdict:'PASS'|'FAIL', passed, failed, stepsRun, totalSteps, controller, controllerResolved, transcript:[...] } — the full per-step pass/fail record, including any capture PNG paths; the finished summary stays readable until the next playtest starts. If none has run yet: { active:false, finished:false }.",
     {},
     async () => reply(await bridge.send("playtest_status", {}))
   );

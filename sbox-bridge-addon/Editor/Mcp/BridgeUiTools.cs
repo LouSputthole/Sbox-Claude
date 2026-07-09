@@ -15,9 +15,11 @@ public static class BridgeUiTools
 {
 	/// <summary>
 	/// Create a new GameObject with a ScreenPanel component for full-screen UI overlay (HUD, menus,
-	/// etc.).
+	/// etc.). Returns { created, gameObject:{ id, name, components, ... } }. NOTE: panelComponent is
+	/// looked up in the TypeLibrary and SILENTLY skipped if the type isn't loaded (freshly generated
+	/// panels need trigger_hotload first) — check gameObject.components to confirm it attached.
 	/// </summary>
-	/// <param name="name">Name for the UI GameObject. Defaults to 'Screen UI'.</param>
+	/// <param name="name">Name for the UI GameObject. Defaults to 'Screen Panel'.</param>
 	/// <param name="zIndex">Z-index for layering multiple screen panels.</param>
 	/// <param name="panelComponent">Name of a Razor PanelComponent to add (e.g. 'GameHud').</param>
 	/// <param name="parent">GUID of parent GameObject.</param>
@@ -27,9 +29,12 @@ public static class BridgeUiTools
 
 	/// <summary>
 	/// Create a new GameObject with a WorldPanel component for in-world 3D UI (health bars, signs,
-	/// nameplates).
+	/// nameplates). Returns { created, gameObject:{ id, name, components, ... } }. As with
+	/// add_screen_panel, panelComponent is SILENTLY skipped if the type isn't in the TypeLibrary
+	/// (trigger_hotload first, then verify via gameObject.components). For CLICKABLE world UI the scene
+	/// also needs a Sandbox.WorldInput (see create_worldpanel_ui).
 	/// </summary>
-	/// <param name="name">Name for the UI GameObject. Defaults to 'World UI'.</param>
+	/// <param name="name">Name for the UI GameObject. Defaults to 'World Panel'.</param>
 	/// <param name="position">World position for the panel — object {x,y,z} or comma string "x,y,z". As "x,y,z" (or JSON {x,y,z}).</param>
 	/// <param name="rotation">Rotation as euler angles. As "pitch,yaw,roll" degrees.</param>
 	/// <param name="worldScale">Scale of the world panel. Smaller = smaller in world.</param>
@@ -41,8 +46,12 @@ public static class BridgeUiTools
 		=> McpGate.Run( "add_world_panel", McpGate.Args( ( "name", name ), ( "position", position ), ( "rotation", rotation ), ( "worldScale", worldScale ), ( "lookAtCamera", lookAtCamera ), ( "panelComponent", panelComponent ), ( "parent", parent ) ) );
 
 	/// <summary>
-	/// Create a Razor UI component file (.razor) with optional SCSS stylesheet. Generates boilerplate
-	/// for HUD, menu, or basic panel types.
+	/// Create a Razor UI component file (.razor). Returns { created, path, componentName }; errors if
+	/// the file already exists. NOTE: the current handler generates one fixed basic panel (a root div +
+	/// label bound to a Title [Property]) from name+directory only —
+	/// panelType/content/styles/includeStyles are not applied and no .scss is written; for custom
+	/// markup or a PanelComponent you can host via add_screen_panel, write the files with write_file
+	/// and check them with razor_lint. Follow with trigger_hotload, then get_compile_errors.
 	/// </summary>
 	/// <param name="name">Component name (e.g. 'GameHud', 'MainMenu').</param>
 	/// <param name="directory">Subdirectory under code/ for the file. Defaults to 'UI'.</param>

@@ -50,7 +50,7 @@
     {
       "module": "assets",
       "name": "install_asset",
-      "description": "Install a community asset package into the project by its ident (e.g. 'facepunch.flatgrass'). Adds it as a project dependency",
+      "description": "Install a community asset package into the project by its ident (e.g. 'facepunch.flatgrass'). Adds it as a project dependency. Returns { installed, ident, name, path, relativePath, restartRecommended, note } — pass the returned path to spawn_model / assign_model. CAUTION: if the package is a code LIBRARY (adds a PackageReference), trigger_hotload will NOT surface its types — call restart_editor so the new package compiles into the project",
       "params": [
         {
           "name": "ident",
@@ -65,11 +65,11 @@
     {
       "module": "assets",
       "name": "list_asset_library",
-      "description": "Browse the s&box community asset library. Search for packages by name, description, or type to find models, maps, and tools to install",
+      "description": "List assets visible to the editor's AssetSystem — project assets plus mounted engine/installed-package content (it does NOT query the remote sbox.game library; use install_asset to pull in new packages). Returns { count, assets:[{ name, path, relativePath, assetType }] } — pass a returned path to spawn_model, assign_model, or get_asset_info",
       "params": [
         {
           "name": "query",
-          "description": "Search term for packages",
+          "description": "Search term, case-insensitive substring match against asset NAMES",
           "optional": true,
           "type": {
             "kind": "string"
@@ -77,7 +77,7 @@
         },
         {
           "name": "type",
-          "description": "Package type filter (e.g. 'model', 'map', 'library')",
+          "description": "Asset type filter, substring-matched against the asset's type (e.g. 'model', 'material', 'sound')",
           "optional": true,
           "type": {
             "kind": "string"
@@ -85,7 +85,7 @@
         },
         {
           "name": "maxResults",
-          "description": "Maximum results. Defaults to 25",
+          "description": "Maximum results. Defaults to 200",
           "optional": true,
           "type": {
             "kind": "number"
@@ -127,7 +127,7 @@
     {
       "module": "audio",
       "name": "assign_sound",
-      "description": "Attach a sound event to a GameObject via SoundPointComponent. Creates the component if needed",
+      "description": "Attach a sound event to a GameObject via SoundPointComponent. Creates the component if needed. Returns { assigned, id, sound, soundLoaded, playOnStart } — soundLoaded:false means the .sound path did not resolve (the component is still added with no event; verify the path with list_sounds)",
       "params": [
         {
           "name": "id",
@@ -147,7 +147,7 @@
         },
         {
           "name": "playOnStart",
-          "description": "Whether the sound plays automatically when the game starts",
+          "description": "If true, the handler calls StartSound() immediately, so the sound starts playing right away (audible in the editor)",
           "optional": true,
           "type": {
             "kind": "boolean"
@@ -158,11 +158,11 @@
     {
       "module": "audio",
       "name": "create_sound_event",
-      "description": "Create a new sound event file (.sound) with volume, pitch, distance falloff, and looping settings",
+      "description": "Create a .sound event file wired to a source .vsnd. Returns { created, path, soundReferenced, note } (path is project-relative); errors if the file already exists. Preview the result with play_sound_preview or attach it to an object with assign_sound. Note: .sound events have no loop flag — looping lives on the SoundPointComponent that plays the event",
       "params": [
         {
           "name": "path",
-          "description": "Path for the sound event file (e.g. 'sounds/footstep.sound')",
+          "description": "Project-relative path for the sound event file (e.g. 'sounds/footstep.sound'; '.sound' appended if missing)",
           "optional": false,
           "type": {
             "kind": "string"
@@ -170,8 +170,8 @@
         },
         {
           "name": "sound",
-          "description": "Path to the source sound asset (.vsnd)",
-          "optional": false,
+          "description": "Path to the source sound asset (.vsnd) the event plays. Omit to create an empty event and wire it later",
+          "optional": true,
           "type": {
             "kind": "string"
           }
@@ -193,27 +193,11 @@
           }
         },
         {
-          "name": "minDistance",
-          "description": "Minimum distance before falloff starts (units). Defaults to 100",
-          "optional": true,
-          "type": {
-            "kind": "number"
-          }
-        },
-        {
           "name": "maxDistance",
-          "description": "Maximum audible distance (units). Defaults to 2000",
+          "description": "Maximum audible distance in units (sets Distance + enables DistanceAttenuation). Omit for the engine default",
           "optional": true,
           "type": {
             "kind": "number"
-          }
-        },
-        {
-          "name": "loop",
-          "description": "Whether the sound should loop. Defaults to false",
-          "optional": true,
-          "type": {
-            "kind": "boolean"
           }
         }
       ]
@@ -221,11 +205,11 @@
     {
       "module": "audio",
       "name": "list_sounds",
-      "description": "List available sound assets in the project and installed packages. Filter by name",
+      "description": "List the project's .sound event files (recursive scan of the project root for *.sound). Returns { count, sounds } — project-relative paths ready to pass to assign_sound, play_sound_preview, or add_lipsync. NOTE: the current handler returns every match (filter/maxResults are not applied) and only covers .sound files in the project tree — use search_assets type='sound' for other sound assets",
       "params": [
         {
           "name": "filter",
-          "description": "Search filter for sound name or path",
+          "description": "Search filter for sound name or path (currently not applied by the handler — all .sound files are returned)",
           "optional": true,
           "type": {
             "kind": "string"
@@ -233,7 +217,7 @@
         },
         {
           "name": "maxResults",
-          "description": "Maximum results. Defaults to 50",
+          "description": "Maximum results. Defaults to 50 (currently not applied by the handler)",
           "optional": true,
           "type": {
             "kind": "number"
@@ -244,7 +228,7 @@
     {
       "module": "audio",
       "name": "play_sound_preview",
-      "description": "Play a sound in the editor for testing without entering play mode",
+      "description": "Play a sound in the editor for testing without entering play mode. Returns { playing, sound, volume }. Fire-and-forget via Sound.Play — there is no stop control, and the volume param is echoed back but not currently applied to playback",
       "params": [
         {
           "name": "sound",
@@ -256,7 +240,7 @@
         },
         {
           "name": "volume",
-          "description": "Preview volume (0-1). Defaults to 1.0",
+          "description": "Preview volume (0-1). Defaults to 1.0 (echoed in the response but not currently applied to playback)",
           "optional": true,
           "type": {
             "kind": "number"
@@ -330,7 +314,7 @@
     {
       "module": "characters",
       "name": "add_ragdoll",
-      "description": "Add ModelPhysics to a skinned model so it becomes a ragdoll (physics-driven bones). NOTE: the ragdoll only flops in PLAY mode — it won't move in the static editor view, so this one is verified structurally, not by screenshot.",
+      "description": "Add ModelPhysics to a skinned model so it becomes a ragdoll (physics-driven bones). NOTE: the ragdoll only flops in PLAY mode — it won't move in the static editor view, so this one is verified structurally, not by screenshot. Returns { ragdoll, note, gameObject } — check gameObject.components for ModelPhysics, then verify at runtime with start_play + capture_view.",
       "params": [
         {
           "name": "id",
@@ -504,7 +488,7 @@
     {
       "module": "characters",
       "name": "pose_citizen",
-      "description": "Pose a Citizen by setting CitizenAnimationHelper params (enables PlayAnimationsInEditorScene so the pose shows in-editor). Set holdType (None/Pistol/Rifle/Shotgun/HoldItem/Punch/Swing), moveStyle (Auto/Walk/Run), specialMove, sitting (bool), and/or duckLevel (0-1).",
+      "description": "Pose a Citizen by setting CitizenAnimationHelper params (enables PlayAnimationsInEditorScene so the pose shows in-editor). Set holdType (None/Pistol/Rifle/Shotgun/HoldItem/Punch/Swing), moveStyle (Auto/Walk/Run), specialMove, sitting (bool), and/or duckLevel (0-1). Returns { posed, changed:[...], gameObject } — changed lists which helper params were applied; take_screenshot to verify the pose.",
       "params": [
         {
           "name": "id",
@@ -559,7 +543,7 @@
     {
       "module": "characters",
       "name": "set_animgraph_param",
-      "description": "Set an AnimationGraph parameter on a GameObject's SkinnedModelRenderer (calls Set). This drives Citizen/animgraph motion — e.g. 'move_x'/'move_y' (float), 'b_grounded'/'b_ducked' (bool), or a Vector3. Pose previews in-editor when PlayAnimationsInEditorScene is on; screenshot to verify. Param names are defined by the model's animation graph.",
+      "description": "Set an AnimationGraph parameter on a GameObject's SkinnedModelRenderer (calls Set). This drives Citizen/animgraph motion — e.g. 'move_x'/'move_y' (float), 'b_grounded'/'b_ducked' (bool), or a Vector3. Pose previews in-editor when PlayAnimationsInEditorScene is on; screenshot to verify. Param names are defined by the model's animation graph — use list_animations to check whether the model is animgraph-driven. Returns { set, param, kind, note } — kind is the type actually applied (float/int/bool/vector).",
       "params": [
         {
           "name": "id",
@@ -604,7 +588,7 @@
     {
       "module": "characters",
       "name": "set_bodygroup",
-      "description": "Show/hide a bodygroup on a SkinnedModelRenderer (e.g. hide hands when holding a tool, swap head variants). Provide value (int index) or choice (string name).",
+      "description": "Show/hide a bodygroup on a SkinnedModelRenderer (e.g. hide hands when holding a tool, swap head variants). Provide value (int index) or choice (string name). Returns { set, bodygroup } on success (errors if the object has no SkinnedModelRenderer or neither value nor choice is given); take_screenshot to verify the visual change.",
       "params": [
         {
           "name": "id",
@@ -643,7 +627,7 @@
     {
       "module": "characters",
       "name": "set_expression",
-      "description": "Set a facial morph (blendshape) on a skinned model — e.g. smile, frown, blink. Call with NO morph to list the model's available morph names (returned as availableMorphs). weight is typically 0-1.",
+      "description": "Set a facial morph (blendshape) on a skinned model — e.g. smile, frown, blink. Call with NO morph to list the model's available morph names (returned as availableMorphs). weight is typically 0-1. Returns { set, morph, weight, availableMorphs } — availableMorphs is included in every response, so a wrong name can be corrected without an extra listing call.",
       "params": [
         {
           "name": "id",
@@ -737,7 +721,7 @@
     {
       "module": "characters",
       "name": "spawn_citizen",
-      "description": "Spawn an animated Citizen character: a SkinnedModelRenderer with the Citizen model, plus (by default) a CitizenAnimationHelper so it idles. PlayAnimationsInEditorScene is enabled so the idle pose shows in the editor view (screenshot-verifiable). Dress it afterward with dress_citizen, pose it with pose_citizen.",
+      "description": "Spawn an animated Citizen character: a SkinnedModelRenderer with the Citizen model, plus (by default) a CitizenAnimationHelper so it idles. PlayAnimationsInEditorScene is enabled so the idle pose shows in the editor view (screenshot-verifiable). Returns { created, hasAnimator, gameObject:{ id, name, position, components, ... } } — pass gameObject.id to the follow-ups: dress_citizen, pose_citizen, set_expression, equip_model.",
       "params": [
         {
           "name": "name",
@@ -887,7 +871,7 @@
     {
       "module": "cinematics",
       "name": "create_cutscene_director",
-      "description": "Generate a hand-authored cutscene player component that needs NO .movie asset — the zero-asset alternative to the MovieMaker family (add_movie_player/play_movie, which play keyframed .movie clips authored in the editor's Movie Maker dock). You author the shots directly in the inspector as parallel lists: ShotPositions (Vector3), ShotAngles (pitch/yaw/roll — Angles, not raw quaternions), ShotHoldSeconds, ShotBlendSeconds, and an optional per-shot ShotLookAt GameObject (aim at a target instead of using ShotAngles). At runtime it takes over the main camera (Scene.Camera) in OnPreRender ONLY while playing — smoothstep-eased Vector3.Lerp + Rotation.Slerp between shots — captures the camera's prior transform and restores it exactly when finished (same un-apply discipline as create_camera_shake). Play from any game code via the static <Name>.Play() (first director) or <Name>.Play(\"name\") (matches CutsceneName); subscribe the static <Name>.OnCutsceneFinished, or gate game logic on the static <Name>.IsCutscenePlaying. LockInput freezes player input each frame via Input.ClearActions() while still reading the SkipAction press first so the cutscene stays skippable. Optional letterbox generates a razor_lint-safe black-bars overlay panel (host under a ScreenPanel) shown while IsCutscenePlaying. LOCAL-only (each client renders its own view) — trigger inside an [Rpc.Broadcast] for all clients. Attach to ANY GameObject; it drives the camera itself and does not need to sit on the camera. Compile with trigger_hotload afterward.",
+      "description": "Generate a hand-authored cutscene player component that needs NO .movie asset — the zero-asset alternative to the MovieMaker family (add_movie_player/play_movie, which play keyframed .movie clips authored in the editor's Movie Maker dock). You author the shots directly in the inspector as parallel lists: ShotPositions (Vector3), ShotAngles (pitch/yaw/roll — Angles, not raw quaternions), ShotHoldSeconds, ShotBlendSeconds, and an optional per-shot ShotLookAt GameObject (aim at a target instead of using ShotAngles). At runtime it takes over the main camera (Scene.Camera) in OnPreRender ONLY while playing — smoothstep-eased Vector3.Lerp + Rotation.Slerp between shots — captures the camera's prior transform and restores it exactly when finished (same un-apply discipline as create_camera_shake). Play from any game code via the static <Name>.Play() (first director) or <Name>.Play(\"name\") (matches CutsceneName); subscribe the static <Name>.OnCutsceneFinished, or gate game logic on the static <Name>.IsCutscenePlaying. LockInput freezes player input each frame via Input.ClearActions() while still reading the SkipAction press first so the cutscene stays skippable. Optional letterbox generates a razor_lint-safe black-bars overlay panel (host under a ScreenPanel) shown while IsCutscenePlaying. LOCAL-only (each client renders its own view) — trigger inside an [Rpc.Broadcast] for all clients. Attach to ANY GameObject; it drives the camera itself and does not need to sit on the camera. Returns { created, path, className, skipAction, lockInput, letterbox, nextSteps } — path is the generated .cs (letterbox lists the overlay files when enabled). Follow with trigger_hotload, then get_compile_errors, then attach via add_component_with_properties (component=className).",
       "params": [
         {
           "name": "name",
@@ -934,7 +918,7 @@
     {
       "module": "cinematics",
       "name": "create_dialogue_system",
-      "description": "Generate an NPC/story dialogue system — a sealed state+data Component paired with a razor_lint-safe Razor HUD panel. Lines are authored in the inspector as a List<string> using the 'Speaker: text' convention (the part before the first colon is the speaker). The generated HUD panel binds to <Name>.Current automatically (no wiring) and renders the current line with a TimeSince-driven typewriter reveal at CharsPerSecond, folding the visible substring into BuildHash so it re-renders as characters appear. Press the AdvanceAction once to snap the whole line into view instantly, again to move to the next line; dismissing the last line ends the conversation. Start from any game code via the static <Name>.StartDialogue(string[] lines) or set Lines and call the instance Begin(). Static events for hooks: OnLineShown(index, speaker) — pair with add_lipsync to drive facial morphs / audio per line — and OnDialogueFinished when the conversation ends. Pairs with create_interactable to trigger dialogue on use. LOCAL-only (per-client HUD) — call StartDialogue inside an [Rpc.Broadcast] if every client should see it. Attach the panel under a ScreenPanel (add_screen_panel) so the HUD renders. Compile with trigger_hotload afterward.",
+      "description": "Generate an NPC/story dialogue system — a sealed state+data Component paired with a razor_lint-safe Razor HUD panel. Lines are authored in the inspector as a List<string> using the 'Speaker: text' convention (the part before the first colon is the speaker). The generated HUD panel binds to <Name>.Current automatically (no wiring) and renders the current line with a TimeSince-driven typewriter reveal at CharsPerSecond, folding the visible substring into BuildHash so it re-renders as characters appear. Press the AdvanceAction once to snap the whole line into view instantly, again to move to the next line; dismissing the last line ends the conversation. Start from any game code via the static <Name>.StartDialogue(string[] lines) or set Lines and call the instance Begin(). Static events for hooks: OnLineShown(index, speaker) — pair with add_lipsync to drive facial morphs / audio per line — and OnDialogueFinished when the conversation ends. Pairs with create_interactable to trigger dialogue on use. LOCAL-only (per-client HUD) — call StartDialogue inside an [Rpc.Broadcast] if every client should see it. Attach the panel under a ScreenPanel (add_screen_panel) so the HUD renders. Returns { created, path, className, charsPerSecond, advanceAction, panel, nextSteps } — panel lists the generated '<Name>Panel' HUD files. Follow with trigger_hotload, then get_compile_errors, then attach both components via add_component_with_properties.",
       "params": [
         {
           "name": "name",
@@ -1004,7 +988,7 @@
     {
       "module": "components",
       "name": "get_all_properties",
-      "description": "Dump all public properties of every component on a GameObject as JSON -- names, types, and current values",
+      "description": "Dump all public properties of every component on a GameObject. Returns { id, components } where each entry is { component, properties: [{ name, type, value }] } — values are stringified (unreadable ones show '<error>'). Use the exact component/property names it reports with set_property or get_property; can be large on component-heavy objects.",
       "params": [
         {
           "name": "id",
@@ -1092,7 +1076,7 @@
     {
       "module": "components",
       "name": "list_available_components",
-      "description": "List all component types available in s&box (built-in and custom). Search by name or filter by category",
+      "description": "List all instantiable component types in the TypeLibrary — built-in AND your project's custom components (abstract types excluded); filter does a substring match on the type name. Returns { count, components } with { name, title, description, fullName } per type, sorted by name — the unfiltered list is LARGE, so pass filter. Use the returned name with add_component_with_properties, and describe_type for a type's full property list.",
       "params": [
         {
           "name": "filter",
@@ -1115,13 +1099,13 @@
     {
       "module": "debugdraw",
       "name": "debug_clear",
-      "description": "Remove all debug-draw primitives by destroying the debug holder for the current scene (edit or play). Call before redrawing a fresh frame of debug shapes.",
+      "description": "Remove ALL debug-draw primitives at once by destroying the debug holder for the current scene (edit or play) — there is no way to remove a single shape. Call before redrawing a fresh frame of debug shapes. Returns { cleared, removed } where removed is how many primitives were destroyed.",
       "params": []
     },
     {
       "module": "debugdraw",
       "name": "debug_draw_box",
-      "description": "Draw a wireframe debug box centered at a point. Renders in editor and play. Ideal for visualizing a trigger_zone's bounds or a physics_overlap box volume. Accumulates until debug_clear.",
+      "description": "Draw a wireframe debug box centered at a point. Renders in editor and play. Ideal for visualizing a trigger_zone's bounds or a physics_overlap box volume. Accumulates until debug_clear. Returns { drawn: 'box', count, mode } — count is the total accumulated primitives, mode is 'edit' or 'play' (edit-mode gizmos are NOT in take_screenshot; use capture_view in play mode).",
       "params": [
         {
           "name": "center",
@@ -1199,7 +1183,7 @@
     {
       "module": "debugdraw",
       "name": "debug_draw_ray",
-      "description": "Draw a debug ray (drawn as an arrow) from an origin along a direction for a given length. Renders in editor and play. Ideal for visualizing a raycast result or a facing/normal direction. Accumulates until debug_clear.",
+      "description": "Draw a debug ray (drawn as an arrow) from an origin along a direction for a given length. Renders in editor and play. Ideal for visualizing a raycast result or a facing/normal direction. Accumulates until debug_clear. Returns { drawn: 'ray', count, mode } — count is the total accumulated primitives, mode is 'edit' or 'play' (edit-mode gizmos are NOT in take_screenshot; use capture_view in play mode).",
       "params": [
         {
           "name": "origin",
@@ -1246,7 +1230,7 @@
     {
       "module": "debugdraw",
       "name": "debug_draw_sphere",
-      "description": "Draw a wireframe debug sphere at a point. Renders in editor and play. Ideal for visualizing a physics_overlap radius or an NPC's hearing/sight range. Accumulates until debug_clear.",
+      "description": "Draw a wireframe debug sphere at a point. Renders in editor and play. Ideal for visualizing a physics_overlap radius or an NPC's hearing/sight range. Accumulates until debug_clear. Returns { drawn: 'sphere', count, mode } — count is the total accumulated primitives, mode is 'edit' or 'play' (edit-mode gizmos are NOT in take_screenshot; use capture_view in play mode).",
       "params": [
         {
           "name": "center",
@@ -1386,7 +1370,7 @@
     {
       "module": "diagnostics",
       "name": "console_run",
-      "description": "Run an s&box console command / ConCmd via Sandbox.ConsoleSystem.Run — e.g. a cvar ('sv_cheats 1') or a registered command. Also the invocation primitive behind execute_csharp.",
+      "description": "Run an s&box console command / ConCmd via Sandbox.ConsoleSystem.Run — e.g. a cvar ('sv_cheats 1') or a registered command. Also the invocation primitive behind execute_csharp. Fire-and-forget: returns only { ran, command } and does NOT capture console output — follow with read_log to see what the command printed.",
       "params": [
         {
           "name": "command",
@@ -1463,7 +1447,7 @@
     {
       "module": "diagnostics",
       "name": "get_bounds",
-      "description": "Get a GameObject's world-space bounding box — center, size, extents, mins/maxs, and a radius. Useful for placing/framing objects and sizing camera moves. Reads GameObject.GetBounds(); objects with no renderer report empty:true with their world position.",
+      "description": "Get a GameObject's world-space bounding box. Returns { id, name, center, size, extents, mins, maxs, radius, position, empty } — objects with no renderer report empty:true (bounds collapse to the world position) plus an explanatory note. Feed center/radius into screenshot_from or frame_camera to frame the object, or use mins/maxs for placement math (screenshot_orbit calls this internally).",
       "params": [
         {
           "name": "id",
@@ -1696,7 +1680,7 @@
     {
       "module": "discovery",
       "name": "find_in_project",
-      "description": "Grep the user's s&box project for a symbol. Returns file paths and line numbers. Useful for finding usage examples of an API or seeing how the project already does something.",
+      "description": "Grep the user's s&box project for a symbol (case-sensitive substring; skips .git/bin/obj). Useful for finding usage examples of an API or seeing how the project already does something. Returns `symbol`, `count`, and `results` [{file, line, text}], capped at `max_results` (default 25) — raise it if you may be missing hits. Follow up with read_file on a result's file path.",
       "params": [
         {
           "name": "symbol",
@@ -1717,7 +1701,7 @@
         },
         {
           "name": "max_results",
-          "description": "",
+          "description": "Maximum hits to return (default 25); the search stops once reached",
           "optional": true,
           "default": 25,
           "type": {
@@ -1752,13 +1736,13 @@
     {
       "module": "discovery",
       "name": "list_libraries",
-      "description": "List the s&box libraries/addons installed in this project (reads Libraries/ + each .sbproj). Discovers what's available to build ON — e.g. character controllers (fish.scc = Shrimple Character Controller, facepunch.playercontroller), world/spline/road tools — so you can leverage an installed library (add its components via add_component_with_properties, or generate code against its API) instead of writing from scratch. Returns ident/org/title/type/enabled per library. Read-only.",
+      "description": "List the s&box libraries/addons installed in this project (reads Libraries/ + each .sbproj). Discovers what's available to build ON — e.g. character controllers (fish.scc = Shrimple Character Controller, facepunch.playercontroller), world/spline/road tools — so you can leverage an installed library (add its components via add_component_with_properties, or generate code against its API) instead of writing from scratch. Returns `count` and `libraries` [{folder, ident, org, title, type, enabled}] — ALL libraries, no limit or pagination; `enabled` is false when the library's .sbproj has been disabled (renamed .sbproj.disabled). Read-only.",
       "params": []
     },
     {
       "module": "discovery",
       "name": "search_types",
-      "description": "Find types matching a name pattern. Pass components_only=true to filter to Component subclasses only. Useful for discovering 'is there a built-in X for this?'",
+      "description": "Find loaded types matching a name pattern. Useful for discovering 'is there a built-in X for this?'. Returns `count` and `matches` with each type's name, fullName, isComponent, and isAbstract — results are silently truncated at `limit` (default 50), so narrow the pattern if you hit the cap. Pass a match's name to describe_type for its full member surface.",
       "params": [
         {
           "name": "pattern",
@@ -1778,7 +1762,7 @@
         },
         {
           "name": "components_only",
-          "description": "",
+          "description": "Only return Component subclasses (default false)",
           "optional": true,
           "default": false,
           "type": {
@@ -1787,7 +1771,7 @@
         },
         {
           "name": "limit",
-          "description": "",
+          "description": "Maximum matches to return (default 50); the search stops silently at this cap",
           "optional": true,
           "default": 50,
           "type": {
@@ -2101,7 +2085,7 @@
     {
       "module": "gameobjects",
       "name": "duplicate_gameobject",
-      "description": "Clone a GameObject with all its components. Optionally offset position or rename",
+      "description": "Clone a GameObject with all its components. Returns { duplicated, original, gameObject } — gameObject.id is the clone's new GUID; pass it to set_transform / add_component_with_properties. If offset is omitted the clone lands exactly on top of the original.",
       "params": [
         {
           "name": "id",
@@ -2132,7 +2116,7 @@
     {
       "module": "gameobjects",
       "name": "focus_object",
-      "description": "Move the editor camera to focus on a specific GameObject (like double-clicking in the hierarchy)",
+      "description": "Highlight a GameObject by selecting it in the editor. NOTE: s&box exposes no dedicated focus API, so this only sets the selection — it does NOT move any camera (returns { focused, id, note } saying so). To actually point the viewport at an object use frame_camera; to aim a screenshot use screenshot_from.",
       "params": [
         {
           "name": "id",
@@ -2170,13 +2154,13 @@
     {
       "module": "gameobjects",
       "name": "get_selected_objects",
-      "description": "Get the GameObjects currently selected by the user in the s&box editor",
+      "description": "Get the GameObjects currently selected by the user in the s&box editor. Returns { count, selected } where each entry is a serialized GameObject (id, name, enabled, position, rotation, scale, components, childCount) — use the ids with set_transform, add_component_with_properties, etc. Handy for 'do X to what I have selected' requests.",
       "params": []
     },
     {
       "module": "gameobjects",
       "name": "rename_gameobject",
-      "description": "Change the display name of a GameObject",
+      "description": "Change the display name of a GameObject identified by its GUID (the GUID itself never changes, so existing references stay valid). Returns { renamed, id, oldName, newName }. Name-based lookups (e.g. find_objects) will see the new name immediately.",
       "params": [
         {
           "name": "id",
@@ -2199,7 +2183,7 @@
     {
       "module": "gameobjects",
       "name": "select_object",
-      "description": "Select a GameObject in the editor (highlights it in the hierarchy and scene view)",
+      "description": "Select a GameObject in the editor (highlights it in the hierarchy and scene view). Replaces the current selection unless addToSelection=true. Returns { selected, id }; confirm the result with get_selected_objects.",
       "params": [
         {
           "name": "id",
@@ -2222,7 +2206,7 @@
     {
       "module": "gameobjects",
       "name": "set_enabled",
-      "description": "Enable or disable a GameObject (disabled objects are invisible and inactive)",
+      "description": "Enable or disable a GameObject (disabled objects are invisible and inactive, including their components and children). Returns { id, enabled } confirming the new state.",
       "params": [
         {
           "name": "id",
@@ -2268,7 +2252,7 @@
     {
       "module": "gameobjects",
       "name": "set_transform",
-      "description": "Set position, rotation, and/or scale on a GameObject. Only provided values are changed",
+      "description": "Set position, rotation, and/or scale on a GameObject. Only provided values are changed; values apply in world space unless local=true. Returns { transformed, gameObject } with the full serialized object (id, name, position, rotation, scale, components) so you can verify what actually applied.",
       "params": [
         {
           "name": "id",
@@ -2640,7 +2624,7 @@
     {
       "module": "gameplay",
       "name": "create_leaderboard_panel",
-      "description": "Generate a Razor PanelComponent that fetches and displays a Sandbox.Services leaderboard derived from a stat name. Produces TWO files: {name}.razor and {name}.razor.scss. The panel auto-refreshes every 30 s, shows rank/displayName/value rows, handles loading state, and includes a BuildHash() override (razor-lint clean). Must be hosted under a ScreenPanel or WorldPanel. Stats must be configured for the project ident on sbox.game. Uses Leaderboards.Get(statName) + board.Refresh() -- the exact API from ServicesQueryHandler.",
+      "description": "Generate a Razor PanelComponent that fetches and displays a Sandbox.Services leaderboard derived from a stat name. Produces TWO files: {name}.razor and {name}.razor.scss. The panel auto-refreshes every 30 s, shows rank/displayName/value rows, handles loading state, and includes a BuildHash() override (razor-lint clean). Must be hosted under a ScreenPanel or WorldPanel. Stats must be configured for the project ident on sbox.game. Uses Leaderboards.Get(statName) + board.Refresh() -- the exact API from ServicesQueryHandler. Returns { created, razorPath, scssPath, className, note }. Follow with trigger_hotload, then get_compile_errors, then host it via add_screen_panel (panelComponent=className).",
       "params": [
         {
           "name": "name",
@@ -2687,7 +2671,7 @@
     {
       "module": "gameplay",
       "name": "create_objective_system",
-      "description": "Generate an ObjectiveManager component — the win/lose brain of a game. Tracks an objective (collect_all / reach_goal / survive_time / eliminate_all), fires a win, and handles a lose condition (fall below kill-Z / timer / out of lives). Self-contained C#; other systems call ObjectiveManager.Instance. Optionally placed as a scene singleton",
+      "description": "Generate an ObjectiveManager component — the win/lose brain of a game. Tracks an objective (collect_all / reach_goal / survive_time / eliminate_all), fires a win, and handles a lose condition (fall below kill-Z / timer / out of lives). Self-contained C#; other systems call ObjectiveManager.Instance. Optionally placed as a scene singleton. Returns { created, path, className, gameObject, note } — gameObject is the placed singleton, or null with a note when the fresh type isn't in the TypeLibrary yet. Follow with trigger_hotload, then get_compile_errors; if placement was skipped, place with add_component_to_new_object after the hotload",
       "params": [
         {
           "name": "name",
@@ -2778,7 +2762,7 @@
     {
       "module": "gameplay",
       "name": "create_pickup",
-      "description": "Generate a trigger-based collectible component. On enter by a tagged object it raises OnCollected (wire it to your objective/score system) and despawns. Optionally builds a visible pickup GameObject with a trigger SphereCollider (+ a model) in one call",
+      "description": "Generate a trigger-based collectible component. On enter by a tagged object it raises OnCollected (wire it to your objective/score system) and despawns. Optionally builds a visible pickup GameObject with a trigger SphereCollider (+ a model) in one call. Returns { created, path, className, gameObject, note } — gameObject is the placed pickup (null unless placeInScene=true); a note flags when the component couldn't attach because the fresh type needs a hotload. Follow with trigger_hotload, then get_compile_errors",
       "params": [
         {
           "name": "name",
@@ -3015,7 +2999,7 @@
     {
       "module": "gameplay",
       "name": "create_stat_modifier_system",
-      "description": "Generate an enum-keyed stat modifier system with three modifier layers: SET (highest-priority-wins hard override), ADD (summed bonuses), MULT (multiplied factors applied last). Modifier storage uses parallel private Lists of primitive types (serialization-safe). RemoveModifiersFrom(source) cleans up all mods from a buff/debuff source by reference. Static OnStatChanged(stat, value) event fires after every add/remove. Mined from RPG/buff/debuff patterns across shipped s&box games.",
+      "description": "Generate an enum-keyed stat modifier system with three modifier layers: SET (highest-priority-wins hard override), ADD (summed bonuses), MULT (multiplied factors applied last). Modifier storage uses parallel private Lists of primitive types (serialization-safe). RemoveModifiersFrom(source) cleans up all mods from a buff/debuff source by reference. Static OnStatChanged(stat, value) event fires after every add/remove. Mined from RPG/buff/debuff patterns across shipped s&box games. Returns { created, path, className, stats, placedOn, note } — stats echoes the sanitized stat names ({name}Stat enum values); placedOn is the target GameObject when attached (needs the type hotloaded). Follow with trigger_hotload, then get_compile_errors.",
       "params": [
         {
           "name": "name",
@@ -3203,7 +3187,7 @@
     {
       "module": "inspection",
       "name": "inspect_networked_object",
-      "description": "Inspect the live networking contract of a GameObject: Network.Owner/IsProxy/IsOwner/Active, OwnerTransfer + OrphanedMode, and every component's [Sync] property names, SyncFlags, and current values (host vs proxy). Unlike get_network_status (session-only), this is per-object — the way to verify a host-authoritative or ownership change actually replicated. Works in edit or play mode.",
+      "description": "Inspect the live networking contract of a GameObject. Returns {id, name, network: {active, isProxy, isOwner, isCreator, ownerId, ownerSteamId, ownerTransfer, orphaned, flags}, components: [{component, fields: [{name, type, isSync, syncFlags, value}]}]} — by default only [Sync]-marked fields are listed (components with none are omitted). Unlike get_network_status (session-only), this is per-object — the way to verify a host-authoritative or ownership change actually replicated; works in edit or play mode. Follow up with set_ownership to change the owner, or networking_lint to find the code-level cause of a bad [Sync] value.",
       "params": [
         {
           "name": "id",
@@ -3272,11 +3256,11 @@
     {
       "module": "inspection",
       "name": "save_inspect",
-      "description": "Inspect the game's FileSystem.Data save files — the assistant is otherwise blind to persisted state. action='list' enumerates files under a folder (with size/mtime); action='read' dumps a save file's JSON; action='diff' compares two save files key-by-key. Use to verify a save actually wrote, debug a load/migration, or confirm a sanitize/clamp ran.",
+      "description": "Inspect the game's FileSystem.Data save files — the assistant is otherwise blind to persisted state. action='list' (default) returns `directories` and `files` [{name, path, size}] under `path` (omit path for the Data root); action='read' returns {path, length, content}, truncating content at 60,000 chars; action='diff' compares two save files key-by-key, returning `diffCount` and up to 200 `diffs` [{key, change: added|removed|changed}]. Use to verify a save actually wrote, debug a load/migration, or confirm a sanitize/clamp ran.",
       "params": [
         {
           "name": "action",
-          "description": "",
+          "description": "'list' (default) enumerates a folder; 'read' dumps one file's JSON; 'diff' compares `path` vs `pathB`",
           "optional": true,
           "default": "list",
           "type": {
@@ -3315,11 +3299,11 @@
     {
       "module": "inspection",
       "name": "services_query",
-      "description": "Read from Sandbox.Services — the cloud stats/leaderboard layer many games use as their real DB. action='stats' lists/reads the project's stat definitions and the local player's values; action='leaderboard' fetches a leaderboard board's top entries. Read-only. Use to verify a Stats.Increment/SetValue path or a leaderboard wired correctly.",
+      "description": "Read from Sandbox.Services — the cloud stats/leaderboard layer many games use as their real DB. action='stats' with `name` returns the local player's stat {ident, value, sum, min, max, lastValue, valueString}; without `name` it returns only the package ident plus a usage note (it does NOT list stat definitions). action='leaderboard' (name required) returns {board, displayName, totalEntries, count, entries} with at most `limit` entries (default 10). Read-only; use to verify a Stats.Increment/SetValue path or a leaderboard wired correctly.",
       "params": [
         {
           "name": "action",
-          "description": "",
+          "description": "'stats' (default) reads a local-player stat by `name`; 'leaderboard' fetches a board's top entries",
           "optional": true,
           "default": "stats",
           "type": {
@@ -3352,7 +3336,7 @@
     {
       "module": "inspection",
       "name": "simulate_input",
-      "description": "Synthesize player input during PLAY mode so behavior can be verified without a human at the keyboard: press/hold/release a named input action (e.g. 'jump','attack1','use','reload') and/or set AnalogMove / AnalogLook for a duration. Drives movement, IPressable interactions, weapon fire/cooldown/reload, vehicle controls, and HUD advance-on-click. Requires play mode.",
+      "description": "Press or release a named input action during PLAY mode (via Sandbox.Input.SetAction) so input-driven behavior — jump, attack1, use, reload, IPressable, weapon fire — can be verified without a human at the keyboard. REQUIRES play mode and a named `action`; returns {action, state: 'down'|'up', note}. Caveats: SetAction applies to the current input frame ('press' and 'hold' both set the action down; 'release' clears it), and analogMove/analogLook/durationMs are accepted but IGNORED — Sandbox.Input has no analog injection API, so for movement use drive_player or the playtest harness instead.",
       "params": [
         {
           "name": "action",
@@ -3555,7 +3539,7 @@
     {
       "module": "leveltools",
       "name": "align_objects",
-      "description": "Align several GameObjects on one axis so they share a coordinate. mode = first (match the first object), min, max, or average.",
+      "description": "Align several GameObjects on one axis so they share a coordinate. mode = first (match the first object), min, max, or average; defaults to first. Returns { aligned, axis, mode, target } — aligned is the object count and target the shared coordinate; verify positions with get_scene_hierarchy or a screenshot.",
       "params": [
         {
           "name": "ids",
@@ -3600,7 +3584,7 @@
     {
       "module": "leveltools",
       "name": "distribute_objects",
-      "description": "Evenly space GameObjects along an axis between the lowest and highest (keeps the two ends fixed, spreads the rest evenly).",
+      "description": "Evenly space GameObjects along an axis between the lowest and highest (keeps the two ends fixed, spreads the rest evenly). Returns { distributed, axis, from, to } — the object count and the fixed end coordinates the rest were spread between.",
       "params": [
         {
           "name": "ids",
@@ -3743,7 +3727,7 @@
     {
       "module": "leveltools",
       "name": "randomize_transforms",
-      "description": "Add natural variation to existing objects: random yaw and/or random uniform scale within a range. Great for breaking up repetition in placed foliage/rocks/crates. Seeded.",
+      "description": "Add natural variation to existing objects: random yaw and/or random uniform scale within a range. Great for breaking up repetition in placed foliage/rocks/crates. Seeded — the same seed reproduces the same layout. Returns { randomized, seed } (the count of objects changed); scale only varies when scaleMax > scaleMin.",
       "params": [
         {
           "name": "ids",
@@ -3793,7 +3777,7 @@
     {
       "module": "leveltools",
       "name": "scatter_props",
-      "description": "Scatter N copies of a model randomly within a radius around a center point — instant foliage, rocks, debris. Each copy gets a random yaw and (by default) is snapped to the ground. Seeded for reproducibility; copies are grouped under one parent by default. Count capped at 300.",
+      "description": "Scatter N copies of a model randomly within a radius around a center point — instant foliage, rocks, debris. Each copy gets a random yaw and (by default) is snapped to the ground. Seeded for reproducibility; copies are grouped under one parent by default. Count capped at 300. Returns { scattered, groupId, seed } — individual prop GUIDs are not returned, so use groupId with get_scene_hierarchy (rootId) to enumerate them, or with set_transform/delete_gameobject to move/remove the whole batch.",
       "params": [
         {
           "name": "model",
@@ -3896,7 +3880,7 @@
     {
       "module": "leveltools",
       "name": "snap_to_ground",
-      "description": "Drop a GameObject straight down onto the surface below it (physics raycast). Works best on collider-less props (an object with its own collider may self-hit). Optional offset lifts it off the surface.",
+      "description": "Drop a GameObject straight down onto the surface below it (physics raycast). Works best on collider-less props (an object with its own collider may self-hit). Optional offset lifts it off the surface. Returns { snapped, groundZ, gameObject } with the object's updated transform — or { snapped: false, reason } (not an error) when no ground was hit below.",
       "params": [
         {
           "name": "id",
@@ -4076,7 +4060,7 @@
     {
       "module": "materials",
       "name": "assign_material",
-      "description": "Apply a material to a ModelRenderer on a GameObject. Optionally target a specific material slot",
+      "description": "Apply a material to a GameObject by setting its ModelRenderer's MaterialOverride (overrides the whole model's material). Requires an existing ModelRenderer (assign_model first) and errors if the material path can't be loaded. Returns { assigned, id, material } — tweak values afterwards with set_material_property.",
       "params": [
         {
           "name": "id",
@@ -4107,7 +4091,7 @@
     {
       "module": "materials",
       "name": "assign_model",
-      "description": "Set a 3D model on a GameObject's ModelRenderer. Creates the renderer component if it doesn't exist",
+      "description": "Set a 3D model on a GameObject's ModelRenderer. Creates the renderer component if it doesn't exist; errors if the model path can't be loaded. Returns { assigned, id, model } — follow with assign_material / set_material_property to style it, or take a screenshot to verify.",
       "params": [
         {
           "name": "id",
@@ -4130,7 +4114,7 @@
     {
       "module": "materials",
       "name": "create_material",
-      "description": "Create a new material file (.vmat) with a shader and properties like color, roughness, metallic, texture",
+      "description": "Create a new material file (.vmat, KV1 format) with a shader and properties like color, roughness, metallic, texture. Errors if the file already exists; when no properties are given it writes sensible PBR defaults (g_flMetalness 0, g_flRoughness 1). Returns { created, path, shader, propertiesWritten } — pass the returned path to recompile_asset (so the editor compiles it) and then assign_material.",
       "params": [
         {
           "name": "path",
@@ -4161,7 +4145,7 @@
     {
       "module": "materials",
       "name": "set_material_property",
-      "description": "Change a property on the material assigned to a GameObject — color, roughness, metallic, texture, etc.",
+      "description": "Change a property on the material assigned to a GameObject — color, roughness, metallic, texture, etc. Operates on the ModelRenderer's MaterialOverride; if none is assigned it auto-creates one from the default complex shader (no separate assign_material step needed). Returns { set, id, property, autoCreatedMaterial } — screenshot to verify the visual change.",
       "params": [
         {
           "name": "id",
@@ -4247,7 +4231,7 @@
     {
       "module": "moviemaker",
       "name": "list_movies",
-      "description": "List the project's .movie resources (Sandbox.MovieMaker clips authored in the editor's Movie Maker dock: Window → Movie Maker). Returns each movie's asset-relative path, whether it currently loads via ResourceLibrary, and whether it has a compiled clip. Start here before add_movie_player / play_movie — and if the list is empty, the movie has to be authored in the dock first (the bridge plays movies; it doesn't author keyframes).",
+      "description": "List the project's .movie resources (Sandbox.MovieMaker clips authored in the editor's Movie Maker dock: Window → Movie Maker). Scans the ENTIRE Assets folder recursively and returns every .movie found — no limit or paging. Returns { count, movies, note } where each movie has { path (asset-relative — the form add_movie_player/play_movie expect), name, loadable (resolves via ResourceLibrary), hasCompiledClip }. Start here before add_movie_player / play_movie — if the list is empty, the movie has to be authored in the dock first (the bridge plays movies; it doesn't author keyframes).",
       "params": []
     },
     {
@@ -4533,11 +4517,11 @@
     {
       "module": "networking",
       "name": "add_network_helper",
-      "description": "Add a NetworkHelper component to the scene for quick multiplayer setup. Handles lobby creation and player prefab spawning",
+      "description": "Add a NetworkHelper component (with StartServer=true) to an existing GameObject for quick multiplayer setup — at runtime it creates the lobby and spawns the player prefab per connection. Returns { added, id, component:'NetworkHelper' }. NOTE: the current handler requires id (create a holder with create_gameobject first) and does not apply maxPlayers/playerPrefab — wire PlayerPrefab afterward with set_prefab_ref/set_property",
       "params": [
         {
           "name": "id",
-          "description": "GUID of existing GameObject. Creates new if omitted",
+          "description": "GUID of the GameObject to attach to. Required in practice — the current handler errors when omitted (create a holder with create_gameobject first)",
           "optional": true,
           "type": {
             "kind": "string"
@@ -4545,7 +4529,7 @@
         },
         {
           "name": "name",
-          "description": "Name for the network manager object. Defaults to 'Network Manager'",
+          "description": "Rename the target GameObject to this. Omit to keep its current name",
           "optional": true,
           "type": {
             "kind": "string"
@@ -4553,7 +4537,7 @@
         },
         {
           "name": "maxPlayers",
-          "description": "Maximum number of players in the lobby",
+          "description": "Maximum number of players in the lobby (currently not applied by the handler)",
           "optional": true,
           "type": {
             "kind": "number"
@@ -4561,7 +4545,7 @@
         },
         {
           "name": "playerPrefab",
-          "description": "Path to the player prefab to spawn for each connection",
+          "description": "Path to the player prefab to spawn for each connection (currently not applied by the handler — set the NetworkHelper's PlayerPrefab afterward with set_prefab_ref)",
           "optional": true,
           "type": {
             "kind": "string"
@@ -4624,7 +4608,7 @@
     {
       "module": "networking",
       "name": "add_sync_property",
-      "description": "Annotate an EXISTING public property in a C# script with the [Sync] attribute so s&box replicates it across the network. This does NOT create a new property — the property named by `propertyName` must already be declared in the file; the tool only inserts the [Sync] attribute above it",
+      "description": "Annotate an EXISTING public property in a C# script with the [Sync] attribute so s&box replicates it across the network. This does NOT create a new property — the property named by `propertyName` must already be declared in the file; the tool only inserts the [Sync] attribute above it. Returns { added, path, property, attribute } — attribute echoes the exact [Sync...] emitted; errors if the property already has [Sync] or isn't found. Follow with trigger_hotload, then get_compile_errors",
       "params": [
         {
           "name": "path",
@@ -4671,11 +4655,11 @@
     {
       "module": "networking",
       "name": "configure_network",
-      "description": "Configure networking settings on the existing NetworkHelper: max players, lobby name, player prefab, start server",
+      "description": "Configure lobby settings on Sandbox.Networking. Currently only lobbyName is applied (sets Networking.ServerName) — Networking.MaxPlayers is read-only on this SDK, and playerPrefab/startServer are not applied by the handler (use add_network_helper + set_prefab_ref for those). Returns { configured, maxPlayers, serverName } reflecting the live Networking values",
       "params": [
         {
           "name": "maxPlayers",
-          "description": "Maximum number of players",
+          "description": "Maximum number of players (currently not applied — Networking.MaxPlayers is read-only on this SDK; the live value is echoed in the response)",
           "optional": true,
           "type": {
             "kind": "number"
@@ -4683,7 +4667,7 @@
         },
         {
           "name": "lobbyName",
-          "description": "Display name for the lobby",
+          "description": "Display name for the lobby (sets Networking.ServerName — the only setting this handler applies)",
           "optional": true,
           "type": {
             "kind": "string"
@@ -4691,7 +4675,7 @@
         },
         {
           "name": "playerPrefab",
-          "description": "Path to the player prefab",
+          "description": "Path to the player prefab (currently not applied by the handler — set the NetworkHelper's PlayerPrefab via set_prefab_ref instead)",
           "optional": true,
           "type": {
             "kind": "string"
@@ -4699,7 +4683,7 @@
         },
         {
           "name": "startServer",
-          "description": "Start the server/lobby immediately",
+          "description": "Start the server/lobby immediately (currently not applied by the handler — add_network_helper sets StartServer=true on the NetworkHelper)",
           "optional": true,
           "type": {
             "kind": "boolean"
@@ -4710,7 +4694,7 @@
     {
       "module": "networking",
       "name": "create_lobby_manager",
-      "description": "Generate a lobby manager script with create/join/leave lobby, player spawning, and connection cleanup",
+      "description": "Generate a lobby manager Component implementing Component.INetworkListener: a static Instance singleton, a [Sync] PlayerCount maintained in OnActive/OnDisconnected, and a LobbyState [Property] that flips to 'playing' when the lobby fills. Writes <name>.cs and returns { created, path, className }. Follow with trigger_hotload, then get_compile_errors, then place via add_component_to_new_object",
       "params": [
         {
           "name": "name",
@@ -4730,7 +4714,7 @@
         },
         {
           "name": "maxPlayers",
-          "description": "Default max players. Defaults to 8",
+          "description": "Currently not applied by the handler — the generated MaxPlayers [Property] defaults to 16; tune it per-instance with set_property",
           "optional": true,
           "type": {
             "kind": "number"
@@ -4741,7 +4725,7 @@
     {
       "module": "networking",
       "name": "create_network_events",
-      "description": "Generate a network event handler script implementing INetworkListener for connect/disconnect/chat events",
+      "description": "Generate a network event relay Component: [Rpc.Broadcast] SendEvent(eventName, payload) to all clients and [Rpc.Host] SendEventToHost(...), both dispatching into a local OnNetworkEvent switch you extend. It does NOT implement INetworkListener — use create_lobby_manager for connect/disconnect hooks. Writes <name>.cs and returns { created, path, className }. Follow with trigger_hotload, then get_compile_errors",
       "params": [
         {
           "name": "name",
@@ -4761,7 +4745,7 @@
         },
         {
           "name": "includeChat",
-          "description": "Include a chat message broadcast system. Defaults to false",
+          "description": "Currently not applied by the handler — no chat system is generated",
           "optional": true,
           "type": {
             "kind": "boolean"
@@ -4772,7 +4756,7 @@
     {
       "module": "networking",
       "name": "create_networked_player",
-      "description": "Generate a network-aware player controller with [Sync] properties, owner-only input, and [Rpc.Broadcast] actions",
+      "description": "Generate a network-aware player controller with [Sync] properties, owner-only input, and [Rpc.Broadcast] actions. Writes <name>.cs and returns { created, path, className }. The generated Component syncs PlayerName/Health, moves a CharacterController from Input.AnalogMove behind an IsProxy guard, and exposes a [Property] MoveSpeed plus an [Rpc.Broadcast] TakeDamage(int). Follow with trigger_hotload, then get_compile_errors, then attach + network_spawn",
       "params": [
         {
           "name": "name",
@@ -4792,7 +4776,7 @@
         },
         {
           "name": "moveSpeed",
-          "description": "Movement speed. Defaults to 300",
+          "description": "Movement speed (generated MoveSpeed [Property]). Defaults to 200",
           "optional": true,
           "type": {
             "kind": "number"
@@ -4800,7 +4784,7 @@
         },
         {
           "name": "includeHealth",
-          "description": "Include health/damage system with host-authoritative TakeDamage. Defaults to true",
+          "description": "Currently not applied by the handler — the [Sync] Health and [Rpc.Broadcast] TakeDamage are always generated",
           "optional": true,
           "type": {
             "kind": "boolean"
@@ -4811,13 +4795,13 @@
     {
       "module": "networking",
       "name": "get_network_status",
-      "description": "Check the current multiplayer status: connection state, player count, lobby info, networked objects",
+      "description": "Check the current multiplayer status. Returns { isActive, isHost, isClient, isConnecting, maxPlayers, serverName } read from Sandbox.Networking — meaningful mostly in play mode with networking active. It does NOT return a player list or networked-object dump; use inspect_networked_object for a specific object's Network/[Sync] state",
       "params": []
     },
     {
       "module": "networking",
       "name": "network_spawn",
-      "description": "Network-enable a GameObject so it is synchronized across all connected clients. Calls NetworkSpawn()",
+      "description": "Network-enable a GameObject so it is synchronized across all connected clients. Calls NetworkSpawn(). Returns { spawned, id } on success — follow with inspect_networked_object to confirm the Network state, or set_ownership to hand it to a connection",
       "params": [
         {
           "name": "id",
@@ -4832,7 +4816,7 @@
     {
       "module": "networking",
       "name": "set_ownership",
-      "description": "Transfer network ownership of a GameObject to a different connection, or take/drop ownership",
+      "description": "Assign network ownership of a GameObject to a connection, or drop ownership. Omitting connectionId (or passing an empty string) calls Network.DropOwnership(); passing a connection Id or SteamId calls Network.AssignOwnership() on the matching live Connection. Returns { ownershipAssigned, id, connectionId } or { ownershipDropped, id }; errors if no connection matches (connections only exist while networking is active)",
       "params": [
         {
           "name": "id",
@@ -4844,7 +4828,7 @@
         },
         {
           "name": "connectionId",
-          "description": "GUID of the target connection. Empty string = drop ownership. Omit = take ownership",
+          "description": "Connection Id GUID or SteamId of the target connection. Omit OR pass an empty string to DROP ownership (there is no take-ownership mode in the current handler)",
           "optional": true,
           "type": {
             "kind": "string"
@@ -5461,7 +5445,7 @@
     {
       "module": "physics",
       "name": "add_collider",
-      "description": "Add a specific collider component to a GameObject. Supports box, sphere, capsule, mesh, and hull types. Can be configured as trigger",
+      "description": "Add a specific collider component to a GameObject (no Rigidbody — use add_physics for a dynamic body). Can be configured as a trigger. Returns { added, id, collider, isTrigger } where collider is the actual component type added — note 'mesh' maps to HullCollider (s&box has no MeshCollider) and unrecognized types fall back to BoxCollider.",
       "params": [
         {
           "name": "id",
@@ -5523,7 +5507,7 @@
     {
       "module": "physics",
       "name": "add_joint",
-      "description": "Add a physics joint/constraint between two GameObjects. Supports fixed, spring, and slider joint types",
+      "description": "Add a physics joint/constraint component to a GameObject, optionally connected to a target body (targetId). Returns { added, id, joint, targetId } — joint is the component type added (FixedJoint/SpringJoint/SliderJoint). If targetId is omitted the joint is added unconnected; wire it later via set_property. Both objects need physics (add_physics) for the constraint to simulate in play mode.",
       "params": [
         {
           "name": "id",
@@ -5575,7 +5559,7 @@
     {
       "module": "physics",
       "name": "add_physics",
-      "description": "Add a Rigidbody and collider to a GameObject, making it a dynamic physics object. Auto-selects BoxCollider if no collider type specified",
+      "description": "Add a Rigidbody and collider to a GameObject, making it a dynamic physics object. Auto-selects BoxCollider if no collider type specified. Returns { physicsAdded, id, components } listing exactly which components were added (e.g. Rigidbody + BoxCollider) — enter play mode (start_play) to see it simulate.",
       "params": [
         {
           "name": "id",
@@ -5651,7 +5635,7 @@
     {
       "module": "physics",
       "name": "raycast",
-      "description": "Perform a physics raycast (Scene.Trace.Ray) and return hit results. Useful for line-of-sight checks, object placement, and collision detection",
+      "description": "Perform a physics raycast (Scene.Trace.Ray) from start to end — pass both; the handler traces the start→end segment. Useful for line-of-sight checks, object placement, and collision detection. Returns { hit, hitPosition, normal, distance, gameObjectId, gameObjectName } — feed gameObjectId into get_all_properties/set_transform, or visualize the result with debug_draw_ray. A 'Default Surface not found' error is a known transient; call restart_editor and retry.",
       "params": [
         {
           "name": "start",
@@ -5844,7 +5828,7 @@
     {
       "module": "playmode",
       "name": "redo",
-      "description": "Redo the last undone editor action",
+      "description": "Re-apply the editor action most recently reverted by undo (editor UndoSystem redo — the counterpart to the undo tool). Returns { redone: true } without details of what was redone, so verify the resulting state with get_scene_hierarchy or get_all_properties.",
       "params": []
     },
     {
@@ -5889,7 +5873,7 @@
     {
       "module": "playmode",
       "name": "set_runtime_property",
-      "description": "Set a component property value during play mode — tweak values live while the game runs",
+      "description": "Set a component property value during play mode — tweak values live while the game runs. Errors if the game is not playing (start_play first). Returns { set, id, component, property, value } like set_property; read it back with get_runtime_property. Runtime changes are DISCARDED when play mode stops — use set_property in edit mode to persist.",
       "params": [
         {
           "name": "id",
@@ -5928,7 +5912,7 @@
     {
       "module": "playmode",
       "name": "start_play",
-      "description": "Enter play mode — starts running the game in the editor. Scripts execute, physics simulate, everything goes live",
+      "description": "Enter play mode — starts running the game in the editor. Scripts execute, physics simulate, everything goes live. Returns { started, method } (method 'EditorScene.Play', or 'SetPlaying (fallback)' with editorErrorSkipped when the safe path failed). While playing, scene-mutating tools refuse — use get/set_runtime_property, capture_view, and playtest, then stop_play to edit again.",
       "params": []
     },
     {
@@ -5940,7 +5924,7 @@
     {
       "module": "playmode",
       "name": "take_screenshot",
-      "description": "Capture the current editor viewport as a PNG screenshot",
+      "description": "Capture a 1920x1080 PNG from the scene's Main Camera (ONE fixed angle — the camera may not face what you changed; use screenshot_from to aim at a target object/point). Returns { taken, note, path }, but the engine saves to its default screenshots folder regardless of the path param (<sbox install>/screenshots/sbox.<timestamp>.png) — list the newest file there and READ the image to verify.",
       "params": [
         {
           "name": "path",
@@ -5955,7 +5939,7 @@
     {
       "module": "playmode",
       "name": "undo",
-      "description": "Undo the last editor action. Safety net for when a change goes wrong",
+      "description": "Undo the last editor action via the editor's UndoSystem. Safety net for when a change goes wrong. Returns { undone: true } — it does not report WHAT was undone, so re-check state with get_scene_hierarchy or get_all_properties. Reverse it with redo. Note: file writes (write_file/create_script) are not editor undo steps.",
       "params": []
     },
     {
@@ -5995,13 +5979,13 @@
     {
       "module": "playtest",
       "name": "playtest_status",
-      "description": "Poll the running/finished playtest. While running: { active:true, step, totalSteps, passed, failed }. When done: { finished:true, verdict:'PASS'|'FAIL', passed, failed, transcript:[...] } — the full per-step pass/fail record.",
+      "description": "Poll the playtest started by the playtest tool. While running: { active:true, step, totalSteps, passed, failed }. When done: { finished:true, reason, verdict:'PASS'|'FAIL', passed, failed, stepsRun, totalSteps, controller, controllerResolved, transcript:[...] } — the full per-step pass/fail record, including any capture PNG paths; the finished summary stays readable until the next playtest starts. If none has run yet: { active:false, finished:false }.",
       "params": []
     },
     {
       "module": "prefabs",
       "name": "create_prefab",
-      "description": "Save an existing GameObject as a reusable .prefab file. The prefab can be instantiated later",
+      "description": "Save an existing GameObject as a .prefab file. NOTE: this writes a minimal descriptor (name, enabled flag, component TYPE names) — component property values and children are NOT serialized, so it is a lightweight template rather than a full s&box prefab asset. Returns { created, path, sourceId } — pass path to instantiate_prefab or get_prefab_info.",
       "params": [
         {
           "name": "id",
@@ -6024,7 +6008,7 @@
     {
       "module": "prefabs",
       "name": "get_prefab_info",
-      "description": "Get detailed information about a prefab file including its JSON contents and metadata",
+      "description": "Get detailed information about a prefab file. Returns { path, name, size, modified, content } — content is the prefab's full raw JSON, so use this to inspect what a prefab actually contains before instantiate_prefab (find prefabs with list_prefabs).",
       "params": [
         {
           "name": "path",
@@ -6039,7 +6023,7 @@
     {
       "module": "prefabs",
       "name": "instantiate_prefab",
-      "description": "Spawn a prefab instance into the active scene at an optional position and rotation",
+      "description": "Spawn a prefab instance into the active scene at an optional position and rotation. NOTE: basic instantiation — it creates a new GameObject named after the prefab; components are NOT recreated from the file (the full s&box prefab pipeline isn't wired), so re-add them with add_component_with_properties. Returns { instantiated, prefab, gameObject, note } — gameObject.id is the new GUID for follow-up calls.",
       "params": [
         {
           "name": "path",
@@ -6115,7 +6099,7 @@
     {
       "module": "project",
       "name": "list_project_files",
-      "description": "Browse the project file tree. Optionally filter by directory path and/or file extension (e.g. '.cs', '.scene')",
+      "description": "Browse the project file tree. Optionally filter by directory path and/or file extension (e.g. '.cs', '.scene'). Returns { path, count, files } as project-root-relative paths — CAPPED AT 500 files (count reflects the truncated list, with no marker that more exist), so on large projects narrow with path/extension or use find_in_project. Recursive by default.",
       "params": [
         {
           "name": "path",
@@ -6176,7 +6160,7 @@
     {
       "module": "project",
       "name": "write_file",
-      "description": "Write or overwrite a file in the s&box project. Creates parent directories as needed",
+      "description": "Write or overwrite a file in the s&box project (SILENTLY replaces existing content — read_file first if you need to preserve it). Creates parent directories as needed; paths are confined to the project root (traversal outside it is denied). Returns a confirmation with the path — for C# follow with trigger_hotload so it compiles; for assets (.vmat etc.) follow with recompile_asset.",
       "params": [
         {
           "name": "path",
@@ -6199,7 +6183,7 @@
     {
       "module": "publishing",
       "name": "get_package_details",
-      "description": "Fetch detailed package information from the s&box asset library (asset.party) including title, author, version, downloads, ratings, and dependencies",
+      "description": "Fetch package information from the s&box package backend (Package.FetchAsync) by ident. Returns { fullIdent, title, summary, description, org } — no download/rating/dependency data is included. Use it to confirm a package exists and what it is before install_asset.",
       "params": [
         {
           "name": "ident",
@@ -6220,7 +6204,7 @@
     {
       "module": "publishing",
       "name": "set_project_config",
-      "description": "Update project configuration fields for publishing: title, description, version, type, package ident, summary, visibility. Only provided fields are changed",
+      "description": "Update project configuration fields for publishing: title, description, version, type, package ident, summary, visibility. Only provided fields are changed — edits string values in the .sbproj file in place. Returns { updated, path } (the .sbproj path); read the result back with get_project_config to confirm what actually changed.",
       "params": [
         {
           "name": "title",
@@ -6318,7 +6302,7 @@
     {
       "module": "publishing",
       "name": "validate_project",
-      "description": "Validate that the project is ready for publishing. Checks: compile errors, metadata completeness, scenes, scripts, thumbnail, and project type",
+      "description": "Validate that the project is ready for publishing. Runs four checks: .sbproj exists, at least one scene, project Ident set, project Title set. Returns { valid, issueCount, issues, checks } — issues are human-readable problems and each checks entry has { check, pass, detail }; fix metadata gaps with set_project_config (it does NOT check compile errors — use get_compile_errors for that).",
       "params": []
     },
     {
@@ -6441,7 +6425,7 @@
     {
       "module": "scenes",
       "name": "create_scene",
-      "description": "Create a new empty scene file. Optionally include basic objects like a camera, directional light, and ground plane",
+      "description": "Create a new EMPTY .scene file under the project's Assets folder and register it with the AssetSystem so load_scene works immediately. Errors if the scene already exists. NOTE: includeDefaults is not yet honored — the scene is always created empty, so after load_scene add a camera/light/ground yourself (create_gameobject, add_light). Returns a confirmation with the path — pass it to load_scene next.",
       "params": [
         {
           "name": "path",
@@ -6493,7 +6477,7 @@
     {
       "module": "scenes",
       "name": "save_scene",
-      "description": "Save the currently open scene in the s&box editor",
+      "description": "Save the currently open scene in the s&box editor (EditorScene.SaveSession) to its existing .scene file — a provided path does NOT redirect the save. Returns a plain 'Scene saved' confirmation. Call after a batch of scene edits so work survives an editor restart.",
       "params": [
         {
           "name": "path",
@@ -6508,7 +6492,7 @@
     {
       "module": "scripts",
       "name": "create_script",
-      "description": "Create a new C# component script in the project. Generates proper s&box component boilerplate with the specified class name, namespace, and optional properties",
+      "description": "Create a new C# component script in the project — a minimal s&box Component class (name is sanitized to a valid identifier), or your exact code when content is provided. Errors if the file already exists. Returns { path, created, className } — the new type is NOT live until a recompile, so call trigger_hotload, then attach it with add_component_with_properties (component=className).",
       "params": [
         {
           "name": "name",
@@ -6558,7 +6542,7 @@
     {
       "module": "scripts",
       "name": "delete_script",
-      "description": "Delete a C# script from the project",
+      "description": "Permanently delete a file from the project by its project-relative path (built for C# scripts, but removes any file; no recycle bin, and editor undo cannot restore it). Errors if the file doesn't exist. Returns a confirmation with the path — follow with trigger_hotload so the removed class actually leaves the compiled assembly.",
       "params": [
         {
           "name": "path",
@@ -6573,7 +6557,7 @@
     {
       "module": "scripts",
       "name": "edit_script",
-      "description": "Edit an existing C# script. Supports find/replace, inserting code at a line number, or appending code to the class body",
+      "description": "Edit an existing C# script in place via exact-text find/replace or a full-content overwrite. Errors if the file or the find text isn't found (find/replace replaces ALL occurrences). Returns { path, edited, operation } where operation is 'find_replace' or 'overwrite' — follow with trigger_hotload so the change compiles, then get_compile_errors if in doubt.",
       "params": [
         {
           "name": "path",
@@ -6658,7 +6642,7 @@
     {
       "module": "status",
       "name": "get_bridge_status",
-      "description": "Check the connection status to the s&box Bridge — whether it's connected, latency, host/port, and editor info. Useful for debugging",
+      "description": "Check the s&box Bridge connection — call this FIRST in a session. Returns a human summary plus JSON: connected, roundTripOk (heartbeat can be fresh while the editor's request loop is stalled — trust roundTripOk), bridgeVersion vs mcpServerVersion + versionsAligned (a mismatch means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs, latencyMs, and ipcDir (transport is file IPC; host/port are legacy fields).",
       "params": []
     },
     {
@@ -6687,7 +6671,7 @@
     {
       "module": "templates",
       "name": "create_game_manager",
-      "description": "Generate a game manager script with configurable game loop features: score tracking, round timer, player spawning, and game state machine",
+      "description": "Generate a minimal game-manager Component: a static Instance singleton, [Property] MaxPlayers / GameState, and a Component.INetworkListener OnActive hook that logs player connects. Writes <name>.cs and returns { created, path, className }. NOTE: the includeScore/includeTimer/includeSpawning params are not currently applied — the same minimal manager is always generated (for richer game-loop scaffolds see create_round_phase_machine / create_objective_system / create_economy_wallet). Follow with trigger_hotload, then get_compile_errors, then place via add_component_to_new_object",
       "params": [
         {
           "name": "name",
@@ -6707,7 +6691,7 @@
         },
         {
           "name": "includeScore",
-          "description": "Include score tracking. Defaults to true",
+          "description": "Include score tracking (currently not applied by the handler)",
           "optional": true,
           "type": {
             "kind": "boolean"
@@ -6715,7 +6699,7 @@
         },
         {
           "name": "includeTimer",
-          "description": "Include round timer with countdown. Defaults to false",
+          "description": "Include round timer with countdown (currently not applied by the handler)",
           "optional": true,
           "type": {
             "kind": "boolean"
@@ -6723,7 +6707,7 @@
         },
         {
           "name": "includeSpawning",
-          "description": "Include player spawning from prefab at spawn point. Defaults to false",
+          "description": "Include player spawning from prefab at spawn point (currently not applied by the handler)",
           "optional": true,
           "type": {
             "kind": "boolean"
@@ -6870,7 +6854,7 @@
     {
       "module": "templates",
       "name": "create_trigger_zone",
-      "description": "Generate a trigger zone script that detects when GameObjects enter/exit a collider volume. Supports teleport, damage, spawn, and log actions",
+      "description": "Generate a trigger-zone Component (Component.ITriggerListener): auto-adds a trigger BoxCollider on start, filters entrants by a TriggerTag [Property] (default 'player'), and logs enter/exit via private OnPlayerEnter/OnPlayerExit extension points you fill in. Writes <name>.cs and returns { created, path, className }. NOTE: the action/filterTag params are not currently applied at generation time — the zone always logs; implement teleport/damage/spawn in the generated methods (edit_script). Follow with trigger_hotload, then get_compile_errors",
       "params": [
         {
           "name": "name",
@@ -6890,7 +6874,7 @@
         },
         {
           "name": "action",
-          "description": "What happens on trigger: 'log' (print message), 'teleport' (move to destination), 'damage' (apply damage), 'spawn' (create prefab). Defaults to 'log'",
+          "description": "What happens on trigger (currently not applied by the handler — the generated zone always logs; implement the effect in OnPlayerEnter yourself)",
           "optional": true,
           "type": {
             "kind": "enum",
@@ -6904,7 +6888,7 @@
         },
         {
           "name": "filterTag",
-          "description": "Only trigger for objects with this tag. Defaults to 'player'",
+          "description": "Only trigger for objects with this tag (currently not applied at generation — the generated TriggerTag [Property] defaults to 'player'; change it per-instance with set_property)",
           "optional": true,
           "type": {
             "kind": "string"
@@ -6915,11 +6899,11 @@
     {
       "module": "ui",
       "name": "add_screen_panel",
-      "description": "Create a new GameObject with a ScreenPanel component for full-screen UI overlay (HUD, menus, etc.)",
+      "description": "Create a new GameObject with a ScreenPanel component for full-screen UI overlay (HUD, menus, etc.). Returns { created, gameObject:{ id, name, components, ... } }. NOTE: panelComponent is looked up in the TypeLibrary and SILENTLY skipped if the type isn't loaded (freshly generated panels need trigger_hotload first) — check gameObject.components to confirm it attached",
       "params": [
         {
           "name": "name",
-          "description": "Name for the UI GameObject. Defaults to 'Screen UI'",
+          "description": "Name for the UI GameObject. Defaults to 'Screen Panel'",
           "optional": true,
           "type": {
             "kind": "string"
@@ -6954,11 +6938,11 @@
     {
       "module": "ui",
       "name": "add_world_panel",
-      "description": "Create a new GameObject with a WorldPanel component for in-world 3D UI (health bars, signs, nameplates)",
+      "description": "Create a new GameObject with a WorldPanel component for in-world 3D UI (health bars, signs, nameplates). Returns { created, gameObject:{ id, name, components, ... } }. As with add_screen_panel, panelComponent is SILENTLY skipped if the type isn't in the TypeLibrary (trigger_hotload first, then verify via gameObject.components). For CLICKABLE world UI the scene also needs a Sandbox.WorldInput (see create_worldpanel_ui)",
       "params": [
         {
           "name": "name",
-          "description": "Name for the UI GameObject. Defaults to 'World UI'",
+          "description": "Name for the UI GameObject. Defaults to 'World Panel'",
           "optional": true,
           "type": {
             "kind": "string"
@@ -7017,7 +7001,7 @@
     {
       "module": "ui",
       "name": "create_razor_ui",
-      "description": "Create a Razor UI component file (.razor) with optional SCSS stylesheet. Generates boilerplate for HUD, menu, or basic panel types",
+      "description": "Create a Razor UI component file (.razor). Returns { created, path, componentName }; errors if the file already exists. NOTE: the current handler generates one fixed basic panel (a root div + label bound to a Title [Property]) from name+directory only — panelType/content/styles/includeStyles are not applied and no .scss is written; for custom markup or a PanelComponent you can host via add_screen_panel, write the files with write_file and check them with razor_lint. Follow with trigger_hotload, then get_compile_errors",
       "params": [
         {
           "name": "name",
@@ -7116,7 +7100,7 @@
     {
       "module": "uifeedback",
       "name": "create_proxy_nametag",
-      "description": "Generate a sealed Component that floats the OWNER'S display name above a networked player. TextRenderer-based (not WorldPanel): a nametag is one short string with a distance fade, so a TextRenderer on a managed child object is far simpler than a WorldPanel + Razor + WorldInput stack — no UI assets, no panel host, per-frame alpha is a one-liner (mirrors create_floating_combat_text). Reads GameObject.Network.Owner.DisplayName (Owner and OwnerConnection are the same Connection on this SDK; falls back to the object name offline). Visibility is the INVERSE of the usual proxy guard: it renders only when GameObject.Network.IsProxy is true — i.e. on OTHER clients' copies of the player — so you never see a tag over your own head (offline / no networking => IsProxy false everywhere => no tags, expected). Spawns a CHILD GameObject for the text so billboarding never rotates the player model; cleaned up on disable. [Property] MaxDistance fades the tag out with distance, HeightOffset floats it above the head, FontSize sizes it. Attach to the ROOT of your networked player object. Pairs with create_networked_player (add it to the generated player prefab so every remote player is labeled).",
+      "description": "Generate a sealed Component that floats the OWNER'S display name above a networked player. TextRenderer-based (not WorldPanel): a nametag is one short string with a distance fade, so a TextRenderer on a managed child object is far simpler than a WorldPanel + Razor + WorldInput stack — no UI assets, no panel host, per-frame alpha is a one-liner (mirrors create_floating_combat_text). Reads GameObject.Network.Owner.DisplayName (Owner and OwnerConnection are the same Connection on this SDK; falls back to the object name offline). Visibility is the INVERSE of the usual proxy guard: it renders only when GameObject.Network.IsProxy is true — i.e. on OTHER clients' copies of the player — so you never see a tag over your own head (offline / no networking => IsProxy false everywhere => no tags, expected). Spawns a CHILD GameObject for the text so billboarding never rotates the player model; cleaned up on disable. [Property] MaxDistance fades the tag out with distance, HeightOffset floats it above the head, FontSize sizes it. Attach to the ROOT of your networked player object. Pairs with create_networked_player (add it to the generated player prefab so every remote player is labeled). Returns { created, path, className, maxDistance, heightOffset, note, nextSteps }. Follow with trigger_hotload, then get_compile_errors, then attach via add_component_with_properties (component=className).",
       "params": [
         {
           "name": "name",
@@ -7186,7 +7170,7 @@
     {
       "module": "visuals",
       "name": "add_beam",
-      "description": "Create an energy/laser beam (BeamEffect) from a position to a target point — additive, tintable. Good for lasers, tracers, magic beams.",
+      "description": "EXPERIMENTAL — create an energy/laser beam (BeamEffect) from a position to a target point (default: 128u straight up) — additive, tintable. Returns { created, gameObject } — gameObject.id is the beam object's GUID. Like the other runtime particle tools, rendering through the bridge is unverified; use spawn_vpcf when you need a guaranteed-visible effect.",
       "params": [
         {
           "name": "position",
@@ -7233,7 +7217,7 @@
     {
       "module": "visuals",
       "name": "add_envmap_probe",
-      "description": "Add an environment reflection/ambient probe (EnvmapProbe) at a position with a cubic influence volume — captures local reflections and indirect light for nearby surfaces.",
+      "description": "Add an environment reflection/ambient probe (EnvmapProbe) at a position with a cubic influence volume — captures local reflections and indirect light for nearby surfaces. IMPORTANT: a placed probe captures NOTHING until baked — follow with bake_reflections. Returns { created, gameObject } — gameObject.id is the probe object's GUID.",
       "params": [
         {
           "name": "name",
@@ -7475,7 +7459,7 @@
     {
       "module": "visuals",
       "name": "apply_atmosphere",
-      "description": "One-call scene mood: composes ambient + directional light, gradient fog, and a camera post-fx stack (tonemap + colour grade + vignette) tuned for the chosen mood. Idempotent — re-runs update the same 'Atmosphere *' objects.",
+      "description": "One-call scene mood: composes ambient + directional light, gradient fog, and a camera post-fx stack (tonemap + colour grade + vignette) tuned for the chosen mood. Idempotent — re-runs update the same 'Atmosphere *' objects. Returns { applied, mood, components, postFxCamera } — the post-fx stack is only applied when a camera exists (postFxCamera is null otherwise; add a camera and re-run). Screenshot to verify.",
       "params": [
         {
           "name": "mood",
@@ -7496,7 +7480,7 @@
     {
       "module": "visuals",
       "name": "apply_post_fx_look",
-      "description": "Apply just a camera post-processing look (no lights/fog): cinematic (tonemap + bloom + soft vignette), filmic-horror (desaturated, high-contrast, heavy vignette, film grain), or clean (tonemap only).",
+      "description": "Apply just a camera post-processing look (no lights/fog): cinematic (tonemap + bloom + soft vignette), filmic-horror (desaturated, high-contrast, heavy vignette, film grain), or clean (tonemap only). Errors if the scene has no CameraComponent. Returns { applied, look, components, camera } listing the effect components added to the main camera — tune them individually afterwards with add_post_process.",
       "params": [
         {
           "name": "look",
@@ -7516,7 +7500,7 @@
     {
       "module": "visuals",
       "name": "bake_reflections",
-      "description": "Bake all EnvmapProbe reflection probes in the scene (EnvmapProbe.BakeAll) so they actually capture their surroundings — placing a probe with add_envmap_probe does nothing visible until it's baked. This is a real editor compute step, not a component setter. Runs async; re-screenshot after a moment to see reflections appear on shiny surfaces.",
+      "description": "Bake all EnvmapProbe reflection probes in the scene (EnvmapProbe.BakeAll) so they actually capture their surroundings — placing a probe with add_envmap_probe does nothing visible until it's baked. This is a real editor compute step, not a component setter. Runs async — returns { baking, count, note, probes } immediately (each probe: id, name, mode, hasBaked), or { baked: false, count: 0 } when the scene has no probes; re-screenshot after a moment to see reflections appear.",
       "params": []
     },
     {
@@ -7633,7 +7617,7 @@
     {
       "module": "visuals",
       "name": "set_fog",
-      "description": "Add or update fog in the active scene. Types: 'gradient' (distance haze — great for mood/horror), 'cubemap' (sky-tinted distance fog), 'volumetric' (a localized fog volume). Re-running on the same target updates it rather than duplicating.",
+      "description": "Add or update fog in the active scene. Types: 'gradient' (distance haze — great for mood/horror), 'cubemap' (sky-tinted distance fog), 'volumetric' (a localized fog volume). Re-running with the same targetId updates it rather than duplicating; without targetId each call creates a new fog object. Returns { created, type, gameObject } — gameObject.id addresses the fog object for later set_property/delete_gameobject; screenshot to verify the look.",
       "params": [
         {
           "name": "type",
@@ -7757,7 +7741,7 @@
     {
       "module": "visuals",
       "name": "set_skybox",
-      "description": "Set the scene's 2D skybox tint / indirect lighting (re-uses an existing SkyBox2D or creates one). Darken the tint for night/dusk. Optionally point it at a .vmat sky material.",
+      "description": "Set the scene's 2D skybox tint / indirect lighting (re-uses an existing SkyBox2D or creates one). Darken the tint for night/dusk. Optionally point it at a .vmat sky material (silently kept as-is if the material fails to load). Returns { created, gameObject } — gameObject.id is the sky object; screenshot to verify the change.",
       "params": [
         {
           "name": "tint",
@@ -7796,7 +7780,7 @@
     {
       "module": "visuals",
       "name": "spawn_particle",
-      "description": "Spawn an additive particle effect (no texture asset needed): kind = fire (rising flame), embers (slow drifting glow), or sparks (a one-shot burst). Renders as tinted glowing dots — great for campfires, torches, and impacts. (smoke needs a soft sprite; not in v1.)",
+      "description": "EXPERIMENTAL — build an additive runtime ParticleEffect (no texture asset needed): kind = fire, embers, sparks, magic, dust, blood, or snow ('smoke' returns an error). Returns { created, kind, gameObject } — the component graph is created, but this runtime particle path has NOT been verified to render through the bridge; for particles you can actually see, prefer spawn_vpcf.",
       "params": [
         {
           "name": "kind",
@@ -7899,11 +7883,11 @@
     {
       "module": "world",
       "name": "add_cave_waypoint",
-      "description": "Append (or insert) a waypoint to CaveBuilder.Path. Z is depth (negative = underground).",
+      "description": "Append (or insert at `index`) a waypoint to CaveBuilder.Path. Z is depth (negative = underground). Returns `added`, `total` (waypoint count), and `rebuilt` — rebuilds the cave ('Build Cave') immediately unless rebuild=false.",
       "params": [
         {
           "name": "x",
-          "description": "",
+          "description": "World X of the waypoint",
           "optional": false,
           "type": {
             "kind": "number"
@@ -7911,7 +7895,7 @@
         },
         {
           "name": "y",
-          "description": "",
+          "description": "World Y of the waypoint",
           "optional": false,
           "type": {
             "kind": "number"
@@ -7936,7 +7920,7 @@
         },
         {
           "name": "rebuild",
-          "description": "",
+          "description": "Rebuild the cave after adding (default true; set false to batch)",
           "optional": true,
           "default": true,
           "type": {
@@ -7945,7 +7929,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the CaveBuilder; omit to auto-find the first CaveBuilder in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -7964,11 +7948,11 @@
     {
       "module": "world",
       "name": "add_forest_poi",
-      "description": "Add a point of interest (clearing) to ForestGenerator.POIs. Returns the index of the new POI for use with add_forest_trail.",
+      "description": "Add a point of interest (clearing) to ForestGenerator.POIs. Returns `added`, `index` (the new POI's index — pass it to add_forest_trail as from_index/to_index), `total`, and `rebuilt`. Forest gen is slow (~1s), so rebuild defaults to false — batch your POIs/trails, then regenerate once (rebuild=true on the last call, or invoke_button 'Generate Forest').",
       "params": [
         {
           "name": "name",
-          "description": "",
+          "description": "Display name for the POI. Default 'POI'.",
           "optional": true,
           "default": "POI",
           "type": {
@@ -7977,7 +7961,7 @@
         },
         {
           "name": "x",
-          "description": "",
+          "description": "World X of POI center",
           "optional": false,
           "type": {
             "kind": "number"
@@ -7985,7 +7969,7 @@
         },
         {
           "name": "y",
-          "description": "",
+          "description": "World Y of POI center",
           "optional": false,
           "type": {
             "kind": "number"
@@ -7993,7 +7977,7 @@
         },
         {
           "name": "radius",
-          "description": "",
+          "description": "POI radius in world units. Default 300.",
           "optional": true,
           "default": 300,
           "type": {
@@ -8020,7 +8004,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8039,11 +8023,11 @@
     {
       "module": "world",
       "name": "add_forest_trail",
-      "description": "Add a trail gap between two POIs (by index) to ForestGenerator.Trails.",
+      "description": "Add a trail gap between two POIs to ForestGenerator.Trails. Returns `added`, `total` (trail count), and `rebuilt`. rebuild defaults to false — nothing changes visually until you regenerate (rebuild=true, or invoke_button 'Generate Forest').",
       "params": [
         {
           "name": "from_index",
-          "description": "",
+          "description": "Index of the start POI (the `index` returned by add_forest_poi)",
           "optional": false,
           "type": {
             "kind": "integer"
@@ -8051,7 +8035,7 @@
         },
         {
           "name": "to_index",
-          "description": "",
+          "description": "Index of the end POI (the `index` returned by add_forest_poi)",
           "optional": false,
           "type": {
             "kind": "integer"
@@ -8059,7 +8043,7 @@
         },
         {
           "name": "rebuild",
-          "description": "",
+          "description": "Regenerate the forest after adding (default false — batch, then rebuild once)",
           "optional": true,
           "default": false,
           "type": {
@@ -8068,7 +8052,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8087,11 +8071,11 @@
     {
       "module": "world",
       "name": "add_terrain_clearing",
-      "description": "Add a flat clearing zone to MapBuilder (lerps height toward base inside radius).",
+      "description": "Add a flat clearing zone to MapBuilder's Clearings list (lerps height toward base inside radius). Returns `added`, `total` (clearing count), and `rebuilt`. Rebuilds terrain immediately by default; set rebuild=false to batch edits, then rebuild once (rebuild=true on the last call, or invoke_button 'Build Terrain').",
       "params": [
         {
           "name": "x",
-          "description": "",
+          "description": "World X of clearing center",
           "optional": false,
           "type": {
             "kind": "number"
@@ -8099,7 +8083,7 @@
         },
         {
           "name": "y",
-          "description": "",
+          "description": "World Y of clearing center",
           "optional": false,
           "type": {
             "kind": "number"
@@ -8107,7 +8091,7 @@
         },
         {
           "name": "radius",
-          "description": "",
+          "description": "Clearing radius in world units. Default 300.",
           "optional": true,
           "default": 300,
           "type": {
@@ -8116,7 +8100,7 @@
         },
         {
           "name": "rebuild",
-          "description": "",
+          "description": "Rebuild terrain after adding (default true; set false to batch)",
           "optional": true,
           "default": true,
           "type": {
@@ -8125,7 +8109,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8144,7 +8128,7 @@
     {
       "module": "world",
       "name": "add_terrain_hill",
-      "description": "Add a hill (cosine-falloff bump) to MapBuilder. Negative height creates a depression.",
+      "description": "Add a hill (cosine-falloff bump) to MapBuilder's Hills list. Negative height creates a depression. Returns `added`, `total` (hills now in the list), and `rebuilt`; verify the surface with raycast_terrain at the hill center.",
       "params": [
         {
           "name": "x",
@@ -8191,7 +8175,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8210,11 +8194,11 @@
     {
       "module": "world",
       "name": "add_terrain_trail",
-      "description": "Carve a trail depression between two points on MapBuilder.",
+      "description": "Carve a trail depression between two points on MapBuilder (appends to its Trails list). Returns `added`, `total` (trail count), and `rebuilt`. Rebuilds terrain immediately by default; set rebuild=false to batch, then invoke_button 'Build Terrain' once.",
       "params": [
         {
           "name": "from",
-          "description": "",
+          "description": "Trail start point (world x/y)",
           "optional": false,
           "type": {
             "kind": "object"
@@ -8222,7 +8206,7 @@
         },
         {
           "name": "to",
-          "description": "",
+          "description": "Trail end point (world x/y)",
           "optional": false,
           "type": {
             "kind": "object"
@@ -8230,7 +8214,7 @@
         },
         {
           "name": "rebuild",
-          "description": "",
+          "description": "Rebuild terrain after adding (default true; set false to batch)",
           "optional": true,
           "default": true,
           "type": {
@@ -8239,7 +8223,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8258,7 +8242,7 @@
     {
       "module": "world",
       "name": "build_terrain_mesh",
-      "description": "Build a standalone heightmap terrain mesh from a hills/clearings JSON spec — independent of MapBuilder. Use when you don't have a MapBuilder component in the scene and want one-shot terrain.",
+      "description": "Build a standalone heightmap terrain mesh (a MeshComponent) from a hills/clearings JSON spec — independent of MapBuilder. Use when you don't have a MapBuilder component in the scene and want one-shot terrain. Returns `built`, `id` (the new GameObject's GUID), `name`, `vertices`, and `faces`; pass `id` to assign_material, set_transform, or delete_gameobject. Note: raycast_terrain cannot sample this mesh (it requires MapBuilder).",
       "params": [
         {
           "name": "size",
@@ -8280,7 +8264,7 @@
         },
         {
           "name": "name",
-          "description": "",
+          "description": "Name for the created terrain GameObject. Default 'Generated Terrain'.",
           "optional": true,
           "default": "Generated Terrain",
           "type": {
@@ -8289,7 +8273,7 @@
         },
         {
           "name": "hills",
-          "description": "",
+          "description": "Hill bumps: array of {x, y, radius (default 500), height (default 100; negative = depression)}. Default: none.",
           "optional": true,
           "default": [],
           "type": {
@@ -8301,7 +8285,7 @@
         },
         {
           "name": "clearings",
-          "description": "",
+          "description": "Zones flattened back toward height 0: array of {x, y, radius (default 300)}. Default: none.",
           "optional": true,
           "default": [],
           "type": {
@@ -8316,11 +8300,11 @@
     {
       "module": "world",
       "name": "clear_cave_path",
-      "description": "Clear all waypoints in CaveBuilder and remove the cave from the scene.",
+      "description": "Clear all waypoints in CaveBuilder.Path and remove the built cave from the scene (invokes 'Clear Cave'). Destructive. Returns `cleared` — the number of waypoints removed; start a new path with add_cave_waypoint.",
       "params": [
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the CaveBuilder; omit to auto-find the first CaveBuilder in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8339,11 +8323,11 @@
     {
       "module": "world",
       "name": "clear_forest_pois",
-      "description": "Wipe all POIs and trails in ForestGenerator and clear placed forest objects from the scene.",
+      "description": "Wipe all POIs and trails in ForestGenerator and clear placed forest objects from the scene (invokes 'Clear Forest'). Destructive. Returns `cleared` — the number of POIs removed; rebuild a layout with add_forest_poi + add_forest_trail, then invoke_button 'Generate Forest'.",
       "params": [
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8362,11 +8346,11 @@
     {
       "module": "world",
       "name": "clear_terrain_features",
-      "description": "Wipe Hills, Clearings, Trails, or all features from MapBuilder. 'what' is one of: Hills, Clearings, Trails, CavePath, all (default).",
+      "description": "Wipe MapBuilder feature lists — Hills, Clearings, Trails, CavePath, or all of them (default). Destructive: the feature definitions are removed. Returns `cleared` (map of list name → entries removed) and `rebuilt`; re-add features with add_terrain_hill / add_terrain_clearing / add_terrain_trail.",
       "params": [
         {
           "name": "what",
-          "description": "",
+          "description": "Which feature list to clear. Default 'all' (clears all four).",
           "optional": true,
           "default": "all",
           "type": {
@@ -8382,7 +8366,7 @@
         },
         {
           "name": "rebuild",
-          "description": "",
+          "description": "Rebuild terrain after clearing (default true)",
           "optional": true,
           "default": true,
           "type": {
@@ -8391,7 +8375,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8475,11 +8459,11 @@
     {
       "module": "world",
       "name": "paint_forest_density",
-      "description": "Add a circular biome region with overridden forest density. Multiple regions stack via cosine falloff. density: 0=no trees, 1=normal, 2=double.",
+      "description": "Add a circular biome region with overridden forest density to ForestGenerator.DensityRegions. Multiple regions stack via cosine falloff. density: 0=no trees, 1=normal, 2=double. Returns `painted`, `total` (region count), and `rebuilt` — rebuild defaults to false, so regenerate (rebuild=true, or invoke_button 'Generate Forest') to see the change.",
       "params": [
         {
           "name": "x",
-          "description": "",
+          "description": "World X of region center",
           "optional": false,
           "type": {
             "kind": "number"
@@ -8487,7 +8471,7 @@
         },
         {
           "name": "y",
-          "description": "",
+          "description": "World Y of region center",
           "optional": false,
           "type": {
             "kind": "number"
@@ -8495,7 +8479,7 @@
         },
         {
           "name": "radius",
-          "description": "",
+          "description": "Region radius in world units. Default 800.",
           "optional": true,
           "default": 800,
           "type": {
@@ -8513,7 +8497,7 @@
         },
         {
           "name": "rebuild",
-          "description": "",
+          "description": "Regenerate the forest after adding (default false; batch, then rebuild once)",
           "optional": true,
           "default": false,
           "type": {
@@ -8522,7 +8506,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8541,7 +8525,7 @@
     {
       "module": "world",
       "name": "place_along_path",
-      "description": "Drop instances of a model along a path (list of points). Useful for fences, lampposts, road markers, lined-up rocks.",
+      "description": "Drop instances of a model along a path (list of points). Useful for fences, lampposts, road markers, lined-up rocks. Returns `placed` (instance count) and `folder` — the GUID of the new parent GameObject grouping the instances; pass `folder` to delete_gameobject to remove the whole run, or to set_parent/set_transform to move it.",
       "params": [
         {
           "name": "model",
@@ -8582,7 +8566,7 @@
         },
         {
           "name": "min_scale",
-          "description": "",
+          "description": "Minimum uniform scale per instance (random between min and max). Default 1.",
           "optional": true,
           "default": 1,
           "type": {
@@ -8591,7 +8575,7 @@
         },
         {
           "name": "max_scale",
-          "description": "",
+          "description": "Maximum uniform scale per instance. Default 1.",
           "optional": true,
           "default": 1,
           "type": {
@@ -8600,7 +8584,7 @@
         },
         {
           "name": "seed",
-          "description": "",
+          "description": "Random seed for jitter and scale — same seed reproduces the same placement. Default 42.",
           "optional": true,
           "default": 42,
           "type": {
@@ -8660,7 +8644,7 @@
     {
       "module": "world",
       "name": "sculpt_terrain",
-      "description": "Apply a heightmap brush at (x, y) to MapBuilder. Modes: raise, lower, flatten, smooth. Modifies the current heightmap directly and rebuilds the mesh; survives between calls until you press Build Terrain again.",
+      "description": "Apply a heightmap brush at (x, y) to MapBuilder. Modes: raise, lower, flatten, smooth. Modifies the current heightmap directly and rebuilds the mesh; edits survive between calls but are lost when 'Build Terrain' regenerates from the feature lists. Returns `sculpted`, `mode`, and `affected_vertices`; verify with raycast_terrain at the brush center.",
       "params": [
         {
           "name": "x",
@@ -8698,7 +8682,7 @@
         },
         {
           "name": "mode",
-          "description": "",
+          "description": "Brush mode. Default 'raise'. `strength` applies to raise/lower only.",
           "optional": true,
           "default": "raise",
           "type": {
@@ -8713,7 +8697,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene",
           "optional": true,
           "type": {
             "kind": "string"
@@ -8732,11 +8716,11 @@
     {
       "module": "world",
       "name": "set_forest_seed",
-      "description": "Set ForestGenerator.Seed and regenerate. Useful for re-rolling layouts.",
+      "description": "Set ForestGenerator.Seed and (by default) regenerate — re-rolls the forest layout while keeping POIs, trails, and density regions. Returns `set`, `seed`, and `rebuilt`; take a screenshot afterwards (screenshot_from) to judge the new layout.",
       "params": [
         {
           "name": "seed",
-          "description": "",
+          "description": "New random seed (integer). Default 77.",
           "optional": true,
           "default": 77,
           "type": {
@@ -8745,7 +8729,7 @@
         },
         {
           "name": "rebuild",
-          "description": "",
+          "description": "Regenerate the forest after setting (default true)",
           "optional": true,
           "default": true,
           "type": {
@@ -8754,7 +8738,7 @@
         },
         {
           "name": "id",
-          "description": "",
+          "description": "GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene",
           "optional": true,
           "type": {
             "kind": "string"

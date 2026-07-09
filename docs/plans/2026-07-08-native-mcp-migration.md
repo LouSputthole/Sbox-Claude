@@ -1,6 +1,33 @@
 # v2.0.0 — Migrate onto the native s&box MCP server
 
-**Status:** PHASE 1 CODEGEN BUILT (2026-07-08/09) — live verify-gate in progress
+**Status:** PHASE 1 COMPLETE (verify-gate 16/16 live, commit 89ec14c) · DESCRIPTION SWEEP
+COMPLETE (2026-07-09, 156 quality warnings → 0) — undo-convention verification in flight
+
+## Description sweep + hardening (2026-07-09, iteration 2)
+
+- 3 parallel agents improved 111 tool descriptions + ~50 param docs across 29 TS modules
+  (style: what it does → what it returns (real fields, verified against handler return
+  statements) → what to pass where next → truncation/limits → surprising behavior).
+  `audit-mcp-quality.mjs`: 156 warnings → **0 warnings, 0 errors**.
+- The sweep doubled as a tool audit — ~20 dishonest descriptions corrected (focus_object
+  never moved the camera; get_package_details/validate_project overclaimed; create_scene
+  ignores includeDefaults; several scaffold params are handler no-ops — all now flagged
+  "currently not applied by the handler" per the v1.5.0 honest-schemas precedent).
+- **create_sound_event FIXED** (was latent-broken: schema sent `path`, handler read
+  `name`+`directory`; the .sound never referenced the source .vsnd). Handler now honors
+  path/sound/volume/pitch/maxDistance — field names verified against real .sound files +
+  live `describe_type SoundEvent` (no Looped/minDistance on SoundEvent → dropped from the
+  schema as unrepresentable). Live-verified via the gate (path-param discriminator check).
+- **execute_csharp template FIXED** (26.07.08b: `Sandbox.Log` → bare `Log`, matching the
+  addon's own pattern). Compile-level fix; live QA at release.
+- **Undo convention (Phase 3 item)**: McpGate pushes `UndoSystem.Snapshot("bridge: <cmd>")
+  AFTER successful scene-mutating commands (docs: "call after you make a change";
+  the earlier before-mutation `FullUndoSnapshot` attempt landed nothing on the stack).
+  Verify-gate check added (create → built-in undo → object gone). VERIFICATION IN FLIGHT.
+- **New gotcha documented (BRIDGE_GOTCHAS.md #9)**: the Libraries file-watcher is
+  unreliable for external edits — sync then `restart_editor` is the only dependable
+  recompile loop; successful compiles log nothing (fingerprint = status.json handlerCount).
+- Verify-gate extended to 18 checks (sound-event path param + undo step).
 
 ## Phase 1 progress (2026-07-08 late session)
 

@@ -29,7 +29,7 @@ export function registerStatusTools(
   // ── get_bridge_status ────────────────────────────────────────────
   server.tool(
     "get_bridge_status",
-    "Check the connection status to the s&box Bridge — whether it's connected, latency, host/port, and editor info. Useful for debugging",
+    "Check the s&box Bridge connection — call this FIRST in a session. Returns a human summary plus JSON: connected, roundTripOk (heartbeat can be fresh while the editor's request loop is stalled — trust roundTripOk), bridgeVersion vs mcpServerVersion + versionsAligned (a mismatch means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs, latencyMs, and ipcDir (transport is file IPC; host/port are legacy fields).",
     {},
     async () => {
       const connected = bridge.isConnected();

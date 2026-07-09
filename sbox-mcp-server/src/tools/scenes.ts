@@ -55,7 +55,7 @@ export function registerSceneTools(
   // ── save_scene ───────────────────────────────────────────────────
   server.tool(
     "save_scene",
-    "Save the currently open scene in the s&box editor",
+    "Save the currently open scene in the s&box editor (EditorScene.SaveSession) to its existing .scene file — a provided path does NOT redirect the save. Returns a plain 'Scene saved' confirmation. Call after a batch of scene edits so work survives an editor restart.",
     {
       path: z
         .string()
@@ -78,7 +78,7 @@ export function registerSceneTools(
   // ── create_scene ─────────────────────────────────────────────────
   server.tool(
     "create_scene",
-    "Create a new empty scene file. Optionally include basic objects like a camera, directional light, and ground plane",
+    "Create a new EMPTY .scene file under the project's Assets folder and register it with the AssetSystem so load_scene works immediately. Errors if the scene already exists. NOTE: includeDefaults is not yet honored — the scene is always created empty, so after load_scene add a camera/light/ground yourself (create_gameobject, add_light). Returns a confirmation with the path — pass it to load_scene next.",
     {
       path: z
         .string()

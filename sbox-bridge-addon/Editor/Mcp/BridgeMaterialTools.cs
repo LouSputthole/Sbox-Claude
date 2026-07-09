@@ -13,7 +13,10 @@ using Editor.Mcp;
 public static class BridgeMaterialTools
 {
 	/// <summary>
-	/// Apply a material to a ModelRenderer on a GameObject. Optionally target a specific material slot.
+	/// Apply a material to a GameObject by setting its ModelRenderer's MaterialOverride (overrides the
+	/// whole model's material). Requires an existing ModelRenderer (assign_model first) and errors if
+	/// the material path can't be loaded. Returns { assigned, id, material } — tweak values afterwards
+	/// with set_material_property.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="material">Material path (e.g. 'materials/walls/brick.vmat').</param>
@@ -24,7 +27,8 @@ public static class BridgeMaterialTools
 
 	/// <summary>
 	/// Set a 3D model on a GameObject's ModelRenderer. Creates the renderer component if it doesn't
-	/// exist.
+	/// exist; errors if the model path can't be loaded. Returns { assigned, id, model } — follow with
+	/// assign_material / set_material_property to style it, or take a screenshot to verify.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="model">Model path (e.g. 'models/citizen/citizen.vmdl', 'models/dev/box.vmdl').</param>
@@ -33,8 +37,11 @@ public static class BridgeMaterialTools
 		=> McpGate.Run( "assign_model", McpGate.Args( ( "id", id ), ( "model", model ) ) );
 
 	/// <summary>
-	/// Create a new material file (.vmat) with a shader and properties like color, roughness, metallic,
-	/// texture.
+	/// Create a new material file (.vmat, KV1 format) with a shader and properties like color,
+	/// roughness, metallic, texture. Errors if the file already exists; when no properties are given it
+	/// writes sensible PBR defaults (g_flMetalness 0, g_flRoughness 1). Returns { created, path,
+	/// shader, propertiesWritten } — pass the returned path to recompile_asset (so the editor compiles
+	/// it) and then assign_material.
 	/// </summary>
 	/// <param name="path">Relative path for the material (e.g. 'materials/walls/brick.vmat').</param>
 	/// <param name="shader">Shader to use. Defaults to 'shaders/complex.shader' (PBR).</param>
@@ -45,7 +52,9 @@ public static class BridgeMaterialTools
 
 	/// <summary>
 	/// Change a property on the material assigned to a GameObject — color, roughness, metallic,
-	/// texture, etc.
+	/// texture, etc. Operates on the ModelRenderer's MaterialOverride; if none is assigned it
+	/// auto-creates one from the default complex shader (no separate assign_material step needed).
+	/// Returns { set, id, property, autoCreatedMaterial } — screenshot to verify the visual change.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="property">Material property name (e.g. 'Color', 'Roughness', 'Metalness', 'Normal').</param>

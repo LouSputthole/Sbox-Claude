@@ -94,7 +94,7 @@ export function registerGameObjectTools(
   // ── duplicate_gameobject ─────────────────────────────────────────
   server.tool(
     "duplicate_gameobject",
-    "Clone a GameObject with all its components. Optionally offset position or rename",
+    "Clone a GameObject with all its components. Returns { duplicated, original, gameObject } — gameObject.id is the clone's new GUID; pass it to set_transform / add_component_with_properties. If offset is omitted the clone lands exactly on top of the original.",
     {
       id: z.string().describe("GUID of the GameObject to duplicate"),
       name: z.string().optional().describe("New name for the clone"),
@@ -116,7 +116,7 @@ export function registerGameObjectTools(
   // ── rename_gameobject ────────────────────────────────────────────
   server.tool(
     "rename_gameobject",
-    "Change the display name of a GameObject",
+    "Change the display name of a GameObject identified by its GUID (the GUID itself never changes, so existing references stay valid). Returns { renamed, id, oldName, newName }. Name-based lookups (e.g. find_objects) will see the new name immediately.",
     {
       id: z.string().describe("GUID of the GameObject"),
       name: z.string().describe("New display name"),
@@ -158,7 +158,7 @@ export function registerGameObjectTools(
   // ── set_enabled ──────────────────────────────────────────────────
   server.tool(
     "set_enabled",
-    "Enable or disable a GameObject (disabled objects are invisible and inactive)",
+    "Enable or disable a GameObject (disabled objects are invisible and inactive, including their components and children). Returns { id, enabled } confirming the new state.",
     {
       id: z.string().describe("GUID of the GameObject"),
       enabled: z.boolean().describe("true to enable, false to disable"),
@@ -177,7 +177,7 @@ export function registerGameObjectTools(
   // ── set_transform ────────────────────────────────────────────────
   server.tool(
     "set_transform",
-    "Set position, rotation, and/or scale on a GameObject. Only provided values are changed",
+    "Set position, rotation, and/or scale on a GameObject. Only provided values are changed; values apply in world space unless local=true. Returns { transformed, gameObject } with the full serialized object (id, name, position, rotation, scale, components) so you can verify what actually applied.",
     {
       id: z.string().describe("GUID of the GameObject"),
       position: Vector3Schema.optional().describe("New position"),
@@ -232,7 +232,7 @@ export function registerGameObjectTools(
   // ── get_selected_objects ─────────────────────────────────────────
   server.tool(
     "get_selected_objects",
-    "Get the GameObjects currently selected by the user in the s&box editor",
+    "Get the GameObjects currently selected by the user in the s&box editor. Returns { count, selected } where each entry is a serialized GameObject (id, name, enabled, position, rotation, scale, components, childCount) — use the ids with set_transform, add_component_with_properties, etc. Handy for 'do X to what I have selected' requests.",
     {},
     async () => {
       const res = await bridge.send("get_selected_objects");
@@ -248,7 +248,7 @@ export function registerGameObjectTools(
   // ── select_object ────────────────────────────────────────────────
   server.tool(
     "select_object",
-    "Select a GameObject in the editor (highlights it in the hierarchy and scene view)",
+    "Select a GameObject in the editor (highlights it in the hierarchy and scene view). Replaces the current selection unless addToSelection=true. Returns { selected, id }; confirm the result with get_selected_objects.",
     {
       id: z.string().describe("GUID of the GameObject to select"),
       addToSelection: z
@@ -270,7 +270,7 @@ export function registerGameObjectTools(
   // ── focus_object ─────────────────────────────────────────────────
   server.tool(
     "focus_object",
-    "Move the editor camera to focus on a specific GameObject (like double-clicking in the hierarchy)",
+    "Highlight a GameObject by selecting it in the editor. NOTE: s&box exposes no dedicated focus API, so this only sets the selection — it does NOT move any camera (returns { focused, id, note } saying so). To actually point the viewport at an object use frame_camera; to aim a screenshot use screenshot_from.",
     {
       id: z.string().describe("GUID of the GameObject to focus"),
     },

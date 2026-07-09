@@ -38,7 +38,10 @@ public static class BridgeAssetTools
 
 	/// <summary>
 	/// Install a community asset package into the project by its ident (e.g. 'facepunch.flatgrass').
-	/// Adds it as a project dependency.
+	/// Adds it as a project dependency. Returns { installed, ident, name, path, relativePath,
+	/// restartRecommended, note } — pass the returned path to spawn_model / assign_model. CAUTION: if
+	/// the package is a code LIBRARY (adds a PackageReference), trigger_hotload will NOT surface its
+	/// types — call restart_editor so the new package compiles into the project.
 	/// </summary>
 	/// <param name="ident">Package identifier (e.g. 'facepunch.flatgrass', 'author.package_name').</param>
 	[McpTool( "install_asset" )]
@@ -46,12 +49,14 @@ public static class BridgeAssetTools
 		=> McpGate.Run( "install_asset", McpGate.Args( ( "ident", ident ) ) );
 
 	/// <summary>
-	/// Browse the s&amp;box community asset library. Search for packages by name, description, or type
-	/// to find models, maps, and tools to install.
+	/// List assets visible to the editor's AssetSystem — project assets plus mounted
+	/// engine/installed-package content (it does NOT query the remote sbox.game library; use
+	/// install_asset to pull in new packages). Returns { count, assets:[{ name, path, relativePath,
+	/// assetType }] } — pass a returned path to spawn_model, assign_model, or get_asset_info.
 	/// </summary>
-	/// <param name="query">Search term for packages.</param>
-	/// <param name="type">Package type filter (e.g. 'model', 'map', 'library').</param>
-	/// <param name="maxResults">Maximum results. Defaults to 25.</param>
+	/// <param name="query">Search term, case-insensitive substring match against asset NAMES.</param>
+	/// <param name="type">Asset type filter, substring-matched against the asset's type (e.g. 'model', 'material', 'sound').</param>
+	/// <param name="maxResults">Maximum results. Defaults to 200.</param>
 	[McpTool.ReadOnly( "list_asset_library" )]
 	public static Task<object> ListAssetLibrary( string query = null, string type = null, double? maxResults = null )
 		=> McpGate.Run( "list_asset_library", McpGate.Args( ( "query", query ), ( "type", type ), ( "maxResults", maxResults ) ) );

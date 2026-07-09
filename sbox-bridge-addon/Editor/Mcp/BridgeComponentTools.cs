@@ -44,8 +44,10 @@ public static class BridgeComponentTools
 		=> McpGate.Run( "add_component_with_properties", McpGate.Args( ( "id", id ), ( "component", component ), ( "properties", properties ) ) );
 
 	/// <summary>
-	/// Dump all public properties of every component on a GameObject as JSON -- names, types, and
-	/// current values.
+	/// Dump all public properties of every component on a GameObject. Returns { id, components } where
+	/// each entry is { component, properties: [{ name, type, value }] } — values are stringified
+	/// (unreadable ones show '&lt;error&gt;'). Use the exact component/property names it reports with
+	/// set_property or get_property; can be large on component-heavy objects.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	[McpTool.ReadOnly( "get_all_properties" )]
@@ -97,8 +99,11 @@ public static class BridgeComponentTools
 		=> McpGate.Run( "invoke_method", McpGate.Args( ( "id", id ), ( "method", method ), ( "component", component ), ( "args", args ) ) );
 
 	/// <summary>
-	/// List all component types available in s&amp;box (built-in and custom). Search by name or filter
-	/// by category.
+	/// List all instantiable component types in the TypeLibrary — built-in AND your project's custom
+	/// components (abstract types excluded); filter does a substring match on the type name. Returns {
+	/// count, components } with { name, title, description, fullName } per type, sorted by name — the
+	/// unfiltered list is LARGE, so pass filter. Use the returned name with
+	/// add_component_with_properties, and describe_type for a type's full property list.
 	/// </summary>
 	/// <param name="filter">Search filter — matches against component name and title.</param>
 	/// <param name="category">Filter by category/group (e.g. 'Rendering', 'Physics', 'Audio').</param>

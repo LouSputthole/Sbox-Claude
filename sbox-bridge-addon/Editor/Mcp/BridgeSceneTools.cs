@@ -14,8 +14,11 @@ using Editor.Mcp;
 public static class BridgeSceneTools
 {
 	/// <summary>
-	/// Create a new empty scene file. Optionally include basic objects like a camera, directional
-	/// light, and ground plane.
+	/// Create a new EMPTY .scene file under the project's Assets folder and register it with the
+	/// AssetSystem so load_scene works immediately. Errors if the scene already exists. NOTE:
+	/// includeDefaults is not yet honored — the scene is always created empty, so after load_scene add
+	/// a camera/light/ground yourself (create_gameobject, add_light). Returns a confirmation with the
+	/// path — pass it to load_scene next.
 	/// </summary>
 	/// <param name="path">Relative path for the new scene (e.g. 'scenes/level_01.scene').</param>
 	/// <param name="name">Display name for the scene.</param>

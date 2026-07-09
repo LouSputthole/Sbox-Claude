@@ -41,7 +41,7 @@ export function registerLevelTools(
   // ── snap_to_ground ─────────────────────────────────────────────────
   server.tool(
     "snap_to_ground",
-    "Drop a GameObject straight down onto the surface below it (physics raycast). Works best on collider-less props (an object with its own collider may self-hit). Optional offset lifts it off the surface.",
+    "Drop a GameObject straight down onto the surface below it (physics raycast). Works best on collider-less props (an object with its own collider may self-hit). Optional offset lifts it off the surface. Returns { snapped, groundZ, gameObject } with the object's updated transform — or { snapped: false, reason } (not an error) when no ground was hit below.",
     {
       id: z.string().describe("GUID of the GameObject to snap"),
       offset: z.number().optional().describe("Height above the surface to place it (default 0)"),
@@ -62,7 +62,7 @@ export function registerLevelTools(
   // ── align_objects ──────────────────────────────────────────────────
   server.tool(
     "align_objects",
-    "Align several GameObjects on one axis so they share a coordinate. mode = first (match the first object), min, max, or average.",
+    "Align several GameObjects on one axis so they share a coordinate. mode = first (match the first object), min, max, or average; defaults to first. Returns { aligned, axis, mode, target } — aligned is the object count and target the shared coordinate; verify positions with get_scene_hierarchy or a screenshot.",
     {
       ids: z.array(z.string()).describe("GUIDs of the GameObjects to align (>= 2)"),
       axis: z.enum(["x", "y", "z"]).describe("Axis to align on"),
@@ -85,7 +85,7 @@ export function registerLevelTools(
   // ── distribute_objects ─────────────────────────────────────────────
   server.tool(
     "distribute_objects",
-    "Evenly space GameObjects along an axis between the lowest and highest (keeps the two ends fixed, spreads the rest evenly).",
+    "Evenly space GameObjects along an axis between the lowest and highest (keeps the two ends fixed, spreads the rest evenly). Returns { distributed, axis, from, to } — the object count and the fixed end coordinates the rest were spread between.",
     {
       ids: z.array(z.string()).describe("GUIDs of the GameObjects to distribute (>= 3)"),
       axis: z.enum(["x", "y", "z"]).describe("Axis to distribute along"),
@@ -147,7 +147,7 @@ export function registerLevelTools(
   // ── scatter_props ──────────────────────────────────────────────────
   server.tool(
     "scatter_props",
-    "Scatter N copies of a model randomly within a radius around a center point — instant foliage, rocks, debris. Each copy gets a random yaw and (by default) is snapped to the ground. Seeded for reproducibility; copies are grouped under one parent by default. Count capped at 300.",
+    "Scatter N copies of a model randomly within a radius around a center point — instant foliage, rocks, debris. Each copy gets a random yaw and (by default) is snapped to the ground. Seeded for reproducibility; copies are grouped under one parent by default. Count capped at 300. Returns { scattered, groupId, seed } — individual prop GUIDs are not returned, so use groupId with get_scene_hierarchy (rootId) to enumerate them, or with set_transform/delete_gameobject to move/remove the whole batch.",
     {
       model: z.string().describe("Model path to scatter, e.g. 'models/dev/box.vmdl'"),
       center: Vector3Schema.optional().describe("Centre of the scatter area (default origin)"),
@@ -178,7 +178,7 @@ export function registerLevelTools(
   // ── randomize_transforms ───────────────────────────────────────────
   server.tool(
     "randomize_transforms",
-    "Add natural variation to existing objects: random yaw and/or random uniform scale within a range. Great for breaking up repetition in placed foliage/rocks/crates. Seeded.",
+    "Add natural variation to existing objects: random yaw and/or random uniform scale within a range. Great for breaking up repetition in placed foliage/rocks/crates. Seeded — the same seed reproduces the same layout. Returns { randomized, seed } (the count of objects changed); scale only varies when scaleMax > scaleMin.",
     {
       ids: z.array(z.string()).describe("GUIDs of the GameObjects to randomize"),
       randomYaw: z.boolean().optional().describe("Randomize Z rotation (default true)"),

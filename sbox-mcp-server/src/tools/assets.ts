@@ -44,20 +44,20 @@ export function registerAssetTools(
   // ── list_asset_library ───────────────────────────────────────────
   server.tool(
     "list_asset_library",
-    "Browse the s&box community asset library. Search for packages by name, description, or type to find models, maps, and tools to install",
+    "List assets visible to the editor's AssetSystem — project assets plus mounted engine/installed-package content (it does NOT query the remote sbox.game library; use install_asset to pull in new packages). Returns { count, assets:[{ name, path, relativePath, assetType }] } — pass a returned path to spawn_model, assign_model, or get_asset_info",
     {
       query: z
         .string()
         .optional()
-        .describe("Search term for packages"),
+        .describe("Search term, case-insensitive substring match against asset NAMES"),
       type: z
         .string()
         .optional()
-        .describe("Package type filter (e.g. 'model', 'map', 'library')"),
+        .describe("Asset type filter, substring-matched against the asset's type (e.g. 'model', 'material', 'sound')"),
       maxResults: z
         .number()
         .optional()
-        .describe("Maximum results. Defaults to 25"),
+        .describe("Maximum results. Defaults to 200"),
     },
     async (params) => {
       const res = await bridge.send("list_asset_library", params);
@@ -73,7 +73,7 @@ export function registerAssetTools(
   // ── install_asset ────────────────────────────────────────────────
   server.tool(
     "install_asset",
-    "Install a community asset package into the project by its ident (e.g. 'facepunch.flatgrass'). Adds it as a project dependency",
+    "Install a community asset package into the project by its ident (e.g. 'facepunch.flatgrass'). Adds it as a project dependency. Returns { installed, ident, name, path, relativePath, restartRecommended, note } — pass the returned path to spawn_model / assign_model. CAUTION: if the package is a code LIBRARY (adds a PackageReference), trigger_hotload will NOT surface its types — call restart_editor so the new package compiles into the project",
     {
       ident: z
         .string()

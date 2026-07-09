@@ -14,43 +14,52 @@ public static class BridgeAudioTools
 {
 	/// <summary>
 	/// Attach a sound event to a GameObject via SoundPointComponent. Creates the component if needed.
+	/// Returns { assigned, id, sound, soundLoaded, playOnStart } — soundLoaded:false means the .sound
+	/// path did not resolve (the component is still added with no event; verify the path with
+	/// list_sounds).
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="sound">Sound event path (e.g. 'sounds/ambient_wind.sound').</param>
-	/// <param name="playOnStart">Whether the sound plays automatically when the game starts.</param>
+	/// <param name="playOnStart">If true, the handler calls StartSound() immediately, so the sound starts playing right away (audible in the editor).</param>
 	[McpTool( "assign_sound" )]
 	public static Task<object> AssignSound( string id, string sound, bool? playOnStart = null )
 		=> McpGate.Run( "assign_sound", McpGate.Args( ( "id", id ), ( "sound", sound ), ( "playOnStart", playOnStart ) ) );
 
 	/// <summary>
-	/// Create a new sound event file (.sound) with volume, pitch, distance falloff, and looping
-	/// settings.
+	/// Create a .sound event file wired to a source .vsnd. Returns { created, path, soundReferenced,
+	/// note } (path is project-relative); errors if the file already exists. Preview the result with
+	/// play_sound_preview or attach it to an object with assign_sound. Note: .sound events have no loop
+	/// flag — looping lives on the SoundPointComponent that plays the event.
 	/// </summary>
-	/// <param name="path">Path for the sound event file (e.g. 'sounds/footstep.sound').</param>
-	/// <param name="sound">Path to the source sound asset (.vsnd).</param>
+	/// <param name="path">Project-relative path for the sound event file (e.g. 'sounds/footstep.sound'; '.sound' appended if missing).</param>
+	/// <param name="sound">Path to the source sound asset (.vsnd) the event plays. Omit to create an empty event and wire it later.</param>
 	/// <param name="volume">Volume multiplier (0-1). Defaults to 1.0.</param>
 	/// <param name="pitch">Pitch multiplier. Defaults to 1.0.</param>
-	/// <param name="minDistance">Minimum distance before falloff starts (units). Defaults to 100.</param>
-	/// <param name="maxDistance">Maximum audible distance (units). Defaults to 2000.</param>
-	/// <param name="loop">Whether the sound should loop. Defaults to false.</param>
+	/// <param name="maxDistance">Maximum audible distance in units (sets Distance + enables DistanceAttenuation). Omit for the engine default.</param>
 	[McpTool( "create_sound_event" )]
-	public static Task<object> CreateSoundEvent( string path, string sound, double? volume = null, double? pitch = null, double? minDistance = null, double? maxDistance = null, bool? loop = null )
-		=> McpGate.Run( "create_sound_event", McpGate.Args( ( "path", path ), ( "sound", sound ), ( "volume", volume ), ( "pitch", pitch ), ( "minDistance", minDistance ), ( "maxDistance", maxDistance ), ( "loop", loop ) ) );
+	public static Task<object> CreateSoundEvent( string path, string sound = null, double? volume = null, double? pitch = null, double? maxDistance = null )
+		=> McpGate.Run( "create_sound_event", McpGate.Args( ( "path", path ), ( "sound", sound ), ( "volume", volume ), ( "pitch", pitch ), ( "maxDistance", maxDistance ) ) );
 
 	/// <summary>
-	/// List available sound assets in the project and installed packages. Filter by name.
+	/// List the project's .sound event files (recursive scan of the project root for *.sound). Returns
+	/// { count, sounds } — project-relative paths ready to pass to assign_sound, play_sound_preview, or
+	/// add_lipsync. NOTE: the current handler returns every match (filter/maxResults are not applied)
+	/// and only covers .sound files in the project tree — use search_assets type='sound' for other
+	/// sound assets.
 	/// </summary>
-	/// <param name="filter">Search filter for sound name or path.</param>
-	/// <param name="maxResults">Maximum results. Defaults to 50.</param>
+	/// <param name="filter">Search filter for sound name or path (currently not applied by the handler — all .sound files are returned).</param>
+	/// <param name="maxResults">Maximum results. Defaults to 50 (currently not applied by the handler).</param>
 	[McpTool.ReadOnly( "list_sounds" )]
 	public static Task<object> ListSounds( string filter = null, double? maxResults = null )
 		=> McpGate.Run( "list_sounds", McpGate.Args( ( "filter", filter ), ( "maxResults", maxResults ) ) );
 
 	/// <summary>
-	/// Play a sound in the editor for testing without entering play mode.
+	/// Play a sound in the editor for testing without entering play mode. Returns { playing, sound,
+	/// volume }. Fire-and-forget via Sound.Play — there is no stop control, and the volume param is
+	/// echoed back but not currently applied to playback.
 	/// </summary>
 	/// <param name="sound">Sound event or asset path to preview.</param>
-	/// <param name="volume">Preview volume (0-1). Defaults to 1.0.</param>
+	/// <param name="volume">Preview volume (0-1). Defaults to 1.0 (echoed in the response but not currently applied to playback).</param>
 	[McpTool( "play_sound_preview" )]
 	public static Task<object> PlaySoundPreview( string sound, double? volume = null )
 		=> McpGate.Run( "play_sound_preview", McpGate.Args( ( "sound", sound ), ( "volume", volume ) ) );

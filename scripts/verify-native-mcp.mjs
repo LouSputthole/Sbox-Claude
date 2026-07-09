@@ -167,6 +167,37 @@ try {
   } catch (e) {
     check("error semantics (bad GUID throws)", /not found|error/i.test(e.message), e.message.slice(0, 100));
   }
+
+  // 8. create_sound_event accepts `path` (v2 fix): aiming at an EXISTING .sound must
+  // produce the "already exists" error — the pre-fix handler would fail on a missing
+  // `name` property instead. No file is written either way.
+  try {
+    await callTool("create_sound_event", { path: "Assets/audio/fx/dig.sound" });
+    check("create_sound_event path param honored", false, "expected already-exists error");
+  } catch (e) {
+    check("create_sound_event path param honored", /already exists/i.test(e.message), e.message.slice(0, 100));
+  }
+
+  // 9. undo convention: a scene-mutating bridge tool pushes an undo step — the built-in
+  // `undo` must remove the object the bridge created.
+  try {
+    const created = await callTool("create_gameobject", { name: "__undo_probe", position: "0,0,6000" });
+    const guid = created.text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0];
+    if (!guid) throw new Error("no GUID from create_gameobject");
+    const undo = await rpc("tools/call", { name: "call_tool", arguments: { name: "undo", arguments: {} } });
+    const undoText = (undo.content ?? []).map((c) => c.text).join(" ");
+    let gone = false;
+    try {
+      await callTool("delete_gameobject", { id: guid });
+      // delete succeeded → object still existed → undo did NOT remove it (cleaned up though)
+    } catch {
+      gone = true;
+    }
+    check("scene mutation pushes undo step (built-in undo removes it)", gone,
+      gone ? "object gone after undo" : `object survived undo (${undoText.slice(0, 60)})`);
+  } catch (e) {
+    check("scene mutation pushes undo step", false, e.message.slice(0, 120));
+  }
 } catch (e) {
   console.error(`FATAL: ${e.message}`);
   process.exit(2);

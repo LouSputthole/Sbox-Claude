@@ -121,7 +121,7 @@ export function registerTemplateTools(
   // ── create_game_manager ───────────────────────────────────────────
   server.tool(
     "create_game_manager",
-    "Generate a game manager script with configurable game loop features: score tracking, round timer, player spawning, and game state machine",
+    "Generate a minimal game-manager Component: a static Instance singleton, [Property] MaxPlayers / GameState, and a Component.INetworkListener OnActive hook that logs player connects. Writes <name>.cs and returns { created, path, className }. NOTE: the includeScore/includeTimer/includeSpawning params are not currently applied — the same minimal manager is always generated (for richer game-loop scaffolds see create_round_phase_machine / create_objective_system / create_economy_wallet). Follow with trigger_hotload, then get_compile_errors, then place via add_component_to_new_object",
     {
       name: z
         .string()
@@ -134,16 +134,16 @@ export function registerTemplateTools(
       includeScore: z
         .boolean()
         .optional()
-        .describe("Include score tracking. Defaults to true"),
+        .describe("Include score tracking (currently not applied by the handler)"),
       includeTimer: z
         .boolean()
         .optional()
-        .describe("Include round timer with countdown. Defaults to false"),
+        .describe("Include round timer with countdown (currently not applied by the handler)"),
       includeSpawning: z
         .boolean()
         .optional()
         .describe(
-          "Include player spawning from prefab at spawn point. Defaults to false"
+          "Include player spawning from prefab at spawn point (currently not applied by the handler)"
         ),
     },
     async (params) => {
@@ -160,7 +160,7 @@ export function registerTemplateTools(
   // ── create_trigger_zone ───────────────────────────────────────────
   server.tool(
     "create_trigger_zone",
-    "Generate a trigger zone script that detects when GameObjects enter/exit a collider volume. Supports teleport, damage, spawn, and log actions",
+    "Generate a trigger-zone Component (Component.ITriggerListener): auto-adds a trigger BoxCollider on start, filters entrants by a TriggerTag [Property] (default 'player'), and logs enter/exit via private OnPlayerEnter/OnPlayerExit extension points you fill in. Writes <name>.cs and returns { created, path, className }. NOTE: the action/filterTag params are not currently applied at generation time — the zone always logs; implement teleport/damage/spawn in the generated methods (edit_script). Follow with trigger_hotload, then get_compile_errors",
     {
       name: z
         .string()
@@ -174,13 +174,13 @@ export function registerTemplateTools(
         .enum(["log", "teleport", "damage", "spawn"])
         .optional()
         .describe(
-          "What happens on trigger: 'log' (print message), 'teleport' (move to destination), 'damage' (apply damage), 'spawn' (create prefab). Defaults to 'log'"
+          "What happens on trigger (currently not applied by the handler — the generated zone always logs; implement the effect in OnPlayerEnter yourself)"
         ),
       filterTag: z
         .string()
         .optional()
         .describe(
-          "Only trigger for objects with this tag. Defaults to 'player'"
+          "Only trigger for objects with this tag (currently not applied at generation — the generated TriggerTag [Property] defaults to 'player'; change it per-instance with set_property)"
         ),
     },
     async (params) => {

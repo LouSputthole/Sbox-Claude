@@ -38,13 +38,16 @@ public static class BridgeNetworkingTools
 		=> McpGate.Run( "add_host_migration_recovery", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "targetId", targetId ) ) );
 
 	/// <summary>
-	/// Add a NetworkHelper component to the scene for quick multiplayer setup. Handles lobby creation
-	/// and player prefab spawning.
+	/// Add a NetworkHelper component (with StartServer=true) to an existing GameObject for quick
+	/// multiplayer setup — at runtime it creates the lobby and spawns the player prefab per connection.
+	/// Returns { added, id, component:'NetworkHelper' }. NOTE: the current handler requires id (create
+	/// a holder with create_gameobject first) and does not apply maxPlayers/playerPrefab — wire
+	/// PlayerPrefab afterward with set_prefab_ref/set_property.
 	/// </summary>
-	/// <param name="id">GUID of existing GameObject. Creates new if omitted.</param>
-	/// <param name="name">Name for the network manager object. Defaults to 'Network Manager'.</param>
-	/// <param name="maxPlayers">Maximum number of players in the lobby.</param>
-	/// <param name="playerPrefab">Path to the player prefab to spawn for each connection.</param>
+	/// <param name="id">GUID of the GameObject to attach to. Required in practice — the current handler errors when omitted (create a holder with create_gameobject first).</param>
+	/// <param name="name">Rename the target GameObject to this. Omit to keep its current name.</param>
+	/// <param name="maxPlayers">Maximum number of players in the lobby (currently not applied by the handler).</param>
+	/// <param name="playerPrefab">Path to the player prefab to spawn for each connection (currently not applied by the handler — set the NetworkHelper's PlayerPrefab afterward with set_prefab_ref).</param>
 	[McpTool( "add_network_helper" )]
 	public static Task<object> AddNetworkHelper( string id = null, string name = null, double? maxPlayers = null, string playerPrefab = null )
 		=> McpGate.Run( "add_network_helper", McpGate.Args( ( "id", id ), ( "name", name ), ( "maxPlayers", maxPlayers ), ( "playerPrefab", playerPrefab ) ) );
@@ -68,7 +71,9 @@ public static class BridgeNetworkingTools
 	/// Annotate an EXISTING public property in a C# script with the [Sync] attribute so s&amp;box
 	/// replicates it across the network. This does NOT create a new property — the property named by
 	/// `propertyName` must already be declared in the file; the tool only inserts the [Sync] attribute
-	/// above it.
+	/// above it. Returns { added, path, property, attribute } — attribute echoes the exact [Sync...]
+	/// emitted; errors if the property already has [Sync] or isn't found. Follow with trigger_hotload,
+	/// then get_compile_errors.
 	/// </summary>
 	/// <param name="path">Relative path to the script file (e.g. 'code/Player.cs').</param>
 	/// <param name="propertyName">Name of the existing public property to annotate with [Sync].</param>
@@ -101,13 +106,16 @@ public static class BridgeNetworkingTools
 		=> McpGate.Run( "add_targeted_rpc", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "targetId", targetId ) ) );
 
 	/// <summary>
-	/// Configure networking settings on the existing NetworkHelper: max players, lobby name, player
-	/// prefab, start server.
+	/// Configure lobby settings on Sandbox.Networking. Currently only lobbyName is applied (sets
+	/// Networking.ServerName) — Networking.MaxPlayers is read-only on this SDK, and
+	/// playerPrefab/startServer are not applied by the handler (use add_network_helper + set_prefab_ref
+	/// for those). Returns { configured, maxPlayers, serverName } reflecting the live Networking
+	/// values.
 	/// </summary>
-	/// <param name="maxPlayers">Maximum number of players.</param>
-	/// <param name="lobbyName">Display name for the lobby.</param>
-	/// <param name="playerPrefab">Path to the player prefab.</param>
-	/// <param name="startServer">Start the server/lobby immediately.</param>
+	/// <param name="maxPlayers">Maximum number of players (currently not applied — Networking.MaxPlayers is read-only on this SDK; the live value is echoed in the response).</param>
+	/// <param name="lobbyName">Display name for the lobby (sets Networking.ServerName — the only setting this handler applies).</param>
+	/// <param name="playerPrefab">Path to the player prefab (currently not applied by the handler — set the NetworkHelper's PlayerPrefab via set_prefab_ref instead).</param>
+	/// <param name="startServer">Start the server/lobby immediately (currently not applied by the handler — add_network_helper sets StartServer=true on the NetworkHelper).</param>
 	[McpTool( "configure_network" )]
 	public static Task<object> ConfigureNetwork( double? maxPlayers = null, string lobbyName = null, string playerPrefab = null, bool? startServer = null )
 		=> McpGate.Run( "configure_network", McpGate.Args( ( "maxPlayers", maxPlayers ), ( "lobbyName", lobbyName ), ( "playerPrefab", playerPrefab ), ( "startServer", startServer ) ) );
@@ -137,12 +145,15 @@ public static class BridgeNetworkingTools
 		=> McpGate.Run( "create_host_rpc_action", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "cooldownSeconds", cooldownSeconds ), ( "targetId", targetId ) ) );
 
 	/// <summary>
-	/// Generate a lobby manager script with create/join/leave lobby, player spawning, and connection
-	/// cleanup.
+	/// Generate a lobby manager Component implementing Component.INetworkListener: a static Instance
+	/// singleton, a [Sync] PlayerCount maintained in OnActive/OnDisconnected, and a LobbyState
+	/// [Property] that flips to 'playing' when the lobby fills. Writes &lt;name&gt;.cs and returns {
+	/// created, path, className }. Follow with trigger_hotload, then get_compile_errors, then place via
+	/// add_component_to_new_object.
 	/// </summary>
 	/// <param name="name">Class name. Defaults to 'LobbyManager'.</param>
 	/// <param name="directory">Subdirectory under code/.</param>
-	/// <param name="maxPlayers">Default max players. Defaults to 8.</param>
+	/// <param name="maxPlayers">Currently not applied by the handler — the generated MaxPlayers [Property] defaults to 16; tune it per-instance with set_property.</param>
 	[McpTool( "create_lobby_manager" )]
 	public static Task<object> CreateLobbyManager( string name = null, string directory = null, double? maxPlayers = null )
 		=> McpGate.Run( "create_lobby_manager", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "maxPlayers", maxPlayers ) ) );
@@ -172,31 +183,40 @@ public static class BridgeNetworkingTools
 		=> McpGate.Run( "create_local_player_resolver", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "playerTag", playerTag ), ( "targetId", targetId ) ) );
 
 	/// <summary>
-	/// Generate a network event handler script implementing INetworkListener for
-	/// connect/disconnect/chat events.
+	/// Generate a network event relay Component: [Rpc.Broadcast] SendEvent(eventName, payload) to all
+	/// clients and [Rpc.Host] SendEventToHost(...), both dispatching into a local OnNetworkEvent switch
+	/// you extend. It does NOT implement INetworkListener — use create_lobby_manager for
+	/// connect/disconnect hooks. Writes &lt;name&gt;.cs and returns { created, path, className }.
+	/// Follow with trigger_hotload, then get_compile_errors.
 	/// </summary>
 	/// <param name="name">Class name. Defaults to 'NetworkEvents'.</param>
 	/// <param name="directory">Subdirectory under code/.</param>
-	/// <param name="includeChat">Include a chat message broadcast system. Defaults to false.</param>
+	/// <param name="includeChat">Currently not applied by the handler — no chat system is generated.</param>
 	[McpTool( "create_network_events" )]
 	public static Task<object> CreateNetworkEvents( string name = null, string directory = null, bool? includeChat = null )
 		=> McpGate.Run( "create_network_events", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "includeChat", includeChat ) ) );
 
 	/// <summary>
 	/// Generate a network-aware player controller with [Sync] properties, owner-only input, and
-	/// [Rpc.Broadcast] actions.
+	/// [Rpc.Broadcast] actions. Writes &lt;name&gt;.cs and returns { created, path, className }. The
+	/// generated Component syncs PlayerName/Health, moves a CharacterController from Input.AnalogMove
+	/// behind an IsProxy guard, and exposes a [Property] MoveSpeed plus an [Rpc.Broadcast]
+	/// TakeDamage(int). Follow with trigger_hotload, then get_compile_errors, then attach +
+	/// network_spawn.
 	/// </summary>
 	/// <param name="name">Class name. Defaults to 'NetworkedPlayer'.</param>
 	/// <param name="directory">Subdirectory under code/.</param>
-	/// <param name="moveSpeed">Movement speed. Defaults to 300.</param>
-	/// <param name="includeHealth">Include health/damage system with host-authoritative TakeDamage. Defaults to true.</param>
+	/// <param name="moveSpeed">Movement speed (generated MoveSpeed [Property]). Defaults to 200.</param>
+	/// <param name="includeHealth">Currently not applied by the handler — the [Sync] Health and [Rpc.Broadcast] TakeDamage are always generated.</param>
 	[McpTool( "create_networked_player" )]
 	public static Task<object> CreateNetworkedPlayer( string name = null, string directory = null, double? moveSpeed = null, bool? includeHealth = null )
 		=> McpGate.Run( "create_networked_player", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "moveSpeed", moveSpeed ), ( "includeHealth", includeHealth ) ) );
 
 	/// <summary>
-	/// Check the current multiplayer status: connection state, player count, lobby info, networked
-	/// objects.
+	/// Check the current multiplayer status. Returns { isActive, isHost, isClient, isConnecting,
+	/// maxPlayers, serverName } read from Sandbox.Networking — meaningful mostly in play mode with
+	/// networking active. It does NOT return a player list or networked-object dump; use
+	/// inspect_networked_object for a specific object's Network/[Sync] state.
 	/// </summary>
 	[McpTool.ReadOnly( "get_network_status" )]
 	public static Task<object> GetNetworkStatus()
@@ -204,7 +224,8 @@ public static class BridgeNetworkingTools
 
 	/// <summary>
 	/// Network-enable a GameObject so it is synchronized across all connected clients. Calls
-	/// NetworkSpawn().
+	/// NetworkSpawn(). Returns { spawned, id } on success — follow with inspect_networked_object to
+	/// confirm the Network state, or set_ownership to hand it to a connection.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to network.</param>
 	[McpTool( "network_spawn" )]
@@ -212,10 +233,14 @@ public static class BridgeNetworkingTools
 		=> McpGate.Run( "network_spawn", McpGate.Args( ( "id", id ) ) );
 
 	/// <summary>
-	/// Transfer network ownership of a GameObject to a different connection, or take/drop ownership.
+	/// Assign network ownership of a GameObject to a connection, or drop ownership. Omitting
+	/// connectionId (or passing an empty string) calls Network.DropOwnership(); passing a connection Id
+	/// or SteamId calls Network.AssignOwnership() on the matching live Connection. Returns {
+	/// ownershipAssigned, id, connectionId } or { ownershipDropped, id }; errors if no connection
+	/// matches (connections only exist while networking is active).
 	/// </summary>
 	/// <param name="id">GUID of the networked GameObject.</param>
-	/// <param name="connectionId">GUID of the target connection. Empty string = drop ownership. Omit = take ownership.</param>
+	/// <param name="connectionId">Connection Id GUID or SteamId of the target connection. Omit OR pass an empty string to DROP ownership (there is no take-ownership mode in the current handler).</param>
 	[McpTool( "set_ownership" )]
 	public static Task<object> SetOwnership( string id, string connectionId = null )
 		=> McpGate.Run( "set_ownership", McpGate.Args( ( "id", id ), ( "connectionId", connectionId ) ) );

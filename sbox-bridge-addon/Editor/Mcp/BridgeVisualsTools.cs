@@ -14,8 +14,10 @@ using Editor.Mcp;
 public static class BridgeVisualsTools
 {
 	/// <summary>
-	/// Create an energy/laser beam (BeamEffect) from a position to a target point — additive, tintable.
-	/// Good for lasers, tracers, magic beams.
+	/// EXPERIMENTAL — create an energy/laser beam (BeamEffect) from a position to a target point
+	/// (default: 128u straight up) — additive, tintable. Returns { created, gameObject } —
+	/// gameObject.id is the beam object's GUID. Like the other runtime particle tools, rendering
+	/// through the bridge is unverified; use spawn_vpcf when you need a guaranteed-visible effect.
 	/// </summary>
 	/// <param name="position">Beam start (world position of the beam object). As "x,y,z" (or JSON {x,y,z}).</param>
 	/// <param name="target">Beam end point in world space (default: 128u up). As "x,y,z" (or JSON {x,y,z}).</param>
@@ -28,7 +30,9 @@ public static class BridgeVisualsTools
 
 	/// <summary>
 	/// Add an environment reflection/ambient probe (EnvmapProbe) at a position with a cubic influence
-	/// volume — captures local reflections and indirect light for nearby surfaces.
+	/// volume — captures local reflections and indirect light for nearby surfaces. IMPORTANT: a placed
+	/// probe captures NOTHING until baked — follow with bake_reflections. Returns { created, gameObject
+	/// } — gameObject.id is the probe object's GUID.
 	/// </summary>
 	/// <param name="name">GameObject name.</param>
 	/// <param name="position">World position (centre of the probe). As "x,y,z" (or JSON {x,y,z}).</param>
@@ -94,7 +98,9 @@ public static class BridgeVisualsTools
 	/// <summary>
 	/// One-call scene mood: composes ambient + directional light, gradient fog, and a camera post-fx
 	/// stack (tonemap + colour grade + vignette) tuned for the chosen mood. Idempotent — re-runs update
-	/// the same 'Atmosphere *' objects.
+	/// the same 'Atmosphere *' objects. Returns { applied, mood, components, postFxCamera } — the
+	/// post-fx stack is only applied when a camera exists (postFxCamera is null otherwise; add a camera
+	/// and re-run). Screenshot to verify.
 	/// </summary>
 	/// <param name="mood">Atmosphere preset. One of: horror-night | foggy-dawn | overcast | warm-interior.</param>
 	[McpTool( "apply_atmosphere" )]
@@ -104,7 +110,9 @@ public static class BridgeVisualsTools
 	/// <summary>
 	/// Apply just a camera post-processing look (no lights/fog): cinematic (tonemap + bloom + soft
 	/// vignette), filmic-horror (desaturated, high-contrast, heavy vignette, film grain), or clean
-	/// (tonemap only).
+	/// (tonemap only). Errors if the scene has no CameraComponent. Returns { applied, look, components,
+	/// camera } listing the effect components added to the main camera — tune them individually
+	/// afterwards with add_post_process.
 	/// </summary>
 	/// <param name="look">Post-fx look preset. One of: cinematic | filmic-horror | clean.</param>
 	[McpTool( "apply_post_fx_look" )]
@@ -114,8 +122,10 @@ public static class BridgeVisualsTools
 	/// <summary>
 	/// Bake all EnvmapProbe reflection probes in the scene (EnvmapProbe.BakeAll) so they actually
 	/// capture their surroundings — placing a probe with add_envmap_probe does nothing visible until
-	/// it's baked. This is a real editor compute step, not a component setter. Runs async;
-	/// re-screenshot after a moment to see reflections appear on shiny surfaces.
+	/// it's baked. This is a real editor compute step, not a component setter. Runs async — returns {
+	/// baking, count, note, probes } immediately (each probe: id, name, mode, hasBaked), or { baked:
+	/// false, count: 0 } when the scene has no probes; re-screenshot after a moment to see reflections
+	/// appear.
 	/// </summary>
 	[McpTool( "bake_reflections" )]
 	public static Task<object> BakeReflections()
@@ -146,7 +156,9 @@ public static class BridgeVisualsTools
 	/// <summary>
 	/// Add or update fog in the active scene. Types: 'gradient' (distance haze — great for
 	/// mood/horror), 'cubemap' (sky-tinted distance fog), 'volumetric' (a localized fog volume).
-	/// Re-running on the same target updates it rather than duplicating.
+	/// Re-running with the same targetId updates it rather than duplicating; without targetId each call
+	/// creates a new fog object. Returns { created, type, gameObject } — gameObject.id addresses the
+	/// fog object for later set_property/delete_gameobject; screenshot to verify the look.
 	/// </summary>
 	/// <param name="type">Fog type (default gradient). One of: gradient | cubemap | volumetric.</param>
 	/// <param name="name">GameObject name when creating a new fog object.</param>
@@ -168,7 +180,9 @@ public static class BridgeVisualsTools
 
 	/// <summary>
 	/// Set the scene's 2D skybox tint / indirect lighting (re-uses an existing SkyBox2D or creates
-	/// one). Darken the tint for night/dusk. Optionally point it at a .vmat sky material.
+	/// one). Darken the tint for night/dusk. Optionally point it at a .vmat sky material (silently kept
+	/// as-is if the material fails to load). Returns { created, gameObject } — gameObject.id is the sky
+	/// object; screenshot to verify the change.
 	/// </summary>
 	/// <param name="tint">Sky tint colour. As "r,g,b[,a]" (0-1 floats).</param>
 	/// <param name="indirectLighting">Whether the sky contributes indirect/ambient light.</param>
@@ -179,9 +193,10 @@ public static class BridgeVisualsTools
 		=> McpGate.Run( "set_skybox", McpGate.Args( ( "tint", tint ), ( "indirectLighting", indirectLighting ), ( "material", material ), ( "name", name ) ) );
 
 	/// <summary>
-	/// Spawn an additive particle effect (no texture asset needed): kind = fire (rising flame), embers
-	/// (slow drifting glow), or sparks (a one-shot burst). Renders as tinted glowing dots — great for
-	/// campfires, torches, and impacts. (smoke needs a soft sprite; not in v1.).
+	/// EXPERIMENTAL — build an additive runtime ParticleEffect (no texture asset needed): kind = fire,
+	/// embers, sparks, magic, dust, blood, or snow ('smoke' returns an error). Returns { created, kind,
+	/// gameObject } — the component graph is created, but this runtime particle path has NOT been
+	/// verified to render through the bridge; for particles you can actually see, prefer spawn_vpcf.
 	/// </summary>
 	/// <param name="kind">Particle preset. One of: fire | embers | sparks | magic | dust | blood | snow.</param>
 	/// <param name="position">World position. As "x,y,z" (or JSON {x,y,z}).</param>

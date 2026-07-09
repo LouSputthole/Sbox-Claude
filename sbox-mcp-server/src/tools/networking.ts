@@ -16,24 +16,24 @@ export function registerNetworkingTools(
   // ── add_network_helper ────────────────────────────────────────────
   server.tool(
     "add_network_helper",
-    "Add a NetworkHelper component to the scene for quick multiplayer setup. Handles lobby creation and player prefab spawning",
+    "Add a NetworkHelper component (with StartServer=true) to an existing GameObject for quick multiplayer setup — at runtime it creates the lobby and spawns the player prefab per connection. Returns { added, id, component:'NetworkHelper' }. NOTE: the current handler requires id (create a holder with create_gameobject first) and does not apply maxPlayers/playerPrefab — wire PlayerPrefab afterward with set_prefab_ref/set_property",
     {
       id: z
         .string()
         .optional()
-        .describe("GUID of existing GameObject. Creates new if omitted"),
+        .describe("GUID of the GameObject to attach to. Required in practice — the current handler errors when omitted (create a holder with create_gameobject first)"),
       name: z
         .string()
         .optional()
-        .describe("Name for the network manager object. Defaults to 'Network Manager'"),
+        .describe("Rename the target GameObject to this. Omit to keep its current name"),
       maxPlayers: z
         .number()
         .optional()
-        .describe("Maximum number of players in the lobby"),
+        .describe("Maximum number of players in the lobby (currently not applied by the handler)"),
       playerPrefab: z
         .string()
         .optional()
-        .describe("Path to the player prefab to spawn for each connection"),
+        .describe("Path to the player prefab to spawn for each connection (currently not applied by the handler — set the NetworkHelper's PlayerPrefab afterward with set_prefab_ref)"),
     },
     async (params) => {
       const res = await bridge.send("add_network_helper", params);
@@ -49,24 +49,24 @@ export function registerNetworkingTools(
   // ── configure_network ─────────────────────────────────────────────
   server.tool(
     "configure_network",
-    "Configure networking settings on the existing NetworkHelper: max players, lobby name, player prefab, start server",
+    "Configure lobby settings on Sandbox.Networking. Currently only lobbyName is applied (sets Networking.ServerName) — Networking.MaxPlayers is read-only on this SDK, and playerPrefab/startServer are not applied by the handler (use add_network_helper + set_prefab_ref for those). Returns { configured, maxPlayers, serverName } reflecting the live Networking values",
     {
       maxPlayers: z
         .number()
         .optional()
-        .describe("Maximum number of players"),
+        .describe("Maximum number of players (currently not applied — Networking.MaxPlayers is read-only on this SDK; the live value is echoed in the response)"),
       lobbyName: z
         .string()
         .optional()
-        .describe("Display name for the lobby"),
+        .describe("Display name for the lobby (sets Networking.ServerName — the only setting this handler applies)"),
       playerPrefab: z
         .string()
         .optional()
-        .describe("Path to the player prefab"),
+        .describe("Path to the player prefab (currently not applied by the handler — set the NetworkHelper's PlayerPrefab via set_prefab_ref instead)"),
       startServer: z
         .boolean()
         .optional()
-        .describe("Start the server/lobby immediately"),
+        .describe("Start the server/lobby immediately (currently not applied by the handler — add_network_helper sets StartServer=true on the NetworkHelper)"),
     },
     async (params) => {
       const res = await bridge.send("configure_network", params);
@@ -82,7 +82,7 @@ export function registerNetworkingTools(
   // ── get_network_status ────────────────────────────────────────────
   server.tool(
     "get_network_status",
-    "Check the current multiplayer status: connection state, player count, lobby info, networked objects",
+    "Check the current multiplayer status. Returns { isActive, isHost, isClient, isConnecting, maxPlayers, serverName } read from Sandbox.Networking — meaningful mostly in play mode with networking active. It does NOT return a player list or networked-object dump; use inspect_networked_object for a specific object's Network/[Sync] state",
     {},
     async (params) => {
       const res = await bridge.send("get_network_status", params);
@@ -98,7 +98,7 @@ export function registerNetworkingTools(
   // ── network_spawn ─────────────────────────────────────────────────
   server.tool(
     "network_spawn",
-    "Network-enable a GameObject so it is synchronized across all connected clients. Calls NetworkSpawn()",
+    "Network-enable a GameObject so it is synchronized across all connected clients. Calls NetworkSpawn(). Returns { spawned, id } on success — follow with inspect_networked_object to confirm the Network state, or set_ownership to hand it to a connection",
     {
       id: z.string().describe("GUID of the GameObject to network"),
     },
@@ -116,14 +116,14 @@ export function registerNetworkingTools(
   // ── set_ownership ─────────────────────────────────────────────────
   server.tool(
     "set_ownership",
-    "Transfer network ownership of a GameObject to a different connection, or take/drop ownership",
+    "Assign network ownership of a GameObject to a connection, or drop ownership. Omitting connectionId (or passing an empty string) calls Network.DropOwnership(); passing a connection Id or SteamId calls Network.AssignOwnership() on the matching live Connection. Returns { ownershipAssigned, id, connectionId } or { ownershipDropped, id }; errors if no connection matches (connections only exist while networking is active)",
     {
       id: z.string().describe("GUID of the networked GameObject"),
       connectionId: z
         .string()
         .optional()
         .describe(
-          "GUID of the target connection. Empty string = drop ownership. Omit = take ownership"
+          "Connection Id GUID or SteamId of the target connection. Omit OR pass an empty string to DROP ownership (there is no take-ownership mode in the current handler)"
         ),
     },
     async (params) => {
@@ -140,7 +140,7 @@ export function registerNetworkingTools(
   // ── add_sync_property ─────────────────────────────────────────────
   server.tool(
     "add_sync_property",
-    "Annotate an EXISTING public property in a C# script with the [Sync] attribute so s&box replicates it across the network. This does NOT create a new property — the property named by `propertyName` must already be declared in the file; the tool only inserts the [Sync] attribute above it",
+    "Annotate an EXISTING public property in a C# script with the [Sync] attribute so s&box replicates it across the network. This does NOT create a new property — the property named by `propertyName` must already be declared in the file; the tool only inserts the [Sync] attribute above it. Returns { added, path, property, attribute } — attribute echoes the exact [Sync...] emitted; errors if the property already has [Sync] or isn't found. Follow with trigger_hotload, then get_compile_errors",
     {
       path: z
         .string()
@@ -218,7 +218,7 @@ export function registerNetworkingTools(
   // ── create_networked_player ───────────────────────────────────────
   server.tool(
     "create_networked_player",
-    "Generate a network-aware player controller with [Sync] properties, owner-only input, and [Rpc.Broadcast] actions",
+    "Generate a network-aware player controller with [Sync] properties, owner-only input, and [Rpc.Broadcast] actions. Writes <name>.cs and returns { created, path, className }. The generated Component syncs PlayerName/Health, moves a CharacterController from Input.AnalogMove behind an IsProxy guard, and exposes a [Property] MoveSpeed plus an [Rpc.Broadcast] TakeDamage(int). Follow with trigger_hotload, then get_compile_errors, then attach + network_spawn",
     {
       name: z
         .string()
@@ -228,11 +228,11 @@ export function registerNetworkingTools(
         .string()
         .optional()
         .describe("Subdirectory under code/"),
-      moveSpeed: z.number().optional().describe("Movement speed. Defaults to 300"),
+      moveSpeed: z.number().optional().describe("Movement speed (generated MoveSpeed [Property]). Defaults to 200"),
       includeHealth: z
         .boolean()
         .optional()
-        .describe("Include health/damage system with host-authoritative TakeDamage. Defaults to true"),
+        .describe("Currently not applied by the handler — the [Sync] Health and [Rpc.Broadcast] TakeDamage are always generated"),
     },
     async (params) => {
       const res = await bridge.send("create_networked_player", params);
@@ -248,7 +248,7 @@ export function registerNetworkingTools(
   // ── create_lobby_manager ──────────────────────────────────────────
   server.tool(
     "create_lobby_manager",
-    "Generate a lobby manager script with create/join/leave lobby, player spawning, and connection cleanup",
+    "Generate a lobby manager Component implementing Component.INetworkListener: a static Instance singleton, a [Sync] PlayerCount maintained in OnActive/OnDisconnected, and a LobbyState [Property] that flips to 'playing' when the lobby fills. Writes <name>.cs and returns { created, path, className }. Follow with trigger_hotload, then get_compile_errors, then place via add_component_to_new_object",
     {
       name: z
         .string()
@@ -261,7 +261,7 @@ export function registerNetworkingTools(
       maxPlayers: z
         .number()
         .optional()
-        .describe("Default max players. Defaults to 8"),
+        .describe("Currently not applied by the handler — the generated MaxPlayers [Property] defaults to 16; tune it per-instance with set_property"),
     },
     async (params) => {
       const res = await bridge.send("create_lobby_manager", params);
@@ -277,7 +277,7 @@ export function registerNetworkingTools(
   // ── create_network_events ─────────────────────────────────────────
   server.tool(
     "create_network_events",
-    "Generate a network event handler script implementing INetworkListener for connect/disconnect/chat events",
+    "Generate a network event relay Component: [Rpc.Broadcast] SendEvent(eventName, payload) to all clients and [Rpc.Host] SendEventToHost(...), both dispatching into a local OnNetworkEvent switch you extend. It does NOT implement INetworkListener — use create_lobby_manager for connect/disconnect hooks. Writes <name>.cs and returns { created, path, className }. Follow with trigger_hotload, then get_compile_errors",
     {
       name: z
         .string()
@@ -290,7 +290,7 @@ export function registerNetworkingTools(
       includeChat: z
         .boolean()
         .optional()
-        .describe("Include a chat message broadcast system. Defaults to false"),
+        .describe("Currently not applied by the handler — no chat system is generated"),
     },
     async (params) => {
       const res = await bridge.send("create_network_events", params);

@@ -15,140 +15,163 @@ using Editor.Mcp;
 public static class BridgeWorldTools
 {
 	/// <summary>
-	/// Append (or insert) a waypoint to CaveBuilder.Path. Z is depth (negative = underground).
+	/// Append (or insert at `index`) a waypoint to CaveBuilder.Path. Z is depth (negative =
+	/// underground). Returns `added`, `total` (waypoint count), and `rebuilt` — rebuilds the cave
+	/// ('Build Cave') immediately unless rebuild=false.
 	/// </summary>
-	/// <param name="x"></param>
-	/// <param name="y"></param>
+	/// <param name="x">World X of the waypoint.</param>
+	/// <param name="y">World Y of the waypoint.</param>
 	/// <param name="z">Z depth — negative = underground.</param>
 	/// <param name="index">Optional insert position (default: append to end).</param>
-	/// <param name="rebuild"></param>
-	/// <param name="id"></param>
+	/// <param name="rebuild">Rebuild the cave after adding (default true; set false to batch).</param>
+	/// <param name="id">GUID of the GameObject holding the CaveBuilder; omit to auto-find the first CaveBuilder in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "add_cave_waypoint" )]
 	public static Task<object> AddCaveWaypoint( double x, double y, double z = 0, int? index = null, bool rebuild = true, string id = null, string component = null )
 		=> McpGate.Run( "add_cave_waypoint", McpGate.Args( ( "x", x ), ( "y", y ), ( "z", z ), ( "index", index ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Add a point of interest (clearing) to ForestGenerator.POIs. Returns the index of the new POI for
-	/// use with add_forest_trail.
+	/// Add a point of interest (clearing) to ForestGenerator.POIs. Returns `added`, `index` (the new
+	/// POI's index — pass it to add_forest_trail as from_index/to_index), `total`, and `rebuilt`.
+	/// Forest gen is slow (~1s), so rebuild defaults to false — batch your POIs/trails, then regenerate
+	/// once (rebuild=true on the last call, or invoke_button 'Generate Forest').
 	/// </summary>
-	/// <param name="x"></param>
-	/// <param name="y"></param>
-	/// <param name="name"> Default: "POI".</param>
-	/// <param name="radius"></param>
+	/// <param name="x">World X of POI center.</param>
+	/// <param name="y">World Y of POI center.</param>
+	/// <param name="name">Display name for the POI. Default 'POI'. Default: "POI".</param>
+	/// <param name="radius">POI radius in world units. Default 300.</param>
 	/// <param name="density_multiplier">Multiplies forest density inside this POI's region.</param>
 	/// <param name="rebuild">Forest gen is slow (~1s); default false to batch.</param>
-	/// <param name="id"></param>
+	/// <param name="id">GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "add_forest_poi" )]
 	public static Task<object> AddForestPoi( double x, double y, string name = "POI", double radius = 300, double density_multiplier = 1, bool rebuild = false, string id = null, string component = null )
 		=> McpGate.Run( "add_forest_poi", McpGate.Args( ( "x", x ), ( "y", y ), ( "name", name ), ( "radius", radius ), ( "density_multiplier", density_multiplier ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Add a trail gap between two POIs (by index) to ForestGenerator.Trails.
+	/// Add a trail gap between two POIs to ForestGenerator.Trails. Returns `added`, `total` (trail
+	/// count), and `rebuilt`. rebuild defaults to false — nothing changes visually until you regenerate
+	/// (rebuild=true, or invoke_button 'Generate Forest').
 	/// </summary>
-	/// <param name="from_index"></param>
-	/// <param name="to_index"></param>
-	/// <param name="rebuild"></param>
-	/// <param name="id"></param>
+	/// <param name="from_index">Index of the start POI (the `index` returned by add_forest_poi).</param>
+	/// <param name="to_index">Index of the end POI (the `index` returned by add_forest_poi).</param>
+	/// <param name="rebuild">Regenerate the forest after adding (default false — batch, then rebuild once).</param>
+	/// <param name="id">GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "add_forest_trail" )]
 	public static Task<object> AddForestTrail( int from_index, int to_index, bool rebuild = false, string id = null, string component = null )
 		=> McpGate.Run( "add_forest_trail", McpGate.Args( ( "from_index", from_index ), ( "to_index", to_index ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Add a flat clearing zone to MapBuilder (lerps height toward base inside radius).
+	/// Add a flat clearing zone to MapBuilder's Clearings list (lerps height toward base inside
+	/// radius). Returns `added`, `total` (clearing count), and `rebuilt`. Rebuilds terrain immediately
+	/// by default; set rebuild=false to batch edits, then rebuild once (rebuild=true on the last call,
+	/// or invoke_button 'Build Terrain').
 	/// </summary>
-	/// <param name="x"></param>
-	/// <param name="y"></param>
-	/// <param name="radius"></param>
-	/// <param name="rebuild"></param>
-	/// <param name="id"></param>
+	/// <param name="x">World X of clearing center.</param>
+	/// <param name="y">World Y of clearing center.</param>
+	/// <param name="radius">Clearing radius in world units. Default 300.</param>
+	/// <param name="rebuild">Rebuild terrain after adding (default true; set false to batch).</param>
+	/// <param name="id">GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "add_terrain_clearing" )]
 	public static Task<object> AddTerrainClearing( double x, double y, double radius = 300, bool rebuild = true, string id = null, string component = null )
 		=> McpGate.Run( "add_terrain_clearing", McpGate.Args( ( "x", x ), ( "y", y ), ( "radius", radius ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Add a hill (cosine-falloff bump) to MapBuilder. Negative height creates a depression.
+	/// Add a hill (cosine-falloff bump) to MapBuilder's Hills list. Negative height creates a
+	/// depression. Returns `added`, `total` (hills now in the list), and `rebuilt`; verify the surface
+	/// with raycast_terrain at the hill center.
 	/// </summary>
 	/// <param name="x">World X of hill center.</param>
 	/// <param name="y">World Y of hill center.</param>
 	/// <param name="radius">Hill radius in world units.</param>
 	/// <param name="height">Peak height (negative for depression).</param>
 	/// <param name="rebuild">Rebuild terrain after adding (set false to batch).</param>
-	/// <param name="id"></param>
+	/// <param name="id">GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "add_terrain_hill" )]
 	public static Task<object> AddTerrainHill( double x, double y, double radius = 500, double height = 100, bool rebuild = true, string id = null, string component = null )
 		=> McpGate.Run( "add_terrain_hill", McpGate.Args( ( "x", x ), ( "y", y ), ( "radius", radius ), ( "height", height ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Carve a trail depression between two points on MapBuilder.
+	/// Carve a trail depression between two points on MapBuilder (appends to its Trails list). Returns
+	/// `added`, `total` (trail count), and `rebuilt`. Rebuilds terrain immediately by default; set
+	/// rebuild=false to batch, then invoke_button 'Build Terrain' once.
 	/// </summary>
-	/// <param name="from"> JSON value.</param>
-	/// <param name="to"> JSON value.</param>
-	/// <param name="rebuild"></param>
-	/// <param name="id"></param>
+	/// <param name="from">Trail start point (world x/y). JSON value.</param>
+	/// <param name="to">Trail end point (world x/y). JSON value.</param>
+	/// <param name="rebuild">Rebuild terrain after adding (default true; set false to batch).</param>
+	/// <param name="id">GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "add_terrain_trail" )]
 	public static Task<object> AddTerrainTrail( JsonNode from, JsonNode to, bool rebuild = true, string id = null, string component = null )
 		=> McpGate.Run( "add_terrain_trail", McpGate.Args( ( "from", from ), ( "to", to ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Build a standalone heightmap terrain mesh from a hills/clearings JSON spec — independent of
-	/// MapBuilder. Use when you don't have a MapBuilder component in the scene and want one-shot
-	/// terrain.
+	/// Build a standalone heightmap terrain mesh (a MeshComponent) from a hills/clearings JSON spec —
+	/// independent of MapBuilder. Use when you don't have a MapBuilder component in the scene and want
+	/// one-shot terrain. Returns `built`, `id` (the new GameObject's GUID), `name`, `vertices`, and
+	/// `faces`; pass `id` to assign_material, set_transform, or delete_gameobject. Note:
+	/// raycast_terrain cannot sample this mesh (it requires MapBuilder).
 	/// </summary>
 	/// <param name="size">Total terrain size (world units, square).</param>
 	/// <param name="resolution">Grid resolution per side.</param>
-	/// <param name="name"> Default: "Generated Terrain".</param>
-	/// <param name="hills"> JSON array. Default: [].</param>
-	/// <param name="clearings"> JSON array. Default: [].</param>
+	/// <param name="name">Name for the created terrain GameObject. Default 'Generated Terrain'. Default: "Generated Terrain".</param>
+	/// <param name="hills">Hill bumps: array of {x, y, radius (default 500), height (default 100; negative = depression)}. Default: none. JSON array. Default: [].</param>
+	/// <param name="clearings">Zones flattened back toward height 0: array of {x, y, radius (default 300)}. Default: none. JSON array. Default: [].</param>
 	[McpTool( "build_terrain_mesh" )]
 	public static Task<object> BuildTerrainMesh( double size = 9600, int resolution = 64, string name = "Generated Terrain", JsonNode hills = null, JsonNode clearings = null )
 		=> McpGate.Run( "build_terrain_mesh", McpGate.Args( ( "size", size ), ( "resolution", resolution ), ( "name", name ), ( "hills", hills ), ( "clearings", clearings ) ) );
 
 	/// <summary>
-	/// Clear all waypoints in CaveBuilder and remove the cave from the scene.
+	/// Clear all waypoints in CaveBuilder.Path and remove the built cave from the scene (invokes 'Clear
+	/// Cave'). Destructive. Returns `cleared` — the number of waypoints removed; start a new path with
+	/// add_cave_waypoint.
 	/// </summary>
-	/// <param name="id"></param>
+	/// <param name="id">GUID of the GameObject holding the CaveBuilder; omit to auto-find the first CaveBuilder in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "clear_cave_path" )]
 	public static Task<object> ClearCavePath( string id = null, string component = null )
 		=> McpGate.Run( "clear_cave_path", McpGate.Args( ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Wipe all POIs and trails in ForestGenerator and clear placed forest objects from the scene.
+	/// Wipe all POIs and trails in ForestGenerator and clear placed forest objects from the scene
+	/// (invokes 'Clear Forest'). Destructive. Returns `cleared` — the number of POIs removed; rebuild a
+	/// layout with add_forest_poi + add_forest_trail, then invoke_button 'Generate Forest'.
 	/// </summary>
-	/// <param name="id"></param>
+	/// <param name="id">GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "clear_forest_pois" )]
 	public static Task<object> ClearForestPois( string id = null, string component = null )
 		=> McpGate.Run( "clear_forest_pois", McpGate.Args( ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Wipe Hills, Clearings, Trails, or all features from MapBuilder. 'what' is one of: Hills,
-	/// Clearings, Trails, CavePath, all (default).
+	/// Wipe MapBuilder feature lists — Hills, Clearings, Trails, CavePath, or all of them (default).
+	/// Destructive: the feature definitions are removed. Returns `cleared` (map of list name → entries
+	/// removed) and `rebuilt`; re-add features with add_terrain_hill / add_terrain_clearing /
+	/// add_terrain_trail.
 	/// </summary>
-	/// <param name="what"> One of: Hills | Clearings | Trails | CavePath | all. Default: "all".</param>
-	/// <param name="rebuild"></param>
-	/// <param name="id"></param>
+	/// <param name="what">Which feature list to clear. Default 'all' (clears all four). One of: Hills | Clearings | Trails | CavePath | all. Default: "all".</param>
+	/// <param name="rebuild">Rebuild terrain after clearing (default true).</param>
+	/// <param name="id">GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "clear_terrain_features" )]
 	public static Task<object> ClearTerrainFeatures( string what = "all", bool rebuild = true, string id = null, string component = null )
 		=> McpGate.Run( "clear_terrain_features", McpGate.Args( ( "what", what ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Add a circular biome region with overridden forest density. Multiple regions stack via cosine
-	/// falloff. density: 0=no trees, 1=normal, 2=double.
+	/// Add a circular biome region with overridden forest density to ForestGenerator.DensityRegions.
+	/// Multiple regions stack via cosine falloff. density: 0=no trees, 1=normal, 2=double. Returns
+	/// `painted`, `total` (region count), and `rebuilt` — rebuild defaults to false, so regenerate
+	/// (rebuild=true, or invoke_button 'Generate Forest') to see the change.
 	/// </summary>
-	/// <param name="x"></param>
-	/// <param name="y"></param>
-	/// <param name="radius"></param>
+	/// <param name="x">World X of region center.</param>
+	/// <param name="y">World Y of region center.</param>
+	/// <param name="radius">Region radius in world units. Default 800.</param>
 	/// <param name="density">Density multiplier (0=clear, 1=normal, 2=dense).</param>
-	/// <param name="rebuild"></param>
-	/// <param name="id"></param>
+	/// <param name="rebuild">Regenerate the forest after adding (default false; batch, then rebuild once).</param>
+	/// <param name="id">GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "paint_forest_density" )]
 	public static Task<object> PaintForestDensity( double x, double y, double radius = 800, double density = 1, bool rebuild = false, string id = null, string component = null )
@@ -156,15 +179,17 @@ public static class BridgeWorldTools
 
 	/// <summary>
 	/// Drop instances of a model along a path (list of points). Useful for fences, lampposts, road
-	/// markers, lined-up rocks.
+	/// markers, lined-up rocks. Returns `placed` (instance count) and `folder` — the GUID of the new
+	/// parent GameObject grouping the instances; pass `folder` to delete_gameobject to remove the whole
+	/// run, or to set_parent/set_transform to move it.
 	/// </summary>
 	/// <param name="model">Model path (e.g. 'models/dev/box.vmdl' or installed-asset path).</param>
 	/// <param name="points">Path waypoints (at least 2). JSON array.</param>
 	/// <param name="spacing">Distance between placements (world units).</param>
 	/// <param name="jitter">Max random offset perpendicular to path.</param>
-	/// <param name="min_scale"></param>
-	/// <param name="max_scale"></param>
-	/// <param name="seed"></param>
+	/// <param name="min_scale">Minimum uniform scale per instance (random between min and max). Default 1.</param>
+	/// <param name="max_scale">Maximum uniform scale per instance. Default 1.</param>
+	/// <param name="seed">Random seed for jitter and scale — same seed reproduces the same placement. Default 42.</param>
 	/// <param name="name">Base name for placed objects. Default: "PathItem".</param>
 	[McpTool( "place_along_path" )]
 	public static Task<object> PlaceAlongPath( string model, JsonNode points, double spacing = 200, double jitter = 0, double min_scale = 1, double max_scale = 1, int seed = 42, string name = "PathItem" )
@@ -184,26 +209,29 @@ public static class BridgeWorldTools
 
 	/// <summary>
 	/// Apply a heightmap brush at (x, y) to MapBuilder. Modes: raise, lower, flatten, smooth. Modifies
-	/// the current heightmap directly and rebuilds the mesh; survives between calls until you press
-	/// Build Terrain again.
+	/// the current heightmap directly and rebuilds the mesh; edits survive between calls but are lost
+	/// when 'Build Terrain' regenerates from the feature lists. Returns `sculpted`, `mode`, and
+	/// `affected_vertices`; verify with raycast_terrain at the brush center.
 	/// </summary>
 	/// <param name="x">World X of brush center.</param>
 	/// <param name="y">World Y of brush center.</param>
 	/// <param name="radius">Brush radius in world units.</param>
 	/// <param name="strength">Height delta (units) for raise/lower; ignored for flatten/smooth.</param>
-	/// <param name="mode"> One of: raise | lower | flatten | smooth. Default: "raise".</param>
-	/// <param name="id"></param>
+	/// <param name="mode">Brush mode. Default 'raise'. `strength` applies to raise/lower only. One of: raise | lower | flatten | smooth. Default: "raise".</param>
+	/// <param name="id">GUID of the GameObject holding the MapBuilder; omit to auto-find the first MapBuilder in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "sculpt_terrain" )]
 	public static Task<object> SculptTerrain( double x, double y, double radius = 400, double strength = 50, string mode = "raise", string id = null, string component = null )
 		=> McpGate.Run( "sculpt_terrain", McpGate.Args( ( "x", x ), ( "y", y ), ( "radius", radius ), ( "strength", strength ), ( "mode", mode ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Set ForestGenerator.Seed and regenerate. Useful for re-rolling layouts.
+	/// Set ForestGenerator.Seed and (by default) regenerate — re-rolls the forest layout while keeping
+	/// POIs, trails, and density regions. Returns `set`, `seed`, and `rebuilt`; take a screenshot
+	/// afterwards (screenshot_from) to judge the new layout.
 	/// </summary>
-	/// <param name="seed"></param>
-	/// <param name="rebuild"></param>
-	/// <param name="id"></param>
+	/// <param name="seed">New random seed (integer). Default 77.</param>
+	/// <param name="rebuild">Regenerate the forest after setting (default true).</param>
+	/// <param name="id">GUID of the GameObject holding the ForestGenerator; omit to auto-find the first ForestGenerator in the scene.</param>
 	/// <param name="component">Override the builder component type name — set this if your project's terrain/cave/forest component is named differently than the default (MapBuilder/CaveBuilder/ForestGenerator).</param>
 	[McpTool( "set_forest_seed" )]
 	public static Task<object> SetForestSeed( int seed = 77, bool rebuild = true, string id = null, string component = null )

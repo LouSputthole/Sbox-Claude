@@ -22,7 +22,7 @@ export function registerMovieMakerTools(
   // ── list_movies ───────────────────────────────────────────────────
   server.tool(
     "list_movies",
-    "List the project's .movie resources (Sandbox.MovieMaker clips authored in the editor's Movie Maker dock: Window → Movie Maker). Returns each movie's asset-relative path, whether it currently loads via ResourceLibrary, and whether it has a compiled clip. Start here before add_movie_player / play_movie — and if the list is empty, the movie has to be authored in the dock first (the bridge plays movies; it doesn't author keyframes).",
+    "List the project's .movie resources (Sandbox.MovieMaker clips authored in the editor's Movie Maker dock: Window → Movie Maker). Scans the ENTIRE Assets folder recursively and returns every .movie found — no limit or paging. Returns { count, movies, note } where each movie has { path (asset-relative — the form add_movie_player/play_movie expect), name, loadable (resolves via ResourceLibrary), hasCompiledClip }. Start here before add_movie_player / play_movie — if the list is empty, the movie has to be authored in the dock first (the bridge plays movies; it doesn't author keyframes).",
     {},
     async () => {
       const res = await bridge.send("list_movies", {});

@@ -35,7 +35,7 @@ export function registerProjectTools(
   // ── list_project_files ───────────────────────────────────────────
   server.tool(
     "list_project_files",
-    "Browse the project file tree. Optionally filter by directory path and/or file extension (e.g. '.cs', '.scene')",
+    "Browse the project file tree. Optionally filter by directory path and/or file extension (e.g. '.cs', '.scene'). Returns { path, count, files } as project-root-relative paths — CAPPED AT 500 files (count reflects the truncated list, with no marker that more exist), so on large projects narrow with path/extension or use find_in_project. Recursive by default.",
     {
       path: z
         .string()
@@ -100,7 +100,7 @@ export function registerProjectTools(
   // ── write_file ───────────────────────────────────────────────────
   server.tool(
     "write_file",
-    "Write or overwrite a file in the s&box project. Creates parent directories as needed",
+    "Write or overwrite a file in the s&box project (SILENTLY replaces existing content — read_file first if you need to preserve it). Creates parent directories as needed; paths are confined to the project root (traversal outside it is denied). Returns a confirmation with the path — for C# follow with trigger_hotload so it compiles; for assets (.vmat etc.) follow with recompile_asset.",
     {
       path: z
         .string()

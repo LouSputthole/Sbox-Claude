@@ -22,7 +22,7 @@ export function registerInspectionTools(
   // ── inspect_networked_object ──────────────────────────────────────
   server.tool(
     "inspect_networked_object",
-    "Inspect the live networking contract of a GameObject: Network.Owner/IsProxy/IsOwner/Active, OwnerTransfer + OrphanedMode, and every component's [Sync] property names, SyncFlags, and current values (host vs proxy). Unlike get_network_status (session-only), this is per-object — the way to verify a host-authoritative or ownership change actually replicated. Works in edit or play mode.",
+    "Inspect the live networking contract of a GameObject. Returns {id, name, network: {active, isProxy, isOwner, isCreator, ownerId, ownerSteamId, ownerTransfer, orphaned, flags}, components: [{component, fields: [{name, type, isSync, syncFlags, value}]}]} — by default only [Sync]-marked fields are listed (components with none are omitted). Unlike get_network_status (session-only), this is per-object — the way to verify a host-authoritative or ownership change actually replicated; works in edit or play mode. Follow up with set_ownership to change the owner, or networking_lint to find the code-level cause of a bad [Sync] value.",
     {
       id: z.string().describe("GUID of the GameObject to inspect"),
       allProps: z
@@ -103,9 +103,9 @@ export function registerInspectionTools(
   // ── save_inspect ──────────────────────────────────────────────────
   server.tool(
     "save_inspect",
-    "Inspect the game's FileSystem.Data save files — the assistant is otherwise blind to persisted state. action='list' enumerates files under a folder (with size/mtime); action='read' dumps a save file's JSON; action='diff' compares two save files key-by-key. Use to verify a save actually wrote, debug a load/migration, or confirm a sanitize/clamp ran.",
+    "Inspect the game's FileSystem.Data save files — the assistant is otherwise blind to persisted state. action='list' (default) returns `directories` and `files` [{name, path, size}] under `path` (omit path for the Data root); action='read' returns {path, length, content}, truncating content at 60,000 chars; action='diff' compares two save files key-by-key, returning `diffCount` and up to 200 `diffs` [{key, change: added|removed|changed}]. Use to verify a save actually wrote, debug a load/migration, or confirm a sanitize/clamp ran.",
     {
-      action: z.enum(["list", "read", "diff"]).default("list"),
+      action: z.enum(["list", "read", "diff"]).default("list").describe("'list' (default) enumerates a folder; 'read' dumps one file's JSON; 'diff' compares `path` vs `pathB`"),
       path: z
         .string()
         .optional()
@@ -125,9 +125,9 @@ export function registerInspectionTools(
   // ── services_query ────────────────────────────────────────────────
   server.tool(
     "services_query",
-    "Read from Sandbox.Services — the cloud stats/leaderboard layer many games use as their real DB. action='stats' lists/reads the project's stat definitions and the local player's values; action='leaderboard' fetches a leaderboard board's top entries. Read-only. Use to verify a Stats.Increment/SetValue path or a leaderboard wired correctly.",
+    "Read from Sandbox.Services — the cloud stats/leaderboard layer many games use as their real DB. action='stats' with `name` returns the local player's stat {ident, value, sum, min, max, lastValue, valueString}; without `name` it returns only the package ident plus a usage note (it does NOT list stat definitions). action='leaderboard' (name required) returns {board, displayName, totalEntries, count, entries} with at most `limit` entries (default 10). Read-only; use to verify a Stats.Increment/SetValue path or a leaderboard wired correctly.",
     {
-      action: z.enum(["stats", "leaderboard"]).default("stats"),
+      action: z.enum(["stats", "leaderboard"]).default("stats").describe("'stats' (default) reads a local-player stat by `name`; 'leaderboard' fetches a board's top entries"),
       name: z
         .string()
         .optional()
@@ -144,7 +144,7 @@ export function registerInspectionTools(
   // ── simulate_input ────────────────────────────────────────────────
   server.tool(
     "simulate_input",
-    "Synthesize player input during PLAY mode so behavior can be verified without a human at the keyboard: press/hold/release a named input action (e.g. 'jump','attack1','use','reload') and/or set AnalogMove / AnalogLook for a duration. Drives movement, IPressable interactions, weapon fire/cooldown/reload, vehicle controls, and HUD advance-on-click. Requires play mode.",
+    "Press or release a named input action during PLAY mode (via Sandbox.Input.SetAction) so input-driven behavior — jump, attack1, use, reload, IPressable, weapon fire — can be verified without a human at the keyboard. REQUIRES play mode and a named `action`; returns {action, state: 'down'|'up', note}. Caveats: SetAction applies to the current input frame ('press' and 'hold' both set the action down; 'release' clears it), and analogMove/analogLook/durationMs are accepted but IGNORED — Sandbox.Input has no analog injection API, so for movement use drive_player or the playtest harness instead.",
     {
       action: z
         .string()

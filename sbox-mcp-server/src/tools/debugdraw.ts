@@ -42,7 +42,7 @@ export function registerDebugDrawTools(server: McpServer, bridge: BridgeClient):
 
   server.tool(
     "debug_draw_ray",
-    "Draw a debug ray (drawn as an arrow) from an origin along a direction for a given length. Renders in editor and play. Ideal for visualizing a raycast result or a facing/normal direction. Accumulates until debug_clear.",
+    "Draw a debug ray (drawn as an arrow) from an origin along a direction for a given length. Renders in editor and play. Ideal for visualizing a raycast result or a facing/normal direction. Accumulates until debug_clear. Returns { drawn: 'ray', count, mode } — count is the total accumulated primitives, mode is 'edit' or 'play' (edit-mode gizmos are NOT in take_screenshot; use capture_view in play mode).",
     {
       origin: z.string().describe('Ray origin, world-space "x,y,z"'),
       direction: z.string().describe('Direction vector "x,y,z" (normalized internally)'),
@@ -55,7 +55,7 @@ export function registerDebugDrawTools(server: McpServer, bridge: BridgeClient):
 
   server.tool(
     "debug_draw_box",
-    "Draw a wireframe debug box centered at a point. Renders in editor and play. Ideal for visualizing a trigger_zone's bounds or a physics_overlap box volume. Accumulates until debug_clear.",
+    "Draw a wireframe debug box centered at a point. Renders in editor and play. Ideal for visualizing a trigger_zone's bounds or a physics_overlap box volume. Accumulates until debug_clear. Returns { drawn: 'box', count, mode } — count is the total accumulated primitives, mode is 'edit' or 'play' (edit-mode gizmos are NOT in take_screenshot; use capture_view in play mode).",
     {
       center: z.string().describe('Box center, world-space "x,y,z"'),
       size: z.string().optional().describe('Full size "x,y,z" in units (default "32,32,32")'),
@@ -67,7 +67,7 @@ export function registerDebugDrawTools(server: McpServer, bridge: BridgeClient):
 
   server.tool(
     "debug_draw_sphere",
-    "Draw a wireframe debug sphere at a point. Renders in editor and play. Ideal for visualizing a physics_overlap radius or an NPC's hearing/sight range. Accumulates until debug_clear.",
+    "Draw a wireframe debug sphere at a point. Renders in editor and play. Ideal for visualizing a physics_overlap radius or an NPC's hearing/sight range. Accumulates until debug_clear. Returns { drawn: 'sphere', count, mode } — count is the total accumulated primitives, mode is 'edit' or 'play' (edit-mode gizmos are NOT in take_screenshot; use capture_view in play mode).",
     {
       center: z.string().describe('Sphere center, world-space "x,y,z"'),
       radius: z.number().optional().describe("Radius in units (default 32)"),
@@ -79,7 +79,7 @@ export function registerDebugDrawTools(server: McpServer, bridge: BridgeClient):
 
   server.tool(
     "debug_clear",
-    "Remove all debug-draw primitives by destroying the debug holder for the current scene (edit or play). Call before redrawing a fresh frame of debug shapes.",
+    "Remove ALL debug-draw primitives at once by destroying the debug holder for the current scene (edit or play) — there is no way to remove a single shape. Call before redrawing a fresh frame of debug shapes. Returns { cleared, removed } where removed is how many primitives were destroyed.",
     {},
     async (p) => reply(await bridge.send("debug_clear", p))
   );

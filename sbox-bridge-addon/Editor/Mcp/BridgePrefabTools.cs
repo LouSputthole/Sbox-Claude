@@ -14,7 +14,10 @@ using Editor.Mcp;
 public static class BridgePrefabTools
 {
 	/// <summary>
-	/// Save an existing GameObject as a reusable .prefab file. The prefab can be instantiated later.
+	/// Save an existing GameObject as a .prefab file. NOTE: this writes a minimal descriptor (name,
+	/// enabled flag, component TYPE names) — component property values and children are NOT serialized,
+	/// so it is a lightweight template rather than a full s&amp;box prefab asset. Returns { created,
+	/// path, sourceId } — pass path to instantiate_prefab or get_prefab_info.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to save as prefab.</param>
 	/// <param name="path">Path for the prefab file relative to project root (e.g. 'prefabs/enemies/grunt.prefab').</param>
@@ -23,7 +26,9 @@ public static class BridgePrefabTools
 		=> McpGate.Run( "create_prefab", McpGate.Args( ( "id", id ), ( "path", path ) ) );
 
 	/// <summary>
-	/// Get detailed information about a prefab file including its JSON contents and metadata.
+	/// Get detailed information about a prefab file. Returns { path, name, size, modified, content } —
+	/// content is the prefab's full raw JSON, so use this to inspect what a prefab actually contains
+	/// before instantiate_prefab (find prefabs with list_prefabs).
 	/// </summary>
 	/// <param name="path">Path to the .prefab file (e.g. 'prefabs/enemies/grunt.prefab').</param>
 	[McpTool.ReadOnly( "get_prefab_info" )]
@@ -31,7 +36,11 @@ public static class BridgePrefabTools
 		=> McpGate.Run( "get_prefab_info", McpGate.Args( ( "path", path ) ) );
 
 	/// <summary>
-	/// Spawn a prefab instance into the active scene at an optional position and rotation.
+	/// Spawn a prefab instance into the active scene at an optional position and rotation. NOTE: basic
+	/// instantiation — it creates a new GameObject named after the prefab; components are NOT recreated
+	/// from the file (the full s&amp;box prefab pipeline isn't wired), so re-add them with
+	/// add_component_with_properties. Returns { instantiated, prefab, gameObject, note } —
+	/// gameObject.id is the new GUID for follow-up calls.
 	/// </summary>
 	/// <param name="path">Path to the .prefab file (e.g. 'prefabs/enemies/grunt.prefab').</param>
 	/// <param name="position">World position to spawn at — object {x,y,z} or comma string "x,y,z". Defaults to origin. As "x,y,z" (or JSON {x,y,z}).</param>

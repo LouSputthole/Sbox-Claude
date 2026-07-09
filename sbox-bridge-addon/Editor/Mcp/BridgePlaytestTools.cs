@@ -75,19 +75,24 @@ public static class BridgePlaytestTools
 		=> McpGate.Run( "playtest", McpGate.Args( ( "steps", steps ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Poll the running/finished playtest. While running: { active:true, step, totalSteps, passed,
-	/// failed }. When done: { finished:true, verdict:'PASS'|'FAIL', passed, failed, transcript:[...] }
-	/// — the full per-step pass/fail record.
+	/// Poll the playtest started by the playtest tool. While running: { active:true, step, totalSteps,
+	/// passed, failed }. When done: { finished:true, reason, verdict:'PASS'|'FAIL', passed, failed,
+	/// stepsRun, totalSteps, controller, controllerResolved, transcript:[...] } — the full per-step
+	/// pass/fail record, including any capture PNG paths; the finished summary stays readable until the
+	/// next playtest starts. If none has run yet: { active:false, finished:false }.
 	/// </summary>
 	[McpTool.ReadOnly( "playtest_status" )]
 	public static Task<object> PlaytestStatus()
 		=> McpGate.Run( "playtest_status", McpGate.Args() );
 
 	/// <summary>
-	/// Synthesize player input during PLAY mode so behavior can be verified without a human at the
-	/// keyboard: press/hold/release a named input action (e.g. 'jump','attack1','use','reload') and/or
-	/// set AnalogMove / AnalogLook for a duration. Drives movement, IPressable interactions, weapon
-	/// fire/cooldown/reload, vehicle controls, and HUD advance-on-click. Requires play mode.
+	/// Press or release a named input action during PLAY mode (via Sandbox.Input.SetAction) so
+	/// input-driven behavior — jump, attack1, use, reload, IPressable, weapon fire — can be verified
+	/// without a human at the keyboard. REQUIRES play mode and a named `action`; returns {action,
+	/// state: 'down'|'up', note}. Caveats: SetAction applies to the current input frame ('press' and
+	/// 'hold' both set the action down; 'release' clears it), and analogMove/analogLook/durationMs are
+	/// accepted but IGNORED — Sandbox.Input has no analog injection API, so for movement use
+	/// drive_player or the playtest harness instead.
 	/// </summary>
 	/// <param name="action">Named input action to drive (must exist in Input.config), e.g. 'jump', 'attack1', 'use'.</param>
 	/// <param name="state">press = one tick (Pressed); hold = held for durationMs; release = clear a held action. One of: press | hold | release. Default: "press".</param>

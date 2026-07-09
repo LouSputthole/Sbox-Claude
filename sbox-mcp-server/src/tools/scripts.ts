@@ -14,7 +14,7 @@ export function registerScriptTools(
   // ── create_script ────────────────────────────────────────────────
   server.tool(
     "create_script",
-    "Create a new C# component script in the project. Generates proper s&box component boilerplate with the specified class name, namespace, and optional properties",
+    "Create a new C# component script in the project — a minimal s&box Component class (name is sanitized to a valid identifier), or your exact code when content is provided. Errors if the file already exists. Returns { path, created, className } — the new type is NOT live until a recompile, so call trigger_hotload, then attach it with add_component_with_properties (component=className).",
     {
       name: z
         .string()
@@ -76,7 +76,7 @@ export function registerScriptTools(
   // ── edit_script ──────────────────────────────────────────────────
   server.tool(
     "edit_script",
-    "Edit an existing C# script. Supports find/replace, inserting code at a line number, or appending code to the class body",
+    "Edit an existing C# script in place via exact-text find/replace or a full-content overwrite. Errors if the file or the find text isn't found (find/replace replaces ALL occurrences). Returns { path, edited, operation } where operation is 'find_replace' or 'overwrite' — follow with trigger_hotload so the change compiles, then get_compile_errors if in doubt.",
     {
       path: z
         .string()
@@ -130,7 +130,7 @@ export function registerScriptTools(
   // ── delete_script ────────────────────────────────────────────────
   server.tool(
     "delete_script",
-    "Delete a C# script from the project",
+    "Permanently delete a file from the project by its project-relative path (built for C# scripts, but removes any file; no recycle bin, and editor undo cannot restore it). Errors if the file doesn't exist. Returns a confirmation with the path — follow with trigger_hotload so the removed class actually leaves the compiled assembly.",
     {
       path: z
         .string()

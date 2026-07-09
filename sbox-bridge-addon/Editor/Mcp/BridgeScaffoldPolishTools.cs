@@ -93,7 +93,10 @@ public static class BridgeScaffoldPolishTools
 	/// skippable. Optional letterbox generates a razor_lint-safe black-bars overlay panel (host under a
 	/// ScreenPanel) shown while IsCutscenePlaying. LOCAL-only (each client renders its own view) —
 	/// trigger inside an [Rpc.Broadcast] for all clients. Attach to ANY GameObject; it drives the
-	/// camera itself and does not need to sit on the camera. Compile with trigger_hotload afterward.
+	/// camera itself and does not need to sit on the camera. Returns { created, path, className,
+	/// skipAction, lockInput, letterbox, nextSteps } — path is the generated .cs (letterbox lists the
+	/// overlay files when enabled). Follow with trigger_hotload, then get_compile_errors, then attach
+	/// via add_component_with_properties (component=className).
 	/// </summary>
 	/// <param name="name">Class name for the generated component. Defaults to 'CutsceneDirector'.</param>
 	/// <param name="directory">Subdirectory for the generated files. Defaults to 'Code'.</param>
@@ -118,7 +121,10 @@ public static class BridgeScaffoldPolishTools
 	/// audio per line — and OnDialogueFinished when the conversation ends. Pairs with
 	/// create_interactable to trigger dialogue on use. LOCAL-only (per-client HUD) — call StartDialogue
 	/// inside an [Rpc.Broadcast] if every client should see it. Attach the panel under a ScreenPanel
-	/// (add_screen_panel) so the HUD renders. Compile with trigger_hotload afterward.
+	/// (add_screen_panel) so the HUD renders. Returns { created, path, className, charsPerSecond,
+	/// advanceAction, panel, nextSteps } — panel lists the generated '&lt;Name&gt;Panel' HUD files.
+	/// Follow with trigger_hotload, then get_compile_errors, then attach both components via
+	/// add_component_with_properties.
 	/// </summary>
 	/// <param name="name">Class name for the generated dialogue component (the HUD panel is generated as '&lt;Name&gt;Panel'). Defaults to 'DialogueSystem'.</param>
 	/// <param name="directory">Subdirectory for the generated files. Defaults to 'Code'.</param>
@@ -160,7 +166,9 @@ public static class BridgeScaffoldPolishTools
 	/// model; cleaned up on disable. [Property] MaxDistance fades the tag out with distance,
 	/// HeightOffset floats it above the head, FontSize sizes it. Attach to the ROOT of your networked
 	/// player object. Pairs with create_networked_player (add it to the generated player prefab so
-	/// every remote player is labeled).
+	/// every remote player is labeled). Returns { created, path, className, maxDistance, heightOffset,
+	/// note, nextSteps }. Follow with trigger_hotload, then get_compile_errors, then attach via
+	/// add_component_with_properties (component=className).
 	/// </summary>
 	/// <param name="name">Class name for the generated component. Defaults to 'ProxyNametag'.</param>
 	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>

@@ -13,7 +13,7 @@ export function registerPrefabTools(
   // ── create_prefab ─────────────────────────────────────────────────
   server.tool(
     "create_prefab",
-    "Save an existing GameObject as a reusable .prefab file. The prefab can be instantiated later",
+    "Save an existing GameObject as a .prefab file. NOTE: this writes a minimal descriptor (name, enabled flag, component TYPE names) — component property values and children are NOT serialized, so it is a lightweight template rather than a full s&box prefab asset. Returns { created, path, sourceId } — pass path to instantiate_prefab or get_prefab_info.",
     {
       id: z.string().describe("GUID of the GameObject to save as prefab"),
       path: z
@@ -36,7 +36,7 @@ export function registerPrefabTools(
   // ── instantiate_prefab ────────────────────────────────────────────
   server.tool(
     "instantiate_prefab",
-    "Spawn a prefab instance into the active scene at an optional position and rotation",
+    "Spawn a prefab instance into the active scene at an optional position and rotation. NOTE: basic instantiation — it creates a new GameObject named after the prefab; components are NOT recreated from the file (the full s&box prefab pipeline isn't wired), so re-add them with add_component_with_properties. Returns { instantiated, prefab, gameObject, note } — gameObject.id is the new GUID for follow-up calls.",
     {
       path: z
         .string()
@@ -110,7 +110,7 @@ export function registerPrefabTools(
   // ── get_prefab_info ───────────────────────────────────────────────
   server.tool(
     "get_prefab_info",
-    "Get detailed information about a prefab file including its JSON contents and metadata",
+    "Get detailed information about a prefab file. Returns { path, name, size, modified, content } — content is the prefab's full raw JSON, so use this to inspect what a prefab actually contains before instantiate_prefab (find prefabs with list_prefabs).",
     {
       path: z
         .string()

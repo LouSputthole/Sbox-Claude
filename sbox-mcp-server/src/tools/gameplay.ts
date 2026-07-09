@@ -133,7 +133,7 @@ export function registerGameplayTools(
   // The win/lose primitive — turns "objects in a scene" into "a game with a goal".
   server.tool(
     "create_objective_system",
-    "Generate an ObjectiveManager component — the win/lose brain of a game. Tracks an objective (collect_all / reach_goal / survive_time / eliminate_all), fires a win, and handles a lose condition (fall below kill-Z / timer / out of lives). Self-contained C#; other systems call ObjectiveManager.Instance. Optionally placed as a scene singleton",
+    "Generate an ObjectiveManager component — the win/lose brain of a game. Tracks an objective (collect_all / reach_goal / survive_time / eliminate_all), fires a win, and handles a lose condition (fall below kill-Z / timer / out of lives). Self-contained C#; other systems call ObjectiveManager.Instance. Optionally placed as a scene singleton. Returns { created, path, className, gameObject, note } — gameObject is the placed singleton, or null with a note when the fresh type isn't in the TypeLibrary yet. Follow with trigger_hotload, then get_compile_errors; if placement was skipped, place with add_component_to_new_object after the hotload",
     {
       name: z
         .string()
@@ -376,7 +376,7 @@ export function registerGameplayTools(
   // -- create_pickup -----------------------------------------------------
   server.tool(
     "create_pickup",
-    "Generate a trigger-based collectible component. On enter by a tagged object it raises OnCollected (wire it to your objective/score system) and despawns. Optionally builds a visible pickup GameObject with a trigger SphereCollider (+ a model) in one call",
+    "Generate a trigger-based collectible component. On enter by a tagged object it raises OnCollected (wire it to your objective/score system) and despawns. Optionally builds a visible pickup GameObject with a trigger SphereCollider (+ a model) in one call. Returns { created, path, className, gameObject, note } — gameObject is the placed pickup (null unless placeInScene=true); a note flags when the component couldn't attach because the fresh type needs a hotload. Follow with trigger_hotload, then get_compile_errors",
     {
       name: z.string().optional().describe("Class name. Defaults to 'Pickup'"),
       directory: z
@@ -456,7 +456,7 @@ export function registerGameplayTools(
   // -- create_leaderboard_panel ------------------------------------------
   server.tool(
     "create_leaderboard_panel",
-    "Generate a Razor PanelComponent that fetches and displays a Sandbox.Services leaderboard derived from a stat name. Produces TWO files: {name}.razor and {name}.razor.scss. The panel auto-refreshes every 30 s, shows rank/displayName/value rows, handles loading state, and includes a BuildHash() override (razor-lint clean). Must be hosted under a ScreenPanel or WorldPanel. Stats must be configured for the project ident on sbox.game. Uses Leaderboards.Get(statName) + board.Refresh() -- the exact API from ServicesQueryHandler.",
+    "Generate a Razor PanelComponent that fetches and displays a Sandbox.Services leaderboard derived from a stat name. Produces TWO files: {name}.razor and {name}.razor.scss. The panel auto-refreshes every 30 s, shows rank/displayName/value rows, handles loading state, and includes a BuildHash() override (razor-lint clean). Must be hosted under a ScreenPanel or WorldPanel. Stats must be configured for the project ident on sbox.game. Uses Leaderboards.Get(statName) + board.Refresh() -- the exact API from ServicesQueryHandler. Returns { created, razorPath, scssPath, className, note }. Follow with trigger_hotload, then get_compile_errors, then host it via add_screen_panel (panelComponent=className).",
     {
       name: z.string().optional().describe("Class name for the panel component. Defaults to 'LeaderboardPanel'"),
       directory: z.string().optional().describe("Subdirectory for the generated files. Defaults to 'Code/UI'"),
@@ -496,7 +496,7 @@ export function registerGameplayTools(
   // -- create_stat_modifier_system ---------------------------------------
   server.tool(
     "create_stat_modifier_system",
-    "Generate an enum-keyed stat modifier system with three modifier layers: SET (highest-priority-wins hard override), ADD (summed bonuses), MULT (multiplied factors applied last). Modifier storage uses parallel private Lists of primitive types (serialization-safe). RemoveModifiersFrom(source) cleans up all mods from a buff/debuff source by reference. Static OnStatChanged(stat, value) event fires after every add/remove. Mined from RPG/buff/debuff patterns across shipped s&box games.",
+    "Generate an enum-keyed stat modifier system with three modifier layers: SET (highest-priority-wins hard override), ADD (summed bonuses), MULT (multiplied factors applied last). Modifier storage uses parallel private Lists of primitive types (serialization-safe). RemoveModifiersFrom(source) cleans up all mods from a buff/debuff source by reference. Static OnStatChanged(stat, value) event fires after every add/remove. Mined from RPG/buff/debuff patterns across shipped s&box games. Returns { created, path, className, stats, placedOn, note } — stats echoes the sanitized stat names ({name}Stat enum values); placedOn is the target GameObject when attached (needs the type hotloaded). Follow with trigger_hotload, then get_compile_errors.",
     {
       name: z.string().optional().describe("Class name prefix -- generates {name}Stat enum + {name} Component. Defaults to 'StatSystem'"),
       directory: z.string().optional().describe("Subdirectory for the .cs file. Defaults to 'Code'"),

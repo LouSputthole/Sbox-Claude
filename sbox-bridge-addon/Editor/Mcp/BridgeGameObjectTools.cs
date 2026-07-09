@@ -16,7 +16,9 @@ public static class BridgeGameObjectTools
 {
 	/// <summary>
 	/// Align several GameObjects on one axis so they share a coordinate. mode = first (match the first
-	/// object), min, max, or average.
+	/// object), min, max, or average; defaults to first. Returns { aligned, axis, mode, target } —
+	/// aligned is the object count and target the shared coordinate; verify positions with
+	/// get_scene_hierarchy or a screenshot.
 	/// </summary>
 	/// <param name="ids">GUIDs of the GameObjects to align (&gt;= 2).</param>
 	/// <param name="axis">Axis to align on. One of: x | y | z.</param>
@@ -47,7 +49,8 @@ public static class BridgeGameObjectTools
 
 	/// <summary>
 	/// Evenly space GameObjects along an axis between the lowest and highest (keeps the two ends fixed,
-	/// spreads the rest evenly).
+	/// spreads the rest evenly). Returns { distributed, axis, from, to } — the object count and the
+	/// fixed end coordinates the rest were spread between.
 	/// </summary>
 	/// <param name="ids">GUIDs of the GameObjects to distribute (&gt;= 3).</param>
 	/// <param name="axis">Axis to distribute along. One of: x | y | z.</param>
@@ -56,7 +59,9 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "distribute_objects", McpGate.Args( ( "ids", ids ), ( "axis", axis ) ) );
 
 	/// <summary>
-	/// Clone a GameObject with all its components. Optionally offset position or rename.
+	/// Clone a GameObject with all its components. Returns { duplicated, original, gameObject } —
+	/// gameObject.id is the clone's new GUID; pass it to set_transform / add_component_with_properties.
+	/// If offset is omitted the clone lands exactly on top of the original.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to duplicate.</param>
 	/// <param name="name">New name for the clone.</param>
@@ -80,8 +85,10 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "find_objects", McpGate.Args( ( "name", name ), ( "component", component ), ( "tag", tag ), ( "limit", limit ) ) );
 
 	/// <summary>
-	/// Move the editor camera to focus on a specific GameObject (like double-clicking in the
-	/// hierarchy).
+	/// Highlight a GameObject by selecting it in the editor. NOTE: s&amp;box exposes no dedicated focus
+	/// API, so this only sets the selection — it does NOT move any camera (returns { focused, id, note
+	/// } saying so). To actually point the viewport at an object use frame_camera; to aim a screenshot
+	/// use screenshot_from.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to focus.</param>
 	[McpTool( "focus_object" )]
@@ -89,9 +96,11 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "focus_object", McpGate.Args( ( "id", id ) ) );
 
 	/// <summary>
-	/// Get a GameObject's world-space bounding box — center, size, extents, mins/maxs, and a radius.
-	/// Useful for placing/framing objects and sizing camera moves. Reads GameObject.GetBounds();
-	/// objects with no renderer report empty:true with their world position.
+	/// Get a GameObject's world-space bounding box. Returns { id, name, center, size, extents, mins,
+	/// maxs, radius, position, empty } — objects with no renderer report empty:true (bounds collapse to
+	/// the world position) plus an explanatory note. Feed center/radius into screenshot_from or
+	/// frame_camera to frame the object, or use mins/maxs for placement math (screenshot_orbit calls
+	/// this internally).
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to measure.</param>
 	[McpTool.ReadOnly( "get_bounds" )]
@@ -110,7 +119,10 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "get_scene_hierarchy", McpGate.Args( ( "maxDepth", maxDepth ), ( "rootId", rootId ) ) );
 
 	/// <summary>
-	/// Get the GameObjects currently selected by the user in the s&amp;box editor.
+	/// Get the GameObjects currently selected by the user in the s&amp;box editor. Returns { count,
+	/// selected } where each entry is a serialized GameObject (id, name, enabled, position, rotation,
+	/// scale, components, childCount) — use the ids with set_transform, add_component_with_properties,
+	/// etc. Handy for 'do X to what I have selected' requests.
 	/// </summary>
 	[McpTool.ReadOnly( "get_selected_objects" )]
 	public static Task<object> GetSelectedObjects()
@@ -163,7 +175,9 @@ public static class BridgeGameObjectTools
 
 	/// <summary>
 	/// Add natural variation to existing objects: random yaw and/or random uniform scale within a
-	/// range. Great for breaking up repetition in placed foliage/rocks/crates. Seeded.
+	/// range. Great for breaking up repetition in placed foliage/rocks/crates. Seeded — the same seed
+	/// reproduces the same layout. Returns { randomized, seed } (the count of objects changed); scale
+	/// only varies when scaleMax &gt; scaleMin.
 	/// </summary>
 	/// <param name="ids">GUIDs of the GameObjects to randomize.</param>
 	/// <param name="randomYaw">Randomize Z rotation (default true).</param>
@@ -175,7 +189,9 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "randomize_transforms", McpGate.Args( ( "ids", ids ), ( "randomYaw", randomYaw ), ( "scaleMin", scaleMin ), ( "scaleMax", scaleMax ), ( "seed", seed ) ) );
 
 	/// <summary>
-	/// Change the display name of a GameObject.
+	/// Change the display name of a GameObject identified by its GUID (the GUID itself never changes,
+	/// so existing references stay valid). Returns { renamed, id, oldName, newName }. Name-based
+	/// lookups (e.g. find_objects) will see the new name immediately.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="name">New display name.</param>
@@ -196,7 +212,10 @@ public static class BridgeGameObjectTools
 	/// <summary>
 	/// Scatter N copies of a model randomly within a radius around a center point — instant foliage,
 	/// rocks, debris. Each copy gets a random yaw and (by default) is snapped to the ground. Seeded for
-	/// reproducibility; copies are grouped under one parent by default. Count capped at 300.
+	/// reproducibility; copies are grouped under one parent by default. Count capped at 300. Returns {
+	/// scattered, groupId, seed } — individual prop GUIDs are not returned, so use groupId with
+	/// get_scene_hierarchy (rootId) to enumerate them, or with set_transform/delete_gameobject to
+	/// move/remove the whole batch.
 	/// </summary>
 	/// <param name="model">Model path to scatter, e.g. 'models/dev/box.vmdl'.</param>
 	/// <param name="center">Centre of the scatter area (default origin). As "x,y,z" (or JSON {x,y,z}).</param>
@@ -215,7 +234,9 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "scatter_props", McpGate.Args( ( "model", model ), ( "center", center ), ( "radius", radius ), ( "count", count ), ( "randomYaw", randomYaw ), ( "snapToGround", snapToGround ), ( "scaleMin", scaleMin ), ( "scaleMax", scaleMax ), ( "tint", tint ), ( "seed", seed ), ( "group", group ), ( "name", name ) ) );
 
 	/// <summary>
-	/// Select a GameObject in the editor (highlights it in the hierarchy and scene view).
+	/// Select a GameObject in the editor (highlights it in the hierarchy and scene view). Replaces the
+	/// current selection unless addToSelection=true. Returns { selected, id }; confirm the result with
+	/// get_selected_objects.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to select.</param>
 	/// <param name="addToSelection">If true, adds to current selection instead of replacing it.</param>
@@ -224,7 +245,8 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "select_object", McpGate.Args( ( "id", id ), ( "addToSelection", addToSelection ) ) );
 
 	/// <summary>
-	/// Enable or disable a GameObject (disabled objects are invisible and inactive).
+	/// Enable or disable a GameObject (disabled objects are invisible and inactive, including their
+	/// components and children). Returns { id, enabled } confirming the new state.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="enabled">true to enable, false to disable.</param>
@@ -268,7 +290,10 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "set_tint", McpGate.Args( ( "id", id ), ( "ids", ids ), ( "tint", tint ), ( "color", color ) ) );
 
 	/// <summary>
-	/// Set position, rotation, and/or scale on a GameObject. Only provided values are changed.
+	/// Set position, rotation, and/or scale on a GameObject. Only provided values are changed; values
+	/// apply in world space unless local=true. Returns { transformed, gameObject } with the full
+	/// serialized object (id, name, position, rotation, scale, components) so you can verify what
+	/// actually applied.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="position">New position. As "x,y,z" (or JSON {x,y,z}).</param>
@@ -282,7 +307,8 @@ public static class BridgeGameObjectTools
 	/// <summary>
 	/// Drop a GameObject straight down onto the surface below it (physics raycast). Works best on
 	/// collider-less props (an object with its own collider may self-hit). Optional offset lifts it off
-	/// the surface.
+	/// the surface. Returns { snapped, groundZ, gameObject } with the object's updated transform — or {
+	/// snapped: false, reason } (not an error) when no ground was hit below.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to snap.</param>
 	/// <param name="offset">Height above the surface to place it (default 0).</param>

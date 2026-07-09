@@ -2548,31 +2548,71 @@ public class CreateSoundEventHandler : IBridgeHandler
 	public Task<object> Execute( JsonElement p )
 	{
 		var rootPath = Project.Current.GetRootPath();
-		var name     = p.GetProperty( "name" ).GetString();
-		var subdir   = p.TryGetProperty( "directory", out var d ) ? d.GetString() : "Sounds";
 
-		var fileName = name.EndsWith( ".sound" ) ? name : $"{name}.sound";
-		if ( !ClaudeBridge.TryResolveProjectPath( Path.Combine( subdir, fileName ), out var fullPath, out var pathErr ) )
+		// Preferred: a full project-relative "path" (what the MCP schema sends).
+		// Legacy fallback: "name" + optional "directory" (pre-v2 callers).
+		string relRequested;
+		if ( p.TryGetProperty( "path", out var pathProp ) )
+		{
+			relRequested = pathProp.GetString();
+			if ( !relRequested.EndsWith( ".sound" ) ) relRequested += ".sound";
+		}
+		else if ( p.TryGetProperty( "name", out var nameProp ) )
+		{
+			var name   = nameProp.GetString();
+			var subdir = p.TryGetProperty( "directory", out var d ) ? d.GetString() : "Sounds";
+			var fileName = name.EndsWith( ".sound" ) ? name : $"{name}.sound";
+			relRequested = Path.Combine( subdir, fileName );
+		}
+		else
+			return Task.FromResult<object>( new { error = "path (e.g. 'sounds/footstep.sound') is required" } );
+
+		if ( !ClaudeBridge.TryResolveProjectPath( relRequested, out var fullPath, out var pathErr ) )
 			return Task.FromResult<object>( new { error = pathErr } );
 
 		if ( File.Exists( fullPath ) )
-			return Task.FromResult<object>( new { error = $"Sound already exists: {subdir}/{fileName}" } );
+			return Task.FromResult<object>( new { error = $"Sound already exists: {relRequested}" } );
 
 		Directory.CreateDirectory( Path.GetDirectoryName( fullPath ) );
 
+		// Field names/format verified against real .sound files + describe_type SoundEvent:
+		// Volume/Pitch are RangedFloat (plain "1" string works), Sounds is the .vsnd list,
+		// Distance is the max audible distance. SoundEvent has NO loop/min-distance fields.
 		var volume = p.TryGetProperty( "volume", out var v ) ? v.GetSingle() : 1.0f;
-		var soundJson = JsonSerializer.Serialize( new
-		{
-			__version  = 0,
-			Sounds     = Array.Empty<object>(),
-			Volume     = volume,
-			Pitch      = 1.0f,
-			Attenuation = 1.0f
-		}, new JsonSerializerOptions { WriteIndented = true } );
+		var pitch  = p.TryGetProperty( "pitch", out var pit ) ? pit.GetSingle() : 1.0f;
+		var sounds = p.TryGetProperty( "sound", out var s ) && !string.IsNullOrWhiteSpace( s.GetString() )
+			? new[] { s.GetString().Replace( '\\', '/' ) }
+			: Array.Empty<string>();
+		bool hasDistance = p.TryGetProperty( "maxDistance", out var dist );
 
-		File.WriteAllText( fullPath, soundJson );
+		var evt = new Dictionary<string, object>
+		{
+			["UI"] = false,
+			["Volume"] = volume.ToString( System.Globalization.CultureInfo.InvariantCulture ),
+			["Pitch"] = pitch.ToString( System.Globalization.CultureInfo.InvariantCulture ),
+			["Decibels"] = 70,
+			["SelectionMode"] = "Random",
+			["Sounds"] = sounds,
+			["__references"] = Array.Empty<object>(),
+			["__version"] = 1
+		};
+		if ( hasDistance )
+		{
+			evt["DistanceAttenuation"] = true;
+			evt["Distance"] = dist.GetSingle();
+		}
+
+		File.WriteAllText( fullPath, JsonSerializer.Serialize( evt, new JsonSerializerOptions { WriteIndented = true } ) );
 		var relativePath = Path.GetRelativePath( rootPath, fullPath ).Replace( '\\', '/' );
-		return Task.FromResult<object>( new { created = true, path = relativePath } );
+		return Task.FromResult<object>( new
+		{
+			created = true,
+			path = relativePath,
+			soundReferenced = sounds.Length > 0,
+			note = sounds.Length > 0
+				? "Sound event written with the source .vsnd wired. Preview with play_sound_preview or attach with assign_sound."
+				: "Sound event written with an EMPTY Sounds list — pass 'sound' (a .vsnd path) or edit the file to wire one."
+		} );
 	}
 }
 

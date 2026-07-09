@@ -34,7 +34,8 @@ public static class BridgeCharacterTools
 	/// <summary>
 	/// Add ModelPhysics to a skinned model so it becomes a ragdoll (physics-driven bones). NOTE: the
 	/// ragdoll only flops in PLAY mode — it won't move in the static editor view, so this one is
-	/// verified structurally, not by screenshot.
+	/// verified structurally, not by screenshot. Returns { ragdoll, note, gameObject } — check
+	/// gameObject.components for ModelPhysics, then verify at runtime with start_play + capture_view.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject with a SkinnedModelRenderer.</param>
 	/// <param name="motionEnabled">Whether physics bodies start with motion enabled.</param>
@@ -97,7 +98,9 @@ public static class BridgeCharacterTools
 	/// <summary>
 	/// Pose a Citizen by setting CitizenAnimationHelper params (enables PlayAnimationsInEditorScene so
 	/// the pose shows in-editor). Set holdType (None/Pistol/Rifle/Shotgun/HoldItem/Punch/Swing),
-	/// moveStyle (Auto/Walk/Run), specialMove, sitting (bool), and/or duckLevel (0-1).
+	/// moveStyle (Auto/Walk/Run), specialMove, sitting (bool), and/or duckLevel (0-1). Returns { posed,
+	/// changed:[...], gameObject } — changed lists which helper params were applied; take_screenshot to
+	/// verify the pose.
 	/// </summary>
 	/// <param name="id">GUID of the Citizen GameObject (must have a CitizenAnimationHelper).</param>
 	/// <param name="holdType">Hold pose, e.g. None, Pistol, Rifle, Shotgun, HoldItem.</param>
@@ -113,7 +116,9 @@ public static class BridgeCharacterTools
 	/// Set an AnimationGraph parameter on a GameObject's SkinnedModelRenderer (calls Set). This drives
 	/// Citizen/animgraph motion — e.g. 'move_x'/'move_y' (float), 'b_grounded'/'b_ducked' (bool), or a
 	/// Vector3. Pose previews in-editor when PlayAnimationsInEditorScene is on; screenshot to verify.
-	/// Param names are defined by the model's animation graph.
+	/// Param names are defined by the model's animation graph — use list_animations to check whether
+	/// the model is animgraph-driven. Returns { set, param, kind, note } — kind is the type actually
+	/// applied (float/int/bool/vector).
 	/// </summary>
 	/// <param name="id">GUID of the GameObject with a SkinnedModelRenderer.</param>
 	/// <param name="param">Animgraph parameter name, e.g. 'move_x', 'b_grounded'.</param>
@@ -125,7 +130,9 @@ public static class BridgeCharacterTools
 
 	/// <summary>
 	/// Show/hide a bodygroup on a SkinnedModelRenderer (e.g. hide hands when holding a tool, swap head
-	/// variants). Provide value (int index) or choice (string name).
+	/// variants). Provide value (int index) or choice (string name). Returns { set, bodygroup } on
+	/// success (errors if the object has no SkinnedModelRenderer or neither value nor choice is given);
+	/// take_screenshot to verify the visual change.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject with a SkinnedModelRenderer.</param>
 	/// <param name="name">Bodygroup name.</param>
@@ -138,7 +145,8 @@ public static class BridgeCharacterTools
 	/// <summary>
 	/// Set a facial morph (blendshape) on a skinned model — e.g. smile, frown, blink. Call with NO
 	/// morph to list the model's available morph names (returned as availableMorphs). weight is
-	/// typically 0-1.
+	/// typically 0-1. Returns { set, morph, weight, availableMorphs } — availableMorphs is included in
+	/// every response, so a wrong name can be corrected without an extra listing call.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject with a SkinnedModelRenderer.</param>
 	/// <param name="morph">Morph/blendshape name (omit to list available morphs).</param>
@@ -166,8 +174,9 @@ public static class BridgeCharacterTools
 	/// <summary>
 	/// Spawn an animated Citizen character: a SkinnedModelRenderer with the Citizen model, plus (by
 	/// default) a CitizenAnimationHelper so it idles. PlayAnimationsInEditorScene is enabled so the
-	/// idle pose shows in the editor view (screenshot-verifiable). Dress it afterward with
-	/// dress_citizen, pose it with pose_citizen.
+	/// idle pose shows in the editor view (screenshot-verifiable). Returns { created, hasAnimator,
+	/// gameObject:{ id, name, position, components, ... } } — pass gameObject.id to the follow-ups:
+	/// dress_citizen, pose_citizen, set_expression, equip_model.
 	/// </summary>
 	/// <param name="name">GameObject name (default 'Citizen').</param>
 	/// <param name="model">Override the skinned model (default 'models/citizen/citizen.vmdl').</param>

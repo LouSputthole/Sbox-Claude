@@ -15,11 +15,13 @@ using Editor.Mcp;
 public static class BridgeValidationTools
 {
 	/// <summary>
-	/// Inspect the live networking contract of a GameObject: Network.Owner/IsProxy/IsOwner/Active,
-	/// OwnerTransfer + OrphanedMode, and every component's [Sync] property names, SyncFlags, and
-	/// current values (host vs proxy). Unlike get_network_status (session-only), this is per-object —
-	/// the way to verify a host-authoritative or ownership change actually replicated. Works in edit or
-	/// play mode.
+	/// Inspect the live networking contract of a GameObject. Returns {id, name, network: {active,
+	/// isProxy, isOwner, isCreator, ownerId, ownerSteamId, ownerTransfer, orphaned, flags}, components:
+	/// [{component, fields: [{name, type, isSync, syncFlags, value}]}]} — by default only [Sync]-marked
+	/// fields are listed (components with none are omitted). Unlike get_network_status (session-only),
+	/// this is per-object — the way to verify a host-authoritative or ownership change actually
+	/// replicated; works in edit or play mode. Follow up with set_ownership to change the owner, or
+	/// networking_lint to find the code-level cause of a bad [Sync] value.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to inspect.</param>
 	/// <param name="allProps">Include all component properties, not just [Sync]-marked ones.</param>
@@ -69,11 +71,13 @@ public static class BridgeValidationTools
 
 	/// <summary>
 	/// Inspect the game's FileSystem.Data save files — the assistant is otherwise blind to persisted
-	/// state. action='list' enumerates files under a folder (with size/mtime); action='read' dumps a
-	/// save file's JSON; action='diff' compares two save files key-by-key. Use to verify a save
-	/// actually wrote, debug a load/migration, or confirm a sanitize/clamp ran.
+	/// state. action='list' (default) returns `directories` and `files` [{name, path, size}] under
+	/// `path` (omit path for the Data root); action='read' returns {path, length, content}, truncating
+	/// content at 60,000 chars; action='diff' compares two save files key-by-key, returning `diffCount`
+	/// and up to 200 `diffs` [{key, change: added|removed|changed}]. Use to verify a save actually
+	/// wrote, debug a load/migration, or confirm a sanitize/clamp ran.
 	/// </summary>
-	/// <param name="action"> One of: list | read | diff. Default: "list".</param>
+	/// <param name="action">'list' (default) enumerates a folder; 'read' dumps one file's JSON; 'diff' compares `path` vs `pathB`. One of: list | read | diff. Default: "list".</param>
 	/// <param name="path">File or folder path under FileSystem.Data (e.g. 'lumber_corp2_progress' or '&lt;folder&gt;/steam_123.json').</param>
 	/// <param name="pathB">Second file path for action='diff'.</param>
 	[McpTool.ReadOnly( "save_inspect" )]
@@ -93,11 +97,13 @@ public static class BridgeValidationTools
 
 	/// <summary>
 	/// Read from Sandbox.Services — the cloud stats/leaderboard layer many games use as their real DB.
-	/// action='stats' lists/reads the project's stat definitions and the local player's values;
-	/// action='leaderboard' fetches a leaderboard board's top entries. Read-only. Use to verify a
-	/// Stats.Increment/SetValue path or a leaderboard wired correctly.
+	/// action='stats' with `name` returns the local player's stat {ident, value, sum, min, max,
+	/// lastValue, valueString}; without `name` it returns only the package ident plus a usage note (it
+	/// does NOT list stat definitions). action='leaderboard' (name required) returns {board,
+	/// displayName, totalEntries, count, entries} with at most `limit` entries (default 10). Read-only;
+	/// use to verify a Stats.Increment/SetValue path or a leaderboard wired correctly.
 	/// </summary>
-	/// <param name="action"> One of: stats | leaderboard. Default: "stats".</param>
+	/// <param name="action">'stats' (default) reads a local-player stat by `name`; 'leaderboard' fetches a board's top entries. One of: stats | leaderboard. Default: "stats".</param>
 	/// <param name="name">Stat name (action='stats') or leaderboard/board name (action='leaderboard').</param>
 	/// <param name="limit">Max leaderboard entries to return.</param>
 	[McpTool.ReadOnly( "services_query" )]
@@ -105,8 +111,11 @@ public static class BridgeValidationTools
 		=> McpGate.Run( "services_query", McpGate.Args( ( "action", action ), ( "name", name ), ( "limit", limit ) ) );
 
 	/// <summary>
-	/// Validate that the project is ready for publishing. Checks: compile errors, metadata
-	/// completeness, scenes, scripts, thumbnail, and project type.
+	/// Validate that the project is ready for publishing. Runs four checks: .sbproj exists, at least
+	/// one scene, project Ident set, project Title set. Returns { valid, issueCount, issues, checks } —
+	/// issues are human-readable problems and each checks entry has { check, pass, detail }; fix
+	/// metadata gaps with set_project_config (it does NOT check compile errors — use get_compile_errors
+	/// for that).
 	/// </summary>
 	[McpTool.ReadOnly( "validate_project" )]
 	public static Task<object> ValidateProject()

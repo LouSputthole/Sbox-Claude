@@ -32,7 +32,7 @@ export function registerDiscoveryTools(
   // ── list_libraries ───────────────────────────────────────────────
   server.tool(
     "list_libraries",
-    "List the s&box libraries/addons installed in this project (reads Libraries/ + each .sbproj). Discovers what's available to build ON — e.g. character controllers (fish.scc = Shrimple Character Controller, facepunch.playercontroller), world/spline/road tools — so you can leverage an installed library (add its components via add_component_with_properties, or generate code against its API) instead of writing from scratch. Returns ident/org/title/type/enabled per library. Read-only.",
+    "List the s&box libraries/addons installed in this project (reads Libraries/ + each .sbproj). Discovers what's available to build ON — e.g. character controllers (fish.scc = Shrimple Character Controller, facepunch.playercontroller), world/spline/road tools — so you can leverage an installed library (add its components via add_component_with_properties, or generate code against its API) instead of writing from scratch. Returns `count` and `libraries` [{folder, ident, org, title, type, enabled}] — ALL libraries, no limit or pagination; `enabled` is false when the library's .sbproj has been disabled (renamed .sbproj.disabled). Read-only.",
     {},
     async () => {
       const res = await bridge.send("list_libraries", {});
@@ -44,15 +44,15 @@ export function registerDiscoveryTools(
   // ── search_types ─────────────────────────────────────────────────
   server.tool(
     "search_types",
-    "Find types matching a name pattern. Pass components_only=true to filter to Component subclasses only. Useful for discovering 'is there a built-in X for this?'",
+    "Find loaded types matching a name pattern. Useful for discovering 'is there a built-in X for this?'. Returns `count` and `matches` with each type's name, fullName, isComponent, and isAbstract — results are silently truncated at `limit` (default 50), so narrow the pattern if you hit the cap. Pass a match's name to describe_type for its full member surface.",
     {
       pattern: z.string().describe("Substring to match against type name (case-insensitive)"),
       namespace: z
         .string()
         .optional()
         .describe("Optional namespace filter (case-insensitive substring)"),
-      components_only: z.boolean().default(false),
-      limit: z.number().int().default(50),
+      components_only: z.boolean().default(false).describe("Only return Component subclasses (default false)"),
+      limit: z.number().int().default(50).describe("Maximum matches to return (default 50); the search stops silently at this cap"),
     },
     async (params) => {
       const res = await bridge.send("search_types", params);
@@ -79,11 +79,11 @@ export function registerDiscoveryTools(
   // ── find_in_project ──────────────────────────────────────────────
   server.tool(
     "find_in_project",
-    "Grep the user's s&box project for a symbol. Returns file paths and line numbers. Useful for finding usage examples of an API or seeing how the project already does something.",
+    "Grep the user's s&box project for a symbol (case-sensitive substring; skips .git/bin/obj). Useful for finding usage examples of an API or seeing how the project already does something. Returns `symbol`, `count`, and `results` [{file, line, text}], capped at `max_results` (default 25) — raise it if you may be missing hits. Follow up with read_file on a result's file path.",
     {
       symbol: z.string().describe("Substring or symbol to search for"),
       extension: z.string().default(".cs").describe("File extension filter"),
-      max_results: z.number().int().default(25),
+      max_results: z.number().int().default(25).describe("Maximum hits to return (default 25); the search stops once reached"),
     },
     async (params) => {
       const res = await bridge.send("find_in_project", params);

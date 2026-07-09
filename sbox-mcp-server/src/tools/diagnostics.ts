@@ -322,7 +322,7 @@ export function registerDiagnosticTools(
   // ── console_run ──────────────────────────────────────────────────── (bridge)
   server.tool(
     "console_run",
-    "Run an s&box console command / ConCmd via Sandbox.ConsoleSystem.Run — e.g. a cvar ('sv_cheats 1') or a registered command. Also the invocation primitive behind execute_csharp.",
+    "Run an s&box console command / ConCmd via Sandbox.ConsoleSystem.Run — e.g. a cvar ('sv_cheats 1') or a registered command. Also the invocation primitive behind execute_csharp. Fire-and-forget: returns only { ran, command } and does NOT capture console output — follow with read_log to see what the command printed.",
     {
       command: z.string().describe("The console command line to run"),
     },
@@ -359,15 +359,17 @@ export function registerDiagnosticTools(
       const cmd = `claude_exec_${id}`;
       const filePath = `Editor/__Exec_${id}.cs`;
       const marker = `[EXEC ${id}]`;
+      // Bare `Log` (via `using Sandbox;`), NOT `Sandbox.Log` — the latter stopped
+      // resolving in project editor assemblies on engine 26.07.08b and broke every call.
       const inner = params.expression
-        ? `var __r = (${params.code});\n\t\t\tSandbox.Log.Info( "${marker} RESULT=" + System.Text.Json.JsonSerializer.Serialize( __r ) );`
-        : `${params.code}\n\t\t\tSandbox.Log.Info( "${marker} DONE" );`;
+        ? `var __r = (${params.code});\n\t\t\tLog.Info( "${marker} RESULT=" + System.Text.Json.JsonSerializer.Serialize( __r ) );`
+        : `${params.code}\n\t\t\tLog.Info( "${marker} DONE" );`;
       const cs =
         `using Editor;\nusing Sandbox;\nusing System;\n\n` +
         `public static class __Exec_${id}\n{\n` +
         `\t[ConCmd( "${cmd}" )]\n\tpublic static void Run()\n\t{\n` +
         `\t\ttry\n\t\t{\n\t\t\t${inner}\n\t\t}\n` +
-        `\t\tcatch ( System.Exception __e ) { Sandbox.Log.Error( "${marker} ERROR=" + __e.Message ); }\n` +
+        `\t\tcatch ( System.Exception __e ) { Log.Error( "${marker} ERROR=" + __e.Message ); }\n` +
         `\t}\n}\n`;
       const timeout = params.timeoutMs ?? 20000;
 
@@ -442,7 +444,7 @@ export function registerDiagnosticTools(
   // ── get_bounds ─────────────────────────────────────────────────────── (bridge, Batch 33)
   server.tool(
     "get_bounds",
-    "Get a GameObject's world-space bounding box — center, size, extents, mins/maxs, and a radius. Useful for placing/framing objects and sizing camera moves. Reads GameObject.GetBounds(); objects with no renderer report empty:true with their world position.",
+    "Get a GameObject's world-space bounding box. Returns { id, name, center, size, extents, mins, maxs, radius, position, empty } — objects with no renderer report empty:true (bounds collapse to the world position) plus an explanatory note. Feed center/radius into screenshot_from or frame_camera to frame the object, or use mins/maxs for placement math (screenshot_orbit calls this internally).",
     {
       id: z.string().describe("GUID of the GameObject to measure"),
     },

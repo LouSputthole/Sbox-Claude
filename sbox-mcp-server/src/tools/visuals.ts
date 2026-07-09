@@ -93,7 +93,7 @@ export function registerVisualTools(server: McpServer, bridge: BridgeClient): vo
   // ── set_fog ────────────────────────────────────────────────────────
   server.tool(
     "set_fog",
-    "Add or update fog in the active scene. Types: 'gradient' (distance haze — great for mood/horror), 'cubemap' (sky-tinted distance fog), 'volumetric' (a localized fog volume). Re-running on the same target updates it rather than duplicating.",
+    "Add or update fog in the active scene. Types: 'gradient' (distance haze — great for mood/horror), 'cubemap' (sky-tinted distance fog), 'volumetric' (a localized fog volume). Re-running with the same targetId updates it rather than duplicating; without targetId each call creates a new fog object. Returns { created, type, gameObject } — gameObject.id addresses the fog object for later set_property/delete_gameobject; screenshot to verify the look.",
     {
       type: z
         .enum(["gradient", "cubemap", "volumetric"])
@@ -160,7 +160,7 @@ export function registerVisualTools(server: McpServer, bridge: BridgeClient): vo
   // ── set_skybox ───────────────────────────────────────────────────────
   server.tool(
     "set_skybox",
-    "Set the scene's 2D skybox tint / indirect lighting (re-uses an existing SkyBox2D or creates one). Darken the tint for night/dusk. Optionally point it at a .vmat sky material.",
+    "Set the scene's 2D skybox tint / indirect lighting (re-uses an existing SkyBox2D or creates one). Darken the tint for night/dusk. Optionally point it at a .vmat sky material (silently kept as-is if the material fails to load). Returns { created, gameObject } — gameObject.id is the sky object; screenshot to verify the change.",
     {
       tint: ColorSchema.optional().describe("Sky tint colour"),
       indirectLighting: z
@@ -184,7 +184,7 @@ export function registerVisualTools(server: McpServer, bridge: BridgeClient): vo
   // ── apply_atmosphere (preset) ─────────────────────────────────────────
   server.tool(
     "apply_atmosphere",
-    "One-call scene mood: composes ambient + directional light, gradient fog, and a camera post-fx stack (tonemap + colour grade + vignette) tuned for the chosen mood. Idempotent — re-runs update the same 'Atmosphere *' objects.",
+    "One-call scene mood: composes ambient + directional light, gradient fog, and a camera post-fx stack (tonemap + colour grade + vignette) tuned for the chosen mood. Idempotent — re-runs update the same 'Atmosphere *' objects. Returns { applied, mood, components, postFxCamera } — the post-fx stack is only applied when a camera exists (postFxCamera is null otherwise; add a camera and re-run). Screenshot to verify.",
     {
       mood: z
         .enum(["horror-night", "foggy-dawn", "overcast", "warm-interior"])
@@ -204,7 +204,7 @@ export function registerVisualTools(server: McpServer, bridge: BridgeClient): vo
   // ── apply_post_fx_look (preset) ───────────────────────────────────────
   server.tool(
     "apply_post_fx_look",
-    "Apply just a camera post-processing look (no lights/fog): cinematic (tonemap + bloom + soft vignette), filmic-horror (desaturated, high-contrast, heavy vignette, film grain), or clean (tonemap only).",
+    "Apply just a camera post-processing look (no lights/fog): cinematic (tonemap + bloom + soft vignette), filmic-horror (desaturated, high-contrast, heavy vignette, film grain), or clean (tonemap only). Errors if the scene has no CameraComponent. Returns { applied, look, components, camera } listing the effect components added to the main camera — tune them individually afterwards with add_post_process.",
     {
       look: z
         .enum(["cinematic", "filmic-horror", "clean"])
@@ -224,7 +224,7 @@ export function registerVisualTools(server: McpServer, bridge: BridgeClient): vo
   // ── add_envmap_probe ─────────────────────────────────────────────────
   server.tool(
     "add_envmap_probe",
-    "Add an environment reflection/ambient probe (EnvmapProbe) at a position with a cubic influence volume — captures local reflections and indirect light for nearby surfaces.",
+    "Add an environment reflection/ambient probe (EnvmapProbe) at a position with a cubic influence volume — captures local reflections and indirect light for nearby surfaces. IMPORTANT: a placed probe captures NOTHING until baked — follow with bake_reflections. Returns { created, gameObject } — gameObject.id is the probe object's GUID.",
     {
       name: z.string().optional().describe("GameObject name"),
       position: Vector3Schema.optional().describe("World position (centre of the probe)"),
@@ -249,7 +249,7 @@ export function registerVisualTools(server: McpServer, bridge: BridgeClient): vo
   // ── spawn_particle (Batch 18: VFX) ───────────────────────────────────
   server.tool(
     "spawn_particle",
-    "Spawn an additive particle effect (no texture asset needed): kind = fire (rising flame), embers (slow drifting glow), or sparks (a one-shot burst). Renders as tinted glowing dots — great for campfires, torches, and impacts. (smoke needs a soft sprite; not in v1.)",
+    "EXPERIMENTAL — build an additive runtime ParticleEffect (no texture asset needed): kind = fire, embers, sparks, magic, dust, blood, or snow ('smoke' returns an error). Returns { created, kind, gameObject } — the component graph is created, but this runtime particle path has NOT been verified to render through the bridge; for particles you can actually see, prefer spawn_vpcf.",
     {
       kind: z
         .enum(["fire", "embers", "sparks", "magic", "dust", "blood", "snow"])
@@ -295,7 +295,7 @@ export function registerVisualTools(server: McpServer, bridge: BridgeClient): vo
   // ── add_beam ─────────────────────────────────────────────────────────
   server.tool(
     "add_beam",
-    "Create an energy/laser beam (BeamEffect) from a position to a target point — additive, tintable. Good for lasers, tracers, magic beams.",
+    "EXPERIMENTAL — create an energy/laser beam (BeamEffect) from a position to a target point (default: 128u straight up) — additive, tintable. Returns { created, gameObject } — gameObject.id is the beam object's GUID. Like the other runtime particle tools, rendering through the bridge is unverified; use spawn_vpcf when you need a guaranteed-visible effect.",
     {
       position: Vector3Schema.optional().describe("Beam start (world position of the beam object)"),
       target: Vector3Schema.optional().describe("Beam end point in world space (default: 128u up)"),
@@ -373,7 +373,7 @@ export function registerVisualTools(server: McpServer, bridge: BridgeClient): vo
   // ── bake_reflections ────────────────────────────────────────────────
   server.tool(
     "bake_reflections",
-    "Bake all EnvmapProbe reflection probes in the scene (EnvmapProbe.BakeAll) so they actually capture their surroundings — placing a probe with add_envmap_probe does nothing visible until it's baked. This is a real editor compute step, not a component setter. Runs async; re-screenshot after a moment to see reflections appear on shiny surfaces.",
+    "Bake all EnvmapProbe reflection probes in the scene (EnvmapProbe.BakeAll) so they actually capture their surroundings — placing a probe with add_envmap_probe does nothing visible until it's baked. This is a real editor compute step, not a component setter. Runs async — returns { baking, count, note, probes } immediately (each probe: id, name, mode, hasBaked), or { baked: false, count: 0 } when the scene has no probes; re-screenshot after a moment to see reflections appear.",
     {},
     async (params) => {
       const res = await bridge.send("bake_reflections", params);

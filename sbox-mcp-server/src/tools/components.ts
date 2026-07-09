@@ -38,7 +38,7 @@ export function registerComponentTools(
   // ── get_all_properties ───────────────────────────────────────────
   server.tool(
     "get_all_properties",
-    "Dump all public properties of every component on a GameObject as JSON -- names, types, and current values",
+    "Dump all public properties of every component on a GameObject. Returns { id, components } where each entry is { component, properties: [{ name, type, value }] } — values are stringified (unreadable ones show '<error>'). Use the exact component/property names it reports with set_property or get_property; can be large on component-heavy objects.",
     {
       id: z.string().describe("GUID of the GameObject"),
     },
@@ -56,7 +56,7 @@ export function registerComponentTools(
   // ── list_available_components ────────────────────────────────────
   server.tool(
     "list_available_components",
-    "List all component types available in s&box (built-in and custom). Search by name or filter by category",
+    "List all instantiable component types in the TypeLibrary — built-in AND your project's custom components (abstract types excluded); filter does a substring match on the type name. Returns { count, components } with { name, title, description, fullName } per type, sorted by name — the unfiltered list is LARGE, so pass filter. Use the returned name with add_component_with_properties, and describe_type for a type's full property list.",
     {
       filter: z
         .string()

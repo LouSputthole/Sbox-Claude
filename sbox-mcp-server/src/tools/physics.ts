@@ -24,7 +24,7 @@ export function registerPhysicsTools(
   // ── add_physics ───────────────────────────────────────────────────
   server.tool(
     "add_physics",
-    "Add a Rigidbody and collider to a GameObject, making it a dynamic physics object. Auto-selects BoxCollider if no collider type specified",
+    "Add a Rigidbody and collider to a GameObject, making it a dynamic physics object. Auto-selects BoxCollider if no collider type specified. Returns { physicsAdded, id, components } listing exactly which components were added (e.g. Rigidbody + BoxCollider) — enter play mode (start_play) to see it simulate.",
     {
       id: z.string().describe("GUID of the GameObject"),
       collider: z
@@ -54,7 +54,7 @@ export function registerPhysicsTools(
   // ── add_collider ──────────────────────────────────────────────────
   server.tool(
     "add_collider",
-    "Add a specific collider component to a GameObject. Supports box, sphere, capsule, mesh, and hull types. Can be configured as trigger",
+    "Add a specific collider component to a GameObject (no Rigidbody — use add_physics for a dynamic body). Can be configured as a trigger. Returns { added, id, collider, isTrigger } where collider is the actual component type added — note 'mesh' maps to HullCollider (s&box has no MeshCollider) and unrecognized types fall back to BoxCollider.",
     {
       id: z.string().describe("GUID of the GameObject"),
       type: z
@@ -92,7 +92,7 @@ export function registerPhysicsTools(
   // ── add_joint ─────────────────────────────────────────────────────
   server.tool(
     "add_joint",
-    "Add a physics joint/constraint between two GameObjects. Supports fixed, spring, and slider joint types",
+    "Add a physics joint/constraint component to a GameObject, optionally connected to a target body (targetId). Returns { added, id, joint, targetId } — joint is the component type added (FixedJoint/SpringJoint/SliderJoint). If targetId is omitted the joint is added unconnected; wire it later via set_property. Both objects need physics (add_physics) for the constraint to simulate in play mode.",
     {
       id: z
         .string()
@@ -127,7 +127,7 @@ export function registerPhysicsTools(
   // ── raycast ───────────────────────────────────────────────────────
   server.tool(
     "raycast",
-    "Perform a physics raycast (Scene.Trace.Ray) and return hit results. Useful for line-of-sight checks, object placement, and collision detection",
+    "Perform a physics raycast (Scene.Trace.Ray) from start to end — pass both; the handler traces the start→end segment. Useful for line-of-sight checks, object placement, and collision detection. Returns { hit, hitPosition, normal, distance, gameObjectId, gameObjectName } — feed gameObjectId into get_all_properties/set_transform, or visualize the result with debug_draw_ray. A 'Default Surface not found' error is a known transient; call restart_editor and retry.",
     {
       start: Vector3Schema
         .describe('Ray start position (world space) — object {x,y,z} or comma string "x,y,z"'),

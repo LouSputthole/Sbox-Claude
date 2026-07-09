@@ -192,14 +192,19 @@ public static class BridgeScaffoldGameplayTools
 		=> McpGate.Run( "create_gacha_drop_table", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "pityAfter", pityAfter ), ( "targetId", targetId ) ) );
 
 	/// <summary>
-	/// Generate a game manager script with configurable game loop features: score tracking, round
-	/// timer, player spawning, and game state machine.
+	/// Generate a minimal game-manager Component: a static Instance singleton, [Property] MaxPlayers /
+	/// GameState, and a Component.INetworkListener OnActive hook that logs player connects. Writes
+	/// &lt;name&gt;.cs and returns { created, path, className }. NOTE: the
+	/// includeScore/includeTimer/includeSpawning params are not currently applied — the same minimal
+	/// manager is always generated (for richer game-loop scaffolds see create_round_phase_machine /
+	/// create_objective_system / create_economy_wallet). Follow with trigger_hotload, then
+	/// get_compile_errors, then place via add_component_to_new_object.
 	/// </summary>
 	/// <param name="name">Class name. Defaults to 'GameManager'.</param>
 	/// <param name="directory">Subdirectory under code/ for the file.</param>
-	/// <param name="includeScore">Include score tracking. Defaults to true.</param>
-	/// <param name="includeTimer">Include round timer with countdown. Defaults to false.</param>
-	/// <param name="includeSpawning">Include player spawning from prefab at spawn point. Defaults to false.</param>
+	/// <param name="includeScore">Include score tracking (currently not applied by the handler).</param>
+	/// <param name="includeTimer">Include round timer with countdown (currently not applied by the handler).</param>
+	/// <param name="includeSpawning">Include player spawning from prefab at spawn point (currently not applied by the handler).</param>
 	[McpTool( "create_game_manager" )]
 	public static Task<object> CreateGameManager( string name = null, string directory = null, bool? includeScore = null, bool? includeTimer = null, bool? includeSpawning = null )
 		=> McpGate.Run( "create_game_manager", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "includeScore", includeScore ), ( "includeTimer", includeTimer ), ( "includeSpawning", includeSpawning ) ) );
@@ -279,7 +284,9 @@ public static class BridgeScaffoldGameplayTools
 	/// auto-refreshes every 30 s, shows rank/displayName/value rows, handles loading state, and
 	/// includes a BuildHash() override (razor-lint clean). Must be hosted under a ScreenPanel or
 	/// WorldPanel. Stats must be configured for the project ident on sbox.game. Uses
-	/// Leaderboards.Get(statName) + board.Refresh() -- the exact API from ServicesQueryHandler.
+	/// Leaderboards.Get(statName) + board.Refresh() -- the exact API from ServicesQueryHandler. Returns
+	/// { created, razorPath, scssPath, className, note }. Follow with trigger_hotload, then
+	/// get_compile_errors, then host it via add_screen_panel (panelComponent=className).
 	/// </summary>
 	/// <param name="name">Class name for the panel component. Defaults to 'LeaderboardPanel'.</param>
 	/// <param name="directory">Subdirectory for the generated files. Defaults to 'Code/UI'.</param>
@@ -307,7 +314,10 @@ public static class BridgeScaffoldGameplayTools
 	/// Generate an ObjectiveManager component — the win/lose brain of a game. Tracks an objective
 	/// (collect_all / reach_goal / survive_time / eliminate_all), fires a win, and handles a lose
 	/// condition (fall below kill-Z / timer / out of lives). Self-contained C#; other systems call
-	/// ObjectiveManager.Instance. Optionally placed as a scene singleton.
+	/// ObjectiveManager.Instance. Optionally placed as a scene singleton. Returns { created, path,
+	/// className, gameObject, note } — gameObject is the placed singleton, or null with a note when the
+	/// fresh type isn't in the TypeLibrary yet. Follow with trigger_hotload, then get_compile_errors;
+	/// if placement was skipped, place with add_component_to_new_object after the hotload.
 	/// </summary>
 	/// <param name="name">Class name. Defaults to 'ObjectiveManager'.</param>
 	/// <param name="directory">Subdirectory for the .cs file. Defaults to 'Code'.</param>
@@ -347,7 +357,10 @@ public static class BridgeScaffoldGameplayTools
 	/// <summary>
 	/// Generate a trigger-based collectible component. On enter by a tagged object it raises
 	/// OnCollected (wire it to your objective/score system) and despawns. Optionally builds a visible
-	/// pickup GameObject with a trigger SphereCollider (+ a model) in one call.
+	/// pickup GameObject with a trigger SphereCollider (+ a model) in one call. Returns { created,
+	/// path, className, gameObject, note } — gameObject is the placed pickup (null unless
+	/// placeInScene=true); a note flags when the component couldn't attach because the fresh type needs
+	/// a hotload. Follow with trigger_hotload, then get_compile_errors.
 	/// </summary>
 	/// <param name="name">Class name. Defaults to 'Pickup'.</param>
 	/// <param name="directory">Subdirectory for the .cs file. Defaults to 'Code'.</param>
@@ -491,7 +504,10 @@ public static class BridgeScaffoldGameplayTools
 	/// last). Modifier storage uses parallel private Lists of primitive types (serialization-safe).
 	/// RemoveModifiersFrom(source) cleans up all mods from a buff/debuff source by reference. Static
 	/// OnStatChanged(stat, value) event fires after every add/remove. Mined from RPG/buff/debuff
-	/// patterns across shipped s&amp;box games.
+	/// patterns across shipped s&amp;box games. Returns { created, path, className, stats, placedOn,
+	/// note } — stats echoes the sanitized stat names ({name}Stat enum values); placedOn is the target
+	/// GameObject when attached (needs the type hotloaded). Follow with trigger_hotload, then
+	/// get_compile_errors.
 	/// </summary>
 	/// <param name="name">Class name prefix -- generates {name}Stat enum + {name} Component. Defaults to 'StatSystem'.</param>
 	/// <param name="directory">Subdirectory for the .cs file. Defaults to 'Code'.</param>
@@ -502,13 +518,17 @@ public static class BridgeScaffoldGameplayTools
 		=> McpGate.Run( "create_stat_modifier_system", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "stats", stats ), ( "targetId", targetId ) ) );
 
 	/// <summary>
-	/// Generate a trigger zone script that detects when GameObjects enter/exit a collider volume.
-	/// Supports teleport, damage, spawn, and log actions.
+	/// Generate a trigger-zone Component (Component.ITriggerListener): auto-adds a trigger BoxCollider
+	/// on start, filters entrants by a TriggerTag [Property] (default 'player'), and logs enter/exit
+	/// via private OnPlayerEnter/OnPlayerExit extension points you fill in. Writes &lt;name&gt;.cs and
+	/// returns { created, path, className }. NOTE: the action/filterTag params are not currently
+	/// applied at generation time — the zone always logs; implement teleport/damage/spawn in the
+	/// generated methods (edit_script). Follow with trigger_hotload, then get_compile_errors.
 	/// </summary>
 	/// <param name="name">Class name. Defaults to 'TriggerZone'.</param>
 	/// <param name="directory">Subdirectory under code/ for the file.</param>
-	/// <param name="action">What happens on trigger: 'log' (print message), 'teleport' (move to destination), 'damage' (apply damage), 'spawn' (create prefab). Defaults to 'log'. One of: log | teleport | damage | spawn.</param>
-	/// <param name="filterTag">Only trigger for objects with this tag. Defaults to 'player'.</param>
+	/// <param name="action">What happens on trigger (currently not applied by the handler — the generated zone always logs; implement the effect in OnPlayerEnter yourself). One of: log | teleport | damage | spawn.</param>
+	/// <param name="filterTag">Only trigger for objects with this tag (currently not applied at generation — the generated TriggerTag [Property] defaults to 'player'; change it per-instance with set_property).</param>
 	[McpTool( "create_trigger_zone" )]
 	public static Task<object> CreateTriggerZone( string name = null, string directory = null, string action = null, string filterTag = null )
 		=> McpGate.Run( "create_trigger_zone", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "action", action ), ( "filterTag", filterTag ) ) );

@@ -16,6 +16,8 @@ public static class BridgeDebugTools
 	/// <summary>
 	/// Run an s&amp;box console command / ConCmd via Sandbox.ConsoleSystem.Run — e.g. a cvar
 	/// ('sv_cheats 1') or a registered command. Also the invocation primitive behind execute_csharp.
+	/// Fire-and-forget: returns only { ran, command } and does NOT capture console output — follow with
+	/// read_log to see what the command printed.
 	/// </summary>
 	/// <param name="command">The console command line to run.</param>
 	[McpTool( "console_run" )]
@@ -23,8 +25,10 @@ public static class BridgeDebugTools
 		=> McpGate.Run( "console_run", McpGate.Args( ( "command", command ) ) );
 
 	/// <summary>
-	/// Remove all debug-draw primitives by destroying the debug holder for the current scene (edit or
-	/// play). Call before redrawing a fresh frame of debug shapes.
+	/// Remove ALL debug-draw primitives at once by destroying the debug holder for the current scene
+	/// (edit or play) — there is no way to remove a single shape. Call before redrawing a fresh frame
+	/// of debug shapes. Returns { cleared, removed } where removed is how many primitives were
+	/// destroyed.
 	/// </summary>
 	[McpTool( "debug_clear" )]
 	public static Task<object> DebugClear()
@@ -33,7 +37,9 @@ public static class BridgeDebugTools
 	/// <summary>
 	/// Draw a wireframe debug box centered at a point. Renders in editor and play. Ideal for
 	/// visualizing a trigger_zone's bounds or a physics_overlap box volume. Accumulates until
-	/// debug_clear.
+	/// debug_clear. Returns { drawn: 'box', count, mode } — count is the total accumulated primitives,
+	/// mode is 'edit' or 'play' (edit-mode gizmos are NOT in take_screenshot; use capture_view in play
+	/// mode).
 	/// </summary>
 	/// <param name="center">Box center, world-space "x,y,z".</param>
 	/// <param name="size">Full size "x,y,z" in units (default "32,32,32").</param>
@@ -60,7 +66,9 @@ public static class BridgeDebugTools
 	/// <summary>
 	/// Draw a debug ray (drawn as an arrow) from an origin along a direction for a given length.
 	/// Renders in editor and play. Ideal for visualizing a raycast result or a facing/normal direction.
-	/// Accumulates until debug_clear.
+	/// Accumulates until debug_clear. Returns { drawn: 'ray', count, mode } — count is the total
+	/// accumulated primitives, mode is 'edit' or 'play' (edit-mode gizmos are NOT in take_screenshot;
+	/// use capture_view in play mode).
 	/// </summary>
 	/// <param name="origin">Ray origin, world-space "x,y,z".</param>
 	/// <param name="direction">Direction vector "x,y,z" (normalized internally).</param>
@@ -73,7 +81,9 @@ public static class BridgeDebugTools
 
 	/// <summary>
 	/// Draw a wireframe debug sphere at a point. Renders in editor and play. Ideal for visualizing a
-	/// physics_overlap radius or an NPC's hearing/sight range. Accumulates until debug_clear.
+	/// physics_overlap radius or an NPC's hearing/sight range. Accumulates until debug_clear. Returns {
+	/// drawn: 'sphere', count, mode } — count is the total accumulated primitives, mode is 'edit' or
+	/// 'play' (edit-mode gizmos are NOT in take_screenshot; use capture_view in play mode).
 	/// </summary>
 	/// <param name="center">Sphere center, world-space "x,y,z".</param>
 	/// <param name="radius">Radius in units (default 32).</param>
@@ -97,8 +107,11 @@ public static class BridgeDebugTools
 		=> McpGate.Run( "frame_camera", McpGate.Args( ( "id", id ), ( "position", position ), ( "radius", radius ) ) );
 
 	/// <summary>
-	/// Check the connection status to the s&amp;box Bridge — whether it's connected, latency,
-	/// host/port, and editor info. Useful for debugging.
+	/// Check the s&amp;box Bridge connection — call this FIRST in a session. Returns a human summary
+	/// plus JSON: connected, roundTripOk (heartbeat can be fresh while the editor's request loop is
+	/// stalled — trust roundTripOk), bridgeVersion vs mcpServerVersion + versionsAligned (a mismatch
+	/// means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs, latencyMs, and
+	/// ipcDir (transport is file IPC; host/port are legacy fields).
 	/// </summary>
 	[McpTool.ReadOnly( "get_bridge_status" )]
 	public static Task<object> GetBridgeStatus()

@@ -13,8 +13,10 @@ using Editor.Mcp;
 public static class BridgePhysicsTools
 {
 	/// <summary>
-	/// Add a specific collider component to a GameObject. Supports box, sphere, capsule, mesh, and hull
-	/// types. Can be configured as trigger.
+	/// Add a specific collider component to a GameObject (no Rigidbody — use add_physics for a dynamic
+	/// body). Can be configured as a trigger. Returns { added, id, collider, isTrigger } where collider
+	/// is the actual component type added — note 'mesh' maps to HullCollider (s&amp;box has no
+	/// MeshCollider) and unrecognized types fall back to BoxCollider.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="type">Type of collider to add. One of: box | sphere | capsule | mesh | hull.</param>
@@ -27,8 +29,11 @@ public static class BridgePhysicsTools
 		=> McpGate.Run( "add_collider", McpGate.Args( ( "id", id ), ( "type", type ), ( "isTrigger", isTrigger ), ( "size", size ), ( "radius", radius ), ( "height", height ) ) );
 
 	/// <summary>
-	/// Add a physics joint/constraint between two GameObjects. Supports fixed, spring, and slider joint
-	/// types.
+	/// Add a physics joint/constraint component to a GameObject, optionally connected to a target body
+	/// (targetId). Returns { added, id, joint, targetId } — joint is the component type added
+	/// (FixedJoint/SpringJoint/SliderJoint). If targetId is omitted the joint is added unconnected;
+	/// wire it later via set_property. Both objects need physics (add_physics) for the constraint to
+	/// simulate in play mode.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to add the joint to.</param>
 	/// <param name="type">Type of joint to create. One of: fixed | spring | slider.</param>
@@ -41,7 +46,9 @@ public static class BridgePhysicsTools
 
 	/// <summary>
 	/// Add a Rigidbody and collider to a GameObject, making it a dynamic physics object. Auto-selects
-	/// BoxCollider if no collider type specified.
+	/// BoxCollider if no collider type specified. Returns { physicsAdded, id, components } listing
+	/// exactly which components were added (e.g. Rigidbody + BoxCollider) — enter play mode
+	/// (start_play) to see it simulate.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="collider">Collider type to add. Defaults to 'box'. One of: box | sphere | capsule | mesh.</param>
@@ -65,8 +72,11 @@ public static class BridgePhysicsTools
 		=> McpGate.Run( "physics_overlap", McpGate.Args( ( "center", center ), ( "radius", radius ), ( "size", size ) ) );
 
 	/// <summary>
-	/// Perform a physics raycast (Scene.Trace.Ray) and return hit results. Useful for line-of-sight
-	/// checks, object placement, and collision detection.
+	/// Perform a physics raycast (Scene.Trace.Ray) from start to end — pass both; the handler traces
+	/// the start→end segment. Useful for line-of-sight checks, object placement, and collision
+	/// detection. Returns { hit, hitPosition, normal, distance, gameObjectId, gameObjectName } — feed
+	/// gameObjectId into get_all_properties/set_transform, or visualize the result with debug_draw_ray.
+	/// A 'Default Surface not found' error is a known transient; call restart_editor and retry.
 	/// </summary>
 	/// <param name="start">Ray start position (world space) — object {x,y,z} or comma string "x,y,z". As "x,y,z" (or JSON {x,y,z}).</param>
 	/// <param name="end">Ray end position. Use either end or direction+maxDistance. As "x,y,z" (or JSON {x,y,z}).</param>

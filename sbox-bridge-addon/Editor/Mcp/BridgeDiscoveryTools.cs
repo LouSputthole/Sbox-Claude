@@ -26,12 +26,14 @@ public static class BridgeDiscoveryTools
 		=> McpGate.Run( "describe_type", McpGate.Args( ( "name", name ) ) );
 
 	/// <summary>
-	/// Grep the user's s&amp;box project for a symbol. Returns file paths and line numbers. Useful for
-	/// finding usage examples of an API or seeing how the project already does something.
+	/// Grep the user's s&amp;box project for a symbol (case-sensitive substring; skips .git/bin/obj).
+	/// Useful for finding usage examples of an API or seeing how the project already does something.
+	/// Returns `symbol`, `count`, and `results` [{file, line, text}], capped at `max_results` (default
+	/// 25) — raise it if you may be missing hits. Follow up with read_file on a result's file path.
 	/// </summary>
 	/// <param name="symbol">Substring or symbol to search for.</param>
 	/// <param name="extension">File extension filter. Default: ".cs".</param>
-	/// <param name="max_results"></param>
+	/// <param name="max_results">Maximum hits to return (default 25); the search stops once reached.</param>
 	[McpTool.ReadOnly( "find_in_project" )]
 	public static Task<object> FindInProject( string symbol, string extension = ".cs", int max_results = 25 )
 		=> McpGate.Run( "find_in_project", McpGate.Args( ( "symbol", symbol ), ( "extension", extension ), ( "max_results", max_results ) ) );
@@ -51,21 +53,24 @@ public static class BridgeDiscoveryTools
 	/// Discovers what's available to build ON — e.g. character controllers (fish.scc = Shrimple
 	/// Character Controller, facepunch.playercontroller), world/spline/road tools — so you can leverage
 	/// an installed library (add its components via add_component_with_properties, or generate code
-	/// against its API) instead of writing from scratch. Returns ident/org/title/type/enabled per
-	/// library. Read-only.
+	/// against its API) instead of writing from scratch. Returns `count` and `libraries` [{folder,
+	/// ident, org, title, type, enabled}] — ALL libraries, no limit or pagination; `enabled` is false
+	/// when the library's .sbproj has been disabled (renamed .sbproj.disabled). Read-only.
 	/// </summary>
 	[McpTool.ReadOnly( "list_libraries" )]
 	public static Task<object> ListLibraries()
 		=> McpGate.Run( "list_libraries", McpGate.Args() );
 
 	/// <summary>
-	/// Find types matching a name pattern. Pass components_only=true to filter to Component subclasses
-	/// only. Useful for discovering 'is there a built-in X for this?'.
+	/// Find loaded types matching a name pattern. Useful for discovering 'is there a built-in X for
+	/// this?'. Returns `count` and `matches` with each type's name, fullName, isComponent, and
+	/// isAbstract — results are silently truncated at `limit` (default 50), so narrow the pattern if
+	/// you hit the cap. Pass a match's name to describe_type for its full member surface.
 	/// </summary>
 	/// <param name="pattern">Substring to match against type name (case-insensitive).</param>
 	/// <param name="namespace">Optional namespace filter (case-insensitive substring).</param>
-	/// <param name="components_only"></param>
-	/// <param name="limit"></param>
+	/// <param name="components_only">Only return Component subclasses (default false).</param>
+	/// <param name="limit">Maximum matches to return (default 50); the search stops silently at this cap.</param>
 	[McpTool.ReadOnly( "search_types" )]
 	public static Task<object> SearchTypes( string pattern, string @namespace = null, bool components_only = false, int limit = 50 )
 		=> McpGate.Run( "search_types", McpGate.Args( ( "pattern", pattern ), ( "namespace", @namespace ), ( "components_only", components_only ), ( "limit", limit ) ) );

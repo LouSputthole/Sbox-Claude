@@ -13,7 +13,7 @@ export function registerMaterialTools(
   // ── assign_model ─────────────────────────────────────────────────
   server.tool(
     "assign_model",
-    "Set a 3D model on a GameObject's ModelRenderer. Creates the renderer component if it doesn't exist",
+    "Set a 3D model on a GameObject's ModelRenderer. Creates the renderer component if it doesn't exist; errors if the model path can't be loaded. Returns { assigned, id, model } — follow with assign_material / set_material_property to style it, or take a screenshot to verify.",
     {
       id: z.string().describe("GUID of the GameObject"),
       model: z
@@ -36,7 +36,7 @@ export function registerMaterialTools(
   // ── create_material ──────────────────────────────────────────────
   server.tool(
     "create_material",
-    "Create a new material file (.vmat) with a shader and properties like color, roughness, metallic, texture",
+    "Create a new material file (.vmat, KV1 format) with a shader and properties like color, roughness, metallic, texture. Errors if the file already exists; when no properties are given it writes sensible PBR defaults (g_flMetalness 0, g_flRoughness 1). Returns { created, path, shader, propertiesWritten } — pass the returned path to recompile_asset (so the editor compiles it) and then assign_material.",
     {
       path: z
         .string()
@@ -70,7 +70,7 @@ export function registerMaterialTools(
   // ── assign_material ──────────────────────────────────────────────
   server.tool(
     "assign_material",
-    "Apply a material to a ModelRenderer on a GameObject. Optionally target a specific material slot",
+    "Apply a material to a GameObject by setting its ModelRenderer's MaterialOverride (overrides the whole model's material). Requires an existing ModelRenderer (assign_model first) and errors if the material path can't be loaded. Returns { assigned, id, material } — tweak values afterwards with set_material_property.",
     {
       id: z.string().describe("GUID of the GameObject"),
       material: z
@@ -95,7 +95,7 @@ export function registerMaterialTools(
   // ── set_material_property ────────────────────────────────────────
   server.tool(
     "set_material_property",
-    "Change a property on the material assigned to a GameObject — color, roughness, metallic, texture, etc.",
+    "Change a property on the material assigned to a GameObject — color, roughness, metallic, texture, etc. Operates on the ModelRenderer's MaterialOverride; if none is assigned it auto-creates one from the default complex shader (no separate assign_material step needed). Returns { set, id, property, autoCreatedMaterial } — screenshot to verify the visual change.",
     {
       id: z.string().describe("GUID of the GameObject"),
       property: z

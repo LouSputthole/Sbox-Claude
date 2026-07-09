@@ -16,7 +16,7 @@ export function registerPlayModeTools(
   // ── start_play ───────────────────────────────────────────────────
   server.tool(
     "start_play",
-    "Enter play mode — starts running the game in the editor. Scripts execute, physics simulate, everything goes live",
+    "Enter play mode — starts running the game in the editor. Scripts execute, physics simulate, everything goes live. Returns { started, method } (method 'EditorScene.Play', or 'SetPlaying (fallback)' with editorErrorSkipped when the safe path failed). While playing, scene-mutating tools refuse — use get/set_runtime_property, capture_view, and playtest, then stop_play to edit again.",
     {},
     async () => {
       const res = await bridge.send("start_play");
@@ -68,7 +68,7 @@ export function registerPlayModeTools(
   // ── take_screenshot ──────────────────────────────────────────────
   server.tool(
     "take_screenshot",
-    "Capture the current editor viewport as a PNG screenshot",
+    "Capture a 1920x1080 PNG from the scene's Main Camera (ONE fixed angle — the camera may not face what you changed; use screenshot_from to aim at a target object/point). Returns { taken, note, path }, but the engine saves to its default screenshots folder regardless of the path param (<sbox install>/screenshots/sbox.<timestamp>.png) — list the newest file there and READ the image to verify.",
     {
       path: z
         .string()
@@ -91,7 +91,7 @@ export function registerPlayModeTools(
   // ── undo ─────────────────────────────────────────────────────────
   server.tool(
     "undo",
-    "Undo the last editor action. Safety net for when a change goes wrong",
+    "Undo the last editor action via the editor's UndoSystem. Safety net for when a change goes wrong. Returns { undone: true } — it does not report WHAT was undone, so re-check state with get_scene_hierarchy or get_all_properties. Reverse it with redo. Note: file writes (write_file/create_script) are not editor undo steps.",
     {},
     async () => {
       const res = await bridge.send("undo");
@@ -107,7 +107,7 @@ export function registerPlayModeTools(
   // ── redo ─────────────────────────────────────────────────────────
   server.tool(
     "redo",
-    "Redo the last undone editor action",
+    "Re-apply the editor action most recently reverted by undo (editor UndoSystem redo — the counterpart to the undo tool). Returns { redone: true } without details of what was redone, so verify the resulting state with get_scene_hierarchy or get_all_properties.",
     {},
     async () => {
       const res = await bridge.send("redo");
@@ -168,7 +168,7 @@ export function registerPlayModeTools(
   // ── set_runtime_property ─────────────────────────────────────────
   server.tool(
     "set_runtime_property",
-    "Set a component property value during play mode — tweak values live while the game runs",
+    "Set a component property value during play mode — tweak values live while the game runs. Errors if the game is not playing (start_play first). Returns { set, id, component, property, value } like set_property; read it back with get_runtime_property. Runtime changes are DISCARDED when play mode stops — use set_property in edit mode to persist.",
     {
       id: z.string().describe("GUID of the GameObject"),
       component: z.string().describe("Component type name"),

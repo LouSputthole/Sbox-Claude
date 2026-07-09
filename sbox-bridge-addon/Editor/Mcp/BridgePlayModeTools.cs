@@ -31,7 +31,10 @@ public static class BridgePlayModeTools
 		=> McpGate.Run( "is_playing", McpGate.Args() );
 
 	/// <summary>
-	/// Set a component property value during play mode — tweak values live while the game runs.
+	/// Set a component property value during play mode — tweak values live while the game runs. Errors
+	/// if the game is not playing (start_play first). Returns { set, id, component, property, value }
+	/// like set_property; read it back with get_runtime_property. Runtime changes are DISCARDED when
+	/// play mode stops — use set_property in edit mode to persist.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="component">Component type name.</param>
@@ -43,7 +46,10 @@ public static class BridgePlayModeTools
 
 	/// <summary>
 	/// Enter play mode — starts running the game in the editor. Scripts execute, physics simulate,
-	/// everything goes live.
+	/// everything goes live. Returns { started, method } (method 'EditorScene.Play', or 'SetPlaying
+	/// (fallback)' with editorErrorSkipped when the safe path failed). While playing, scene-mutating
+	/// tools refuse — use get/set_runtime_property, capture_view, and playtest, then stop_play to edit
+	/// again.
 	/// </summary>
 	[McpTool( "start_play" )]
 	public static Task<object> StartPlay()

@@ -13,7 +13,7 @@ export function registerUITools(
   // ── create_razor_ui ───────────────────────────────────────────────
   server.tool(
     "create_razor_ui",
-    "Create a Razor UI component file (.razor) with optional SCSS stylesheet. Generates boilerplate for HUD, menu, or basic panel types",
+    "Create a Razor UI component file (.razor). Returns { created, path, componentName }; errors if the file already exists. NOTE: the current handler generates one fixed basic panel (a root div + label bound to a Title [Property]) from name+directory only — panelType/content/styles/includeStyles are not applied and no .scss is written; for custom markup or a PanelComponent you can host via add_screen_panel, write the files with write_file and check them with razor_lint. Follow with trigger_hotload, then get_compile_errors",
     {
       name: z
         .string()
@@ -67,12 +67,12 @@ export function registerUITools(
   // ── add_screen_panel ──────────────────────────────────────────────
   server.tool(
     "add_screen_panel",
-    "Create a new GameObject with a ScreenPanel component for full-screen UI overlay (HUD, menus, etc.)",
+    "Create a new GameObject with a ScreenPanel component for full-screen UI overlay (HUD, menus, etc.). Returns { created, gameObject:{ id, name, components, ... } }. NOTE: panelComponent is looked up in the TypeLibrary and SILENTLY skipped if the type isn't loaded (freshly generated panels need trigger_hotload first) — check gameObject.components to confirm it attached",
     {
       name: z
         .string()
         .optional()
-        .describe("Name for the UI GameObject. Defaults to 'Screen UI'"),
+        .describe("Name for the UI GameObject. Defaults to 'Screen Panel'"),
       zIndex: z
         .number()
         .optional()
@@ -102,12 +102,12 @@ export function registerUITools(
   // ── add_world_panel ───────────────────────────────────────────────
   server.tool(
     "add_world_panel",
-    "Create a new GameObject with a WorldPanel component for in-world 3D UI (health bars, signs, nameplates)",
+    "Create a new GameObject with a WorldPanel component for in-world 3D UI (health bars, signs, nameplates). Returns { created, gameObject:{ id, name, components, ... } }. As with add_screen_panel, panelComponent is SILENTLY skipped if the type isn't in the TypeLibrary (trigger_hotload first, then verify via gameObject.components). For CLICKABLE world UI the scene also needs a Sandbox.WorldInput (see create_worldpanel_ui)",
     {
       name: z
         .string()
         .optional()
-        .describe("Name for the UI GameObject. Defaults to 'World UI'"),
+        .describe("Name for the UI GameObject. Defaults to 'World Panel'"),
       position: z
         .union([
           z.object({ x: z.number(), y: z.number(), z: z.number() }),

@@ -2,6 +2,7 @@ using System;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using Editor;
 using Sandbox;
 
 /// <summary>
@@ -59,6 +60,17 @@ internal static class McpGate
 		// convert to native throw semantics so agents see a real tool error.
 		if ( ClaudeBridge.TryGetHandlerError( result, out var err ) )
 			throw new Exception( err );
+
+		// Native-server convention: "Every tool that edits the scene pushes an undo step."
+		// UndoSystem.Snapshot is documented "call AFTER you make a change" — the snapshot
+		// diff against the previous one becomes the undo entry, so the built-in `undo`
+		// restores the pre-call scene. Generic full snapshot: the right (only) option for
+		// a gate over heterogeneous handlers.
+		if ( ClaudeBridge.IsSceneMutating( command ) )
+		{
+			try { SceneEditorSession.Active?.UndoSystem?.Snapshot( $"bridge: {command}" ); }
+			catch { /* undo is best-effort — never block the actual command */ }
+		}
 
 		return result;
 	}

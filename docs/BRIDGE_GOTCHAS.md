@@ -274,6 +274,22 @@ restart, not your work. After restarting, re-take the screenshot.
 
 ---
 
+## 9. Libraries file-watcher is unreliable — externally-edited addon code may never recompile
+
+Copying/editing `.cs` files under `Libraries/<addon>/Editor/` from OUTSIDE the editor
+(scripts, `cp`, git checkout) sometimes triggers a recompile and sometimes does nothing —
+observed on 26.07.08b: two syncs recompiled within seconds, then every later sync (cp,
+append, touch) was ignored until an editor restart, including on a freshly-booted editor.
+Assume external addon edits DON'T hotload.
+
+- **Reliable loop:** sync files → `restart_editor` (works over the native server too:
+  `call_tool {name:"restart_editor"}`) → wait for the heartbeat (~90-150 s) → verify.
+- **Assembly fingerprint:** successful compiles log NOTHING (only failures log
+  `Compile of '<addon>' Failed:`), so don't read silence as staleness — check
+  `status.json`'s `handlerCount` (or a version marker) to know which assembly is live.
+- Project `Code/` edits via `write_file`/`create_script` still hotload normally — this
+  gotcha is specifically the `Libraries/` editor-assembly path.
+
 ## Quick reference
 
 | Symptom | Not fixable because… | Do this |

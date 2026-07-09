@@ -36,7 +36,7 @@ export function registerPublishingTools(
   // ── set_project_config ───────────────────────────────────────────
   server.tool(
     "set_project_config",
-    "Update project configuration fields for publishing: title, description, version, type, package ident, summary, visibility. Only provided fields are changed",
+    "Update project configuration fields for publishing: title, description, version, type, package ident, summary, visibility. Only provided fields are changed — edits string values in the .sbproj file in place. Returns { updated, path } (the .sbproj path); read the result back with get_project_config to confirm what actually changed.",
     {
       title: z.string().optional().describe("Project display title"),
       description: z
@@ -80,7 +80,7 @@ export function registerPublishingTools(
   // ── validate_project ─────────────────────────────────────────────
   server.tool(
     "validate_project",
-    "Validate that the project is ready for publishing. Checks: compile errors, metadata completeness, scenes, scripts, thumbnail, and project type",
+    "Validate that the project is ready for publishing. Runs four checks: .sbproj exists, at least one scene, project Ident set, project Title set. Returns { valid, issueCount, issues, checks } — issues are human-readable problems and each checks entry has { check, pass, detail }; fix metadata gaps with set_project_config (it does NOT check compile errors — use get_compile_errors for that).",
     {},
     async (params) => {
       const res = await bridge.send("validate_project", params);
@@ -130,7 +130,7 @@ export function registerPublishingTools(
   // ── get_package_details ──────────────────────────────────────────
   server.tool(
     "get_package_details",
-    "Fetch detailed package information from the s&box asset library (asset.party) including title, author, version, downloads, ratings, and dependencies",
+    "Fetch package information from the s&box package backend (Package.FetchAsync) by ident. Returns { fullIdent, title, summary, description, org } — no download/rating/dependency data is included. Use it to confirm a package exists and what it is before install_asset.",
     {
       ident: z
         .string()

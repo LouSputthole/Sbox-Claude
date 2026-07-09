@@ -14,8 +14,11 @@ using Editor.Mcp;
 public static class BridgeProjectTools
 {
 	/// <summary>
-	/// Create a new C# component script in the project. Generates proper s&amp;box component
-	/// boilerplate with the specified class name, namespace, and optional properties.
+	/// Create a new C# component script in the project — a minimal s&amp;box Component class (name is
+	/// sanitized to a valid identifier), or your exact code when content is provided. Errors if the
+	/// file already exists. Returns { path, created, className } — the new type is NOT live until a
+	/// recompile, so call trigger_hotload, then attach it with add_component_with_properties
+	/// (component=className).
 	/// </summary>
 	/// <param name="name">Class name for the component (e.g. 'PlayerController'). Will also be the filename.</param>
 	/// <param name="directory">Subdirectory under code/ to place the script (e.g. 'Components'). Defaults to 'code/'.</param>
@@ -27,7 +30,10 @@ public static class BridgeProjectTools
 		=> McpGate.Run( "create_script", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "description", description ), ( "properties", properties ), ( "content", content ) ) );
 
 	/// <summary>
-	/// Delete a C# script from the project.
+	/// Permanently delete a file from the project by its project-relative path (built for C# scripts,
+	/// but removes any file; no recycle bin, and editor undo cannot restore it). Errors if the file
+	/// doesn't exist. Returns a confirmation with the path — follow with trigger_hotload so the removed
+	/// class actually leaves the compiled assembly.
 	/// </summary>
 	/// <param name="path">Relative path to the script file to delete.</param>
 	[McpTool( "delete_script" )]
@@ -35,8 +41,10 @@ public static class BridgeProjectTools
 		=> McpGate.Run( "delete_script", McpGate.Args( ( "path", path ) ) );
 
 	/// <summary>
-	/// Edit an existing C# script. Supports find/replace, inserting code at a line number, or appending
-	/// code to the class body.
+	/// Edit an existing C# script in place via exact-text find/replace or a full-content overwrite.
+	/// Errors if the file or the find text isn't found (find/replace replaces ALL occurrences). Returns
+	/// { path, edited, operation } where operation is 'find_replace' or 'overwrite' — follow with
+	/// trigger_hotload so the change compiles, then get_compile_errors if in doubt.
 	/// </summary>
 	/// <param name="path">Relative path to the script file (e.g. 'code/PlayerController.cs').</param>
 	/// <param name="operations">List of edit operations to apply in order. JSON array.</param>
@@ -64,8 +72,9 @@ public static class BridgeProjectTools
 		=> McpGate.Run( "ensure_input_action", McpGate.Args( ( "name", name ), ( "keyboardKey", keyboardKey ), ( "group", group ), ( "update", update ) ) );
 
 	/// <summary>
-	/// Fetch detailed package information from the s&amp;box asset library (asset.party) including
-	/// title, author, version, downloads, ratings, and dependencies.
+	/// Fetch package information from the s&amp;box package backend (Package.FetchAsync) by ident.
+	/// Returns { fullIdent, title, summary, description, org } — no download/rating/dependency data is
+	/// included. Use it to confirm a package exists and what it is before install_asset.
 	/// </summary>
 	/// <param name="ident">Package identifier (e.g. 'facepunch.flatgrass', 'myorg.mygame').</param>
 	[McpTool.ReadOnly( "get_package_details" )]
@@ -90,7 +99,9 @@ public static class BridgeProjectTools
 
 	/// <summary>
 	/// Browse the project file tree. Optionally filter by directory path and/or file extension (e.g.
-	/// '.cs', '.scene').
+	/// '.cs', '.scene'). Returns { path, count, files } as project-root-relative paths — CAPPED AT 500
+	/// files (count reflects the truncated list, with no marker that more exist), so on large projects
+	/// narrow with path/extension or use find_in_project. Recursive by default.
 	/// </summary>
 	/// <param name="path">Relative directory path to list (e.g. 'code/Components'). Defaults to project root.</param>
 	/// <param name="extension">Filter by file extension, including the dot (e.g. '.cs', '.scene').</param>
@@ -109,7 +120,9 @@ public static class BridgeProjectTools
 
 	/// <summary>
 	/// Update project configuration fields for publishing: title, description, version, type, package
-	/// ident, summary, visibility. Only provided fields are changed.
+	/// ident, summary, visibility. Only provided fields are changed — edits string values in the
+	/// .sbproj file in place. Returns { updated, path } (the .sbproj path); read the result back with
+	/// get_project_config to confirm what actually changed.
 	/// </summary>
 	/// <param name="title">Project display title.</param>
 	/// <param name="description">Project description for publishing.</param>
@@ -142,7 +155,11 @@ public static class BridgeProjectTools
 		=> McpGate.Run( "trigger_hotload", McpGate.Args() );
 
 	/// <summary>
-	/// Write or overwrite a file in the s&amp;box project. Creates parent directories as needed.
+	/// Write or overwrite a file in the s&amp;box project (SILENTLY replaces existing content —
+	/// read_file first if you need to preserve it). Creates parent directories as needed; paths are
+	/// confined to the project root (traversal outside it is denied). Returns a confirmation with the
+	/// path — for C# follow with trigger_hotload so it compiles; for assets (.vmat etc.) follow with
+	/// recompile_asset.
 	/// </summary>
 	/// <param name="path">Relative path for the file (e.g. 'code/Components/Health.cs').</param>
 	/// <param name="content">The full file content to write.</param>
