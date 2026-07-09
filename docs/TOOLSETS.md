@@ -10,7 +10,9 @@ else can mutate the project, scene, or editor state.
 
 Not part of this surface: the 6 tools whose names collide with native built-ins
 (spawn_model, list_scenes, save_scene, undo, redo, remove_component — use the built-in versions), and the 7
-lifeline tools that live in the stdio server (read_log, get_compile_errors, execute_csharp, search_docs, get_doc_page, list_doc_categories, run_self_test).
+stdio-server-side tools (read_log, get_compile_errors, execute_csharp, search_docs, get_doc_page, list_doc_categories, run_self_test).
+The slim `--lifeline` mode exposes 7 editor-down tools: that set minus execute_csharp,
+plus get_bridge_status (which is also on the native surface).
 
 | Toolset | Tools | Read-only | Purpose |
 |---|---|---|---|
