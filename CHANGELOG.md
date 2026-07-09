@@ -2,6 +2,29 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## [Unreleased] -- 2.0.0 "Native" (in progress)
+
+**The bridge migrates onto s&box's NATIVE editor MCP server (`http://127.0.0.1:7269/mcp`, shipped in the editor since 2026-07-06). The full tool surface becomes `[McpTool]` static methods discovered by the engine's ToolRegistry — streamable HTTP instead of 50 ms file polling, inline PNG screenshots instead of temp-file paths, XML docs as the schema, `[McpTool.ReadOnly]` permission hints, and hotload = live tool re-registration. All 219 handlers stay; a generated wrapper layer (`Editor/Mcp/`) delegates to the existing dispatch through one gate. Plan + Phase 0/1 live-verification results: `docs/plans/2026-07-08-native-mcp-migration.md`.**
+
+### Added (so far)
+
+- **Codegen pipeline**: `scripts/extract-manifest.mjs` (TS zod schemas → `tools-manifest.json`, 228 tools) + `scripts/emit-mcp-wrappers.mjs` (manifest → 24 `[McpToolset]` classes, 211 tools, 47 read-only + generated `docs/TOOLSETS.md`). Deterministic output, freshness-gated in CI.
+- **`Editor/Mcp/McpGate.cs`** — the single hand-written entry point: play-mode guard, handler lookup, error-object → exception conversion (native throw-to-report semantics).
+- **`Editor/Mcp/BridgeScreenshotTools.cs`** — `take_screenshot` / `capture_view` / `screenshot_from` / `screenshot_orbit` return **inline PNG image blocks** (`McpResult.Image`); orbit is now C#-native and returns every angle in one response.
+- **25 `bridge_*` toolsets** (24 generated + screenshots) — clean, described, collision-free groups browsable via the native `list_toolsets` / `describe_toolset`.
+- **`--lifeline` server mode** — the stdio TS server's long-term role: only the editor-down tools (read_log, get_compile_errors, docs, run_self_test, get_bridge_status), for diagnosing a dead editor that the native server dies with.
+- **`scripts/audit-mcp-quality.mjs`** — surface quality gate: built-in name/toolset collisions (hard fail), vague descriptions, missing param docs, missing next-step/limit notes.
+- **`scripts/verify-native-mcp.mjs`** — live verify-gate over streamable HTTP: toolset inventory, search discovery, read-only spot-runs, nullable-binding check, mutating GUID round-trip, inline-image check, error semantics.
+- **`docs/ADDING-A-TOOL.md`** — the new-tool factory: template, checklist, naming conventions, regeneration workflow.
+
+### Changed
+
+- `get_bridge_status` and `set_prefab_ref` were inline dispatch special cases invisible to the wrapper gate — both are now registered handlers (`Editor/CoreCommandHandlers.cs`; the dormant `SetPrefabRefHandler` finally registered), one dispatch path for both transports. **221 handlers** (was 219).
+
+### Dropped from the native surface (native built-ins are 1:1 equivalents)
+
+`spawn_model`, `list_scenes`, `save_scene`, `undo`, `redo`, `remove_component` — use the built-in `scene` toolset versions. All six remain available over file IPC (v1.x path) until v2.1.0.
+
 ## [1.20.0] -- 2026-07-08
 
 **+19 tools -- "Director's Cut", the biggest single wave since v1.4.0: same-week support for `Sandbox.MovieMaker` (it just landed in the shipping build) plus a broad Tier-2 sweep -- cinematics & dialogue, networking primitives, interaction & carry, loot/economy, and UI feedback. 228 tools / 219 handlers (was 209/200). Six new handler families, all additive -- no existing tool contract changed. Verify-gated live on Gravehold: all 15 codegen scaffolds generated -> hotloaded -> compile-checked clean -> TypeLibrary-load-confirmed (the gate caught a real SDK bug first -- see below), and the 4 MovieMaker tools live-verified end to end.**

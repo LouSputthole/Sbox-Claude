@@ -32,7 +32,7 @@ public static class ClaudeBridge
 
 	// Bridge build version — surfaced in status.json + the Status menu so a
 	// marketplace-addon-vs-MCP-server skew is visible at a glance.
-	private const string BridgeVersion = "1.20.0";
+	internal const string BridgeVersion = "1.20.0";
 
 	// status.json doubles as a heartbeat. _startedAtIso is stamped once at start;
 	// the heartbeat timestamp is refreshed from the frame loop at most once per
@@ -177,6 +177,7 @@ public static class ClaudeBridge
 	{
 		// ── Batch 1: File / project basics ──────────────────────────────
 		Register( "get_project_info",    () => new GetProjectInfoHandler() );
+		Register( "get_bridge_status",   () => new GetBridgeStatusHandler() );
 		Register( "list_project_files",  () => new ListProjectFilesHandler() );
 		Register( "read_file",           () => new ReadFileHandler() );
 		Register( "write_file",          () => new WriteFileHandler() );
@@ -713,23 +714,6 @@ public static class ClaudeBridge
 		if ( string.IsNullOrEmpty( command ) )
 			return MakeError( id, "Missing 'command'" );
 
-		// Built-in status command
-		if ( command == "get_bridge_status" )
-		{
-			return JsonSerializer.Serialize( new
-			{
-				id, success = true,
-				data = new
-				{
-					connected = true,
-					running = _running,
-					version = BridgeVersion,
-					handlerCount = _handlers.Count,
-					registeredCommands = _handlers.Keys.ToArray()
-				}
-			} );
-		}
-
 		// Refuse scene-mutating commands while in play mode. Mutations during play can
 		// corrupt the .scene file when serializer state and editor state diverge.
 		if ( IsSceneMutating( command ) && Game.IsPlaying )
@@ -740,58 +724,6 @@ public static class ClaudeBridge
 				success = false,
 				error = $"'{command}' is not allowed while play mode is active. Stop play first (stop_play) and try again."
 			} );
-		}
-
-		// Set prefab reference (inline — handles GameObject properties that set_property can't)
-		if ( command == "set_prefab_ref" )
-		{
-			try
-			{
-				var sceneRef = SceneEditorSession.Active?.Scene;
-				if ( sceneRef == null )
-					return JsonSerializer.Serialize( new { id, success = false, error = "No active scene" } );
-
-				var paramsEl = root.GetProperty( "params" );
-				var targetIdStr = paramsEl.GetProperty( "id" ).GetString();
-				if ( !Guid.TryParse( targetIdStr, out var targetGuid ) )
-					return JsonSerializer.Serialize( new { id, success = false, error = "Invalid target GUID" } );
-
-				var targetGo = sceneRef.Directory.FindByGuid( targetGuid );
-				if ( targetGo == null )
-					return JsonSerializer.Serialize( new { id, success = false, error = "Target GameObject not found" } );
-
-				var componentType = paramsEl.GetProperty( "component" ).GetString();
-				var propertyName = paramsEl.GetProperty( "property" ).GetString();
-				var prefabPath = paramsEl.GetProperty( "prefabPath" ).GetString();
-
-				var comp = targetGo.Components.GetAll()
-					.FirstOrDefault( c => c.GetType().Name.Equals( componentType, StringComparison.OrdinalIgnoreCase ) );
-				if ( comp == null )
-					return JsonSerializer.Serialize( new { id, success = false, error = $"Component not found: {componentType}" } );
-
-				var prefabFile = ResourceLibrary.Get<PrefabFile>( prefabPath );
-				if ( prefabFile == null )
-					return JsonSerializer.Serialize( new { id, success = false, error = $"Prefab not found: {prefabPath}" } );
-
-				GameObject prefabGo = null;
-				try { prefabGo = SceneUtility.GetPrefabScene( prefabFile ); }
-				catch ( Exception ex ) { return JsonSerializer.Serialize( new { id, success = false, error = $"GetPrefabScene failed: {ex.Message}" } ); }
-
-				if ( prefabGo == null )
-					return JsonSerializer.Serialize( new { id, success = false, error = "Prefab scene is null" } );
-
-				var tDesc = Game.TypeLibrary.GetType( comp.GetType().Name );
-				var prop = tDesc?.Properties.FirstOrDefault( pp => pp.Name == propertyName );
-				if ( prop == null )
-					return JsonSerializer.Serialize( new { id, success = false, error = $"Property not found: {propertyName}" } );
-
-				prop.SetValue( comp, prefabGo );
-				return JsonSerializer.Serialize( new { id, success = true, data = new { wired = propertyName, prefab = prefabPath } } );
-			}
-			catch ( Exception ex )
-			{
-				return MakeError( id, $"set_prefab_ref error: {ex.Message}" );
-			}
 		}
 
 		if ( _handlers.TryGetValue( command, out var handler ) )
@@ -813,10 +745,20 @@ public static class ClaudeBridge
 		return MakeError( id, $"Unknown command: {command}" );
 	}
 
+	/// <summary>
+	/// Look up a registered bridge handler by command name, or null. Used by the
+	/// native-MCP wrapper layer (Editor/Mcp/McpGate.cs) to reuse the same dispatch.
+	/// </summary>
+	internal static IBridgeHandler GetHandler( string command )
+		=> _handlers.TryGetValue( command, out var h ) ? h : null;
+
+	internal static bool IsRunning => _running;
+	internal static string[] RegisteredCommands => _handlers.Keys.ToArray();
+
 	// Many handlers signal failure by returning an object with a non-empty
 	// `error` string property instead of throwing. Detect that via reflection
 	// so the dispatch envelope reports success=false (audit P1).
-	static bool TryGetHandlerError( object result, out string err )
+	internal static bool TryGetHandlerError( object result, out string err )
 	{
 		err = null;
 		if ( result == null )

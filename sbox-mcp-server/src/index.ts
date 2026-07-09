@@ -192,6 +192,25 @@ const bridge = new BridgeClient(
   parseInt(process.env.SBOX_BRIDGE_PORT ?? "29015", 10)
 );
 
+// ── Lifeline mode (v2 migration) ───────────────────────────────────
+// With the native editor MCP server carrying the full tool surface, this stdio
+// server's long-term job is "editor-down diagnostics": the native server dies
+// with the editor; these tools read the log / docs directly and don't. --lifeline
+// registers ONLY that set by filtering server.tool() — everything else is a no-op.
+const LIFELINE_TOOLS = new Set([
+  "read_log", "get_compile_errors", "search_docs", "get_doc_page",
+  "list_doc_categories", "run_self_test", "get_bridge_status",
+]);
+if (args.includes("--lifeline")) {
+  const realTool = server.tool.bind(server);
+  (server as unknown as { tool: (...a: unknown[]) => unknown }).tool = (
+    ...toolArgs: unknown[]
+  ) => {
+    if (LIFELINE_TOOLS.has(toolArgs[0] as string)) return realTool(...(toolArgs as Parameters<typeof realTool>));
+    return undefined;
+  };
+}
+
 // Register all tools
 registerProjectTools(server, bridge);
 registerScriptTools(server, bridge);

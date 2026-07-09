@@ -20,3 +20,18 @@ jobs:
 
       - name: Parity audit (TS tools ↔ C# handlers + version lock)
         run: node scripts/audit-parity.mjs
+
+      - name: MCP tests
+        run: cd sbox-mcp-server && npm test
+
+      # Native-MCP wrapper layer must be regenerated whenever a TS zod schema
+      # changes — a dirty tree here means someone edited schemas without
+      # re-running the codegen (or hand-edited a generated file).
+      - name: Codegen freshness (manifest + [McpTool] wrappers + TOOLSETS.md)
+        run: |
+          node scripts/extract-manifest.mjs
+          node scripts/emit-mcp-wrappers.mjs
+          git diff --exit-code --stat -- scripts/tools-manifest.json sbox-bridge-addon/Editor/Mcp docs/TOOLSETS.md
+
+      - name: MCP surface quality gate (collisions = hard fail)
+        run: node scripts/audit-mcp-quality.mjs
