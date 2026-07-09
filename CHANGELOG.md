@@ -21,6 +21,13 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 
 - `get_bridge_status` and `set_prefab_ref` were inline dispatch special cases invisible to the wrapper gate — both are now registered handlers (`Editor/CoreCommandHandlers.cs`; the dormant `SetPrefabRefHandler` finally registered), one dispatch path for both transports. **221 handlers** (was 219).
 
+### Known limitations
+
+- **No auto-undo for bridge scene mutations** (native-server convention not adoptable):
+  `FullUndoSnapshot`/`UndoSystem.Snapshot` verified inert on engine 26.07.08b — the
+  built-in tools' undo uses an internal mechanism addons can't reach. Engine-watch item;
+  the verify-gate carries a SKIP marker until a public per-edit undo hook ships.
+
 ### Dropped from the native surface (native built-ins are 1:1 equivalents)
 
 `spawn_model`, `list_scenes`, `save_scene`, `undo`, `redo`, `remove_component` — use the built-in `scene` toolset versions. All six remain available over file IPC (v1.x path) until v2.1.0.

@@ -20,10 +20,14 @@ COMPLETE (2026-07-09, 156 quality warnings → 0) — undo-convention verificati
   schema as unrepresentable). Live-verified via the gate (path-param discriminator check).
 - **execute_csharp template FIXED** (26.07.08b: `Sandbox.Log` → bare `Log`, matching the
   addon's own pattern). Compile-level fix; live QA at release.
-- **Undo convention (Phase 3 item)**: McpGate pushes `UndoSystem.Snapshot("bridge: <cmd>")
-  AFTER successful scene-mutating commands (docs: "call after you make a change";
-  the earlier before-mutation `FullUndoSnapshot` attempt landed nothing on the stack).
-  Verify-gate check added (create → built-in undo → object gone). VERIFICATION IN FLIGHT.
+- **Undo convention (Phase 3 item) — PARKED, engine limitation.** Verified live on
+  26.07.08b: `SceneEditorSession.FullUndoSnapshot` AND `UndoSystem.Snapshot` are both
+  INERT (snapshot pair around a real mutation → built-in undo says "Nothing to undo";
+  `UndoSystem.Back.Count` stays 0 even after built-in tool edits). The built-in tools'
+  per-edit undo uses an internal mechanism addons can't reach. Alternatives rejected:
+  `ISceneEditorSession.AddUndo(title, undo, redo)` with full scene re-serialize per
+  mutating call — too costly as a default on big scenes. ENGINE-WATCH: rewire when a
+  public per-edit undo hook ships. Gate check downgraded to SKIP with the note.
 - **New gotcha documented (BRIDGE_GOTCHAS.md #9)**: the Libraries file-watcher is
   unreliable for external edits — sync then `restart_editor` is the only dependable
   recompile loop; successful compiles log nothing (fingerprint = status.json handlerCount).

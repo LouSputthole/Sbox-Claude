@@ -12,7 +12,7 @@ the big stdio tool server are replaced by `[McpTool]` methods the engine discove
 | Screenshots | temp-file path you read back | **inline PNG in the tool result** |
 | Tool discovery | 228 tools flat in tools/list | `search_tools` / 25 described toolsets |
 | Permission prompts | every tool | read-only tools are `[McpTool.ReadOnly]`-hinted — clients can skip prompts |
-| Undo | per-handler, inconsistent | every scene-mutating tool pushes an undo step |
+| Errors | `{ error }` payloads in successful responses | real tool errors (thrown, readable) |
 | Editor crashed? | read_log / get_compile_errors still work | same — via the slim **lifeline** server |
 | Node.js required | yes (npx) | only for the optional lifeline server |
 
@@ -72,7 +72,8 @@ payloads inside a successful response.
 - Vectors/rotations as comma strings: `"x,y,z"`, `"pitch,yaw,roll"` (JSON objects still accepted).
 - Objects and components are referenced by GUID (from `get_scene_hierarchy` / `find_objects`).
 - List tools accept `limit`-style params and say so in their descriptions.
-- Scene-mutating bridge tools refuse during play mode and push an undo step in edit mode.
+- Scene-mutating bridge tools refuse during play mode. (Auto-undo for bridge mutations is
+  an engine-watch item — the public snapshot APIs are inert on current builds.)
 
 ## Timeline
 

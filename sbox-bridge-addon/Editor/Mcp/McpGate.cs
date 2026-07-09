@@ -61,17 +61,13 @@ internal static class McpGate
 		if ( ClaudeBridge.TryGetHandlerError( result, out var err ) )
 			throw new Exception( err );
 
-		// Native-server convention: "Every tool that edits the scene pushes an undo step."
-		// UndoSystem.Snapshot is documented "call AFTER you make a change" — the snapshot
-		// diff against the previous one becomes the undo entry, so the built-in `undo`
-		// restores the pre-call scene. Generic full snapshot: the right (only) option for
-		// a gate over heterogeneous handlers.
-		if ( ClaudeBridge.IsSceneMutating( command ) )
-		{
-			try { SceneEditorSession.Active?.UndoSystem?.Snapshot( $"bridge: {command}" ); }
-			catch { /* undo is best-effort — never block the actual command */ }
-		}
-
+		// ponytail: NO auto-undo step — verified inert on 26.07.08b. Both
+		// SceneEditorSession.FullUndoSnapshot and UndoSystem.Snapshot push nothing the
+		// built-in undo tool can see (tested live: snapshot pair around a real mutation →
+		// "Nothing to undo"; built-in create_game_object → undo works, via an internal
+		// mechanism addons can't reach). Revisit when Facepunch exposes the real per-edit
+		// undo hook; the alternative (AddUndo with full scene re-serialize per mutating
+		// call) costs too much on big scenes to be a default.
 		return result;
 	}
 }
