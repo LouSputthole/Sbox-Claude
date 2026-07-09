@@ -9,21 +9,23 @@ This skill is the workflow you follow whenever you're about to make non-trivial 
 
 **Pair this with the `sbox-api` skill** — that's the *brain* (how to write correct s&box C#: the Unity→s&box translation table, the Ten Rules, and component/UI/networking/physics references). This `sbox-build-feature` skill is the *hands + eyes* (drive the editor, screenshot, verify live). Write it right with `sbox-api`; then build it, run it, and SEE it with the bridge. And the bridge's live reflection (`describe_type`/`search_types`/`get_method_signature`) is the authoritative signature check for your installed SDK.
 
+**Invocation (v2, native MCP):** the tool names below are the plain bridge tool names, served by s&box's native editor MCP server. Find them with `search_tools "<terms>"`, run them with `call_tool {name, arguments}` (batch several in one round trip with `call_tools`), and browse groups with `list_toolsets` / `describe_toolset`. Six names — `spawn_model`, `list_scenes`, `save_scene`, `undo`, `redo`, `remove_component` — are served by the native server's own built-ins: same names, same semantics, Facepunch's implementations.
+
 ## Hard rule: never declare a visual feature "working" without seeing it
 
 If your change affects anything visual (a model, a position, an animation, a UI panel, a particle, a light), you **must** see it before saying the work is done. You're a multimodal model — you can read PNGs.
 
-**Aim the camera, or you'll screenshot the wrong thing.** `mcp__sbox__take_screenshot` renders from the scene's **Main Camera** — one fixed angle that usually isn't pointed at what you just changed. Use **`mcp__sbox__screenshot_from`** to point the camera at your target object/point, capture, and restore. This is the single highest-leverage habit in the whole workflow.
+**Aim the camera, or you'll screenshot the wrong thing.** `take_screenshot` renders the **main camera** view (the player's view in play mode) — one angle that usually isn't pointed at what you just changed. Use **`capture_view`** (or its historical alias `screenshot_from`) to frame your target object/point, or `screenshot_orbit` for several angles in one call. Every screenshot tool returns the PNG **inline in the tool result** — the image is right there in the response; there is no file to hunt down. This is the single highest-leverage habit in the whole workflow.
 
 ## The Workflow — six steps, in order
 
 ### 1. Confirm the bridge is alive
 
 ```
-mcp__sbox__get_bridge_status
+get_bridge_status
 ```
 
-If timed out: s&box isn't running, or the editor is mid-compile/relaunch. (The bridge's frame loop runs independently of the dock as of v1.3.0 — the dock no longer needs to be open.) Don't go further until it responds.
+If the native server doesn't answer: s&box isn't running, the editor is mid-compile/relaunch, or the MCP server is off — check **Editor → Preferences → MCP Server** (on by default at `http://127.0.0.1:7269/mcp`). If the editor log says `[MCP] Couldn't start MCP server on port 7269`, a stale HTTP.sys registration from a dying editor instance is holding the port — restart the editor once the stale process exits. Don't go further until it responds.
 
 ### 2. Brainstorm before code (for non-trivial features)
 
@@ -40,9 +42,9 @@ If the feature is more than a one-line tweak — anything that involves:
 Before writing code that calls a type or method you haven't verified exists in the current SDK build:
 
 ```
-mcp__sbox__describe_type    name="CitizenAnimationHelper"
-mcp__sbox__search_types     pattern="*Renderer"
-mcp__sbox__get_method_signature  type="GameObject" method="AddComponent"
+describe_type           name="CitizenAnimationHelper"
+search_types            pattern="*Renderer"
+get_method_signature    type="GameObject" method="AddComponent"
 ```
 
 s&box's API changes between versions. Reflection is the source of truth, not your training data. Look it up.
@@ -58,7 +60,7 @@ If you need broader documentation (animation graph, IK setup, rendering pipeline
 ### 5. Hotload and verify compile
 
 ```
-mcp__sbox__trigger_hotload
+trigger_hotload
 ```
 
 Then tail the log:
@@ -70,17 +72,21 @@ tail -30 "$LOG" | grep -iE "Compile of 'local\.<projectname>.*Failed|Error \|"
 
 **`Compile of 'local.X' Failed`** lines from earlier hotloads can be stale and survive in the log — what matters is whether the line timestamp is recent and the error message mentions YOUR file. If there's a real error: fix it, re-hotload, re-check.
 
-### 6. Screenshot and read it yourself
+### 6. Screenshot and look at it
 
 For any visual change, **aim the camera at the thing you changed**:
 
 ```
-mcp__sbox__screenshot_from   target=<object GUID or world point>
+capture_view       id=<object GUID>          # auto-frame an object (screenshot_from is the same tool, older name)
+capture_view       position=… lookAt=…       # free camera at any angle
+screenshot_orbit   id=<object GUID>          # several angles in one call
 ```
 
-`screenshot_from` moves the Main Camera to frame your target, captures, and restores it. Plain `mcp__sbox__take_screenshot` renders the Main Camera's *current* angle — fine if it already frames your subject, useless otherwise. Either way the file saves to `<sbox-install>/screenshots/sbox.<timestamp>.png` (the `path` parameter is ignored — known quirk). Use `Bash` to list newest by mtime, then `Read` on the PNG. **Look at the image.** If it doesn't match the design, iterate. Don't declare the feature done based on the code looking right.
+The PNG comes back **inline in the tool result** — there is no file path to read back; the image is right there in the response. Plain `take_screenshot` renders the main camera's view (the player's view in play mode) — fine if it already frames your subject, useless otherwise. `capture_view` shoots from a temporary camera (auto-framed on an object, or free position+lookAt) and cleans up after itself; `screenshot_orbit` orbits an object and returns every angle at once. **Look at the image.** If it doesn't match the design, iterate. Don't declare the feature done based on the code looking right.
 
-For diagnosing a compile/runtime failure, you don't need the editor to respond: `mcp__sbox__get_compile_errors` and `mcp__sbox__read_log` read `sbox-dev.log` directly.
+The verify loop is exactly: **make the change → call `take_screenshot` (or `capture_view` / `screenshot_orbit` for framed or multi-angle shots) → look at the returned image.**
+
+For diagnosing a compile/runtime failure, you don't need the editor to respond: `get_compile_errors` and `read_log` live on the **lifeline** server (`npx -y sbox-mcp-server@2 --lifeline`) and read `sbox-dev.log` directly — the native server dies with the editor; the lifeline doesn't.
 
 For timing-sensitive captures (e.g. a 0.20s animation phase), coordinate with the user: "press the action and tell me 'go' the moment you do" — fire `take_screenshot` immediately, the round-trip captures roughly the right window.
 
@@ -88,7 +94,7 @@ For timing-sensitive captures (e.g. a 0.20s animation phase), coordinate with th
 
 The bridge can verify *gameplay*, not just the edit scene — but the play-mode tools behave differently from the edit-mode ones:
 
-- **`capture_view` is the play-mode eyes.** It renders a camera's view of the *active* scene (`RenderToBitmap`), so in **play mode it captures the running game** — no args = the live main camera (player POV); pass `position`/`id` for a temp camera at any angle. `take_screenshot`/`screenshot_from` are **edit-only**. After it returns, `Read` the PNG at the `path` it gives you.
+- **Seeing the running game:** `take_screenshot` in play mode IS the player's POV (the live main camera). `capture_view` renders the *active* scene from any viewpoint — no args = the live main camera; pass `position`/`id` for a temp camera at any angle. Either way the PNG arrives **inline in the tool result** — look at the returned image, there's no path to read back.
 - **`capture_view` sees *through* screen-space menus.** It renders the world + **world-space** UI but NOT fullscreen **screen-space** panels (lobby/title `ScreenPanel`s) — so a fullscreen lobby overlay won't black it out, but it also won't show screen-space HUD. `take_screenshot` (literal viewport) is the screen-space-UI complement.
 - **To start a match / fire game logic / get past an in-game menu, use `invoke_button`.** It calls *any parameterless public method* on a component (not just `[Button]`s) — e.g. `invoke_button` with `component="SasquatchedGame" method="StartGame"` leaves the lobby. The bridge can't synthesize a UI click; this is how you drive game state.
 - **Networked components are proxies in a no-session solo playtest** — a host-authoritative component (`if (IsProxy) return;`) won't run solo. Generate NPC brains etc. with `networked:false` to iterate solo, or start a host session.
@@ -117,7 +123,7 @@ The bridge connects to a single running s&box editor. **Multiple agents cannot d
 | Citizen "head" bone exists but bone names are case-sensitive | `TryGetBoneTransform("head")` — lowercase |
 | `CitizenAnimationHelper.IkRightHand` is a writable GameObject — IK works at runtime | Set it to a target GO to drive the hand via IK |
 | `set_property` for `Color` wants `"r, g, b, a"` as a string, not a JSON object | Format the value as a comma-separated string |
-| `take_screenshot` renders the **Main Camera** (one fixed angle) and ignores its `path` arg | Use `screenshot_from` to aim at your target; read the latest file in `<sbox>/screenshots/` |
+| `take_screenshot` renders the **main camera** view only (the player's view in play mode) | Use `capture_view`/`screenshot_from` to frame your target, or `screenshot_orbit` for multi-angle; the PNG arrives **inline in the tool result** — no file to read back |
 | Runtime `ParticleEffect` tools (`spawn_particle`, `add_trail`, `add_beam`) don't render through the bridge | Use `spawn_vpcf` (compiled `.vpcf` + `LegacyParticleSystem`) |
 | Play-state flags | `is_playing.isPlaying` is authoritative (`gameFlag‖tracked`); `sessionPlaying` is diagnostic-only and can read stale |
 | A placed `EnvmapProbe` captures nothing until baked | Call `bake_reflections` |
@@ -126,7 +132,7 @@ The bridge connects to a single running s&box editor. **Multiple agents cannot d
 | Code-gen tools (`create_npc_brain`, `create_*_system`, `create_player_controller`) write game-code *strings* — inspection misses compile errors | Always compile-verify the generated component: `describe_type <Class>` resolves only if it compiled (or scan the log for `error CS`) |
 | `trigger_hotload` doesn't reliably recompile externally-edited `.cs` | Entering play (`start_play`) forces the project recompile; **addon** changes need a full `restart_editor` |
 | Generated game code runs in the sandbox | Only sandbox-allowed BCL compiles. `using System;` is needed for things you'd assume are global — e.g. **`Random.Shared.Float`/`.Int`** is `System.Random.Shared` + a Sandbox extension, so a missing `using System;` fails with "name 'Random' does not exist". (For math specifically, see the MathX/Math/MathF row above — it's nuanced, not a blanket ban.) |
-| `set_property`/`add_component_with_properties` now coerce asset + reference props | You can set `Model`/`Material`/`GameObject`/`Component` props by path/GUID; an unresolvable value returns `success:false` (no more silent null) |
+| `set_property`/`add_component_with_properties` now coerce asset + reference props | You can set `Model`/`Material`/`GameObject`/`Component` props by path/GUID; an unresolvable value fails with a real tool error (no more silent null) |
 | Trigger a Citizen attack/one-shot animation | `helper.HoldType = HoldTypes.Punch` + `helper.Target.Set("b_attack", true)` (one-shot bool trigger). Reset `HoldType` after ~0.4s or the pose sticks |
 | Play a sound in code | `Sound.Play("sounds/<name>.sound", worldPos)` — paths resolve case-insensitively, no `Assets/` prefix |
 | New `Sandbox.LipSync` component (2026-07-01 engine update) drives facial morphs from audio | Use `add_lipsync` to wire it to a citizen/model — `SkinnedModelRenderer` + a `SoundPointComponent` bound to a `.sound` path (or an existing sound component); morphs only animate while the sound plays, so verify with `capture_view` in **play mode**, not an edit-mode screenshot |

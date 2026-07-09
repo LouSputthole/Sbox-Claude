@@ -9,7 +9,7 @@ description: Use when writing or modifying code for s&box, sbox, the Facepunch s
 
 **s&box is not Unity.** `MonoBehaviour`, `Start()`, `Update()`, `GetComponent<T>()` call sites, `Instantiate()`, `Destroy(gameObject)`, `Debug.Log`, `[SerializeField]`, `Input.GetKey()`, `Physics.Raycast` — **none of these exist**. If you write any of them you have hallucinated.
 
-s&box is a C# scripting layer on Source 2 by Facepunch. The scene system uses `GameObject` + `Component` with a different lifecycle, a different networking model, and a different API surface. **The single source of truth is the LIVE editor reflection via the Claude Bridge** — `mcp__sbox__describe_type` / `search_types` / `get_method_signature` query the actually-installed SDK. If anything in this skill disagrees with what the bridge reports for your build, the live reflection wins. The curated references here teach the patterns + mental model; verify exact signatures live.
+s&box is a C# scripting layer on Source 2 by Facepunch. The scene system uses `GameObject` + `Component` with a different lifecycle, a different networking model, and a different API surface. **The single source of truth is the LIVE editor reflection via the Claude Bridge** — `describe_type` / `search_types` / `get_method_signature` (bridge tools on s&box's native MCP server, invoked by plain name via `call_tool`) query the actually-installed SDK. If anything in this skill disagrees with what the bridge reports for your build, the live reflection wins. The curated references here teach the patterns + mental model; verify exact signatures live.
 
 **Before you write a single line of s&box code, open the relevant reference file.** SKILL.md is a router — it points you at the answer, it does not contain the answer. Writing a component? Open `references/core-concepts.md`. Writing UI? Open `references/ui-razor.md`. No exceptions for "simple" tasks — your muscle memory is wrong.
 
@@ -74,8 +74,8 @@ Match the task, open the file. Do not guess; open the file.
 | Use `Vector3` / `Rotation` / `Angles` / `Transform` / `BBox` / `Ray` / `Capsule` | `references/input-and-physics.md` → *Math Types* |
 | Use `Time.Now`, `Time.Delta`, `TimeSince`, `TimeUntil` | `references/input-and-physics.md` → *Time* |
 | Draw debug gizmos (`DrawGizmos`, `Gizmo.Draw`) | `references/input-and-physics.md` → *Gizmo* |
-| Need the full signature of `GameObject`, `Component`, `Scene`, `Input`, etc. | **Claude Bridge (live):** `mcp__sbox__describe_type` / `get_method_signature` |
-| Look up whether a given type exists & what it does | **Claude Bridge (live):** `mcp__sbox__search_types` / `describe_type`; prose guides via `search_docs` |
+| Need the full signature of `GameObject`, `Component`, `Scene`, `Input`, etc. | **Claude Bridge (live):** `describe_type` / `get_method_signature` via `call_tool` |
+| Look up whether a given type exists & what it does | **Claude Bridge (live):** `search_types` / `describe_type` via `call_tool`; prose guides via `search_docs` (lifeline server) |
 | See a complete worked example of a pattern before writing your own | `references/patterns-and-examples.md` |
 
 ---
@@ -136,7 +136,7 @@ Any time you write one of the left column, you are hallucinating. Use the right 
 | `UnityEngine.Networking.UnityWebRequest` | `Http.RequestStringAsync(...)` / `Http.RequestJsonAsync<T>(...)` |
 | `Update()` reads `Input.*` AND moves rigidbody | Read input in `OnUpdate`, move in `OnFixedUpdate` |
 
-If a Unity pattern isn't in the table, assume it doesn't exist in s&box and verify with the Claude Bridge — `mcp__sbox__describe_type` / `search_types` — before writing it.
+If a Unity pattern isn't in the table, assume it doesn't exist in s&box and verify with the Claude Bridge — `describe_type` / `search_types` — before writing it.
 
 ---
 
@@ -151,7 +151,7 @@ If a Unity pattern isn't in the table, assume it doesn't exist in s&box and veri
 7. **UI is Razor + flexbox.** `display: flex` is the default and effectively the only layout. `display: block` does not exist. Properties `:intro` / `:outro` animate creation and deletion. Every root panel overrides `BuildHash()` to control re-render.
 8. **Coroutines don't exist — use `async Task`.** `await Task.DelaySeconds( n )`, `await Task.Frame()`. Fire-and-forget with `_ = MyTask();`. The `Component.Task` property scopes cancellation to the GameObject lifetime.
 9. **Never touch blocked .NET APIs.** `System.IO.File`, `Console`, `Thread`, raw sockets, `System.Net.Http.HttpClient` — use `FileSystem.Data`, `Log`, `async/await`, `Http` instead. Code that references these won't compile in the sandbox.
-10. **Look up every API before you use it — live.** The Claude Bridge reflects the actually-installed SDK: `mcp__sbox__describe_type` (a type's members), `search_types` (does it exist?), `get_method_signature` (exact params). If `describe_type` doesn't show a method, you're guessing — stop. s&box's API shifts between SDK builds, so live reflection beats any static list.
+10. **Look up every API before you use it — live.** The Claude Bridge reflects the actually-installed SDK: `describe_type` (a type's members), `search_types` (does it exist?), `get_method_signature` (exact params). If `describe_type` doesn't show a method, you're guessing — stop. s&box's API shifts between SDK builds, so live reflection beats any static list.
 
 ---
 
@@ -262,9 +262,9 @@ These are things that will bite you. They're documented deeper in the reference 
 If you're about to write an API call and you're not sure it exists:
 
 1. **Check the topical file** for the area first (`networking.md`, `ui-razor.md`, etc.). Topical files include inline signatures for the APIs they cover.
-2. **Verify it live with the bridge.** `mcp__sbox__search_types pattern="*Foo*"` to find the type, `mcp__sbox__describe_type name="Foo"` for its members, `mcp__sbox__get_method_signature` for exact params. This reflects YOUR installed SDK — the real source of truth.
+2. **Verify it live with the bridge.** `search_types pattern="*Foo*"` to find the type, `describe_type name="Foo"` for its members, `get_method_signature` for exact params — each invoked through the native server's `call_tool`. This reflects YOUR installed SDK — the real source of truth.
 3. **If the bridge's reflection doesn't show it, it does not exist** in your build. Do not write it. Revisit your design — there is almost certainly an s&box-idiomatic way to do what you want.
-4. **For official guides/prose** (animgraph, rendering pipeline), use `mcp__sbox__search_docs`.
+4. **For official guides/prose** (animgraph, rendering pipeline), use `search_docs` (served by the optional `sbox-lifeline` stdio server).
 
 This skill's curated references teach the patterns + the mental model; the bridge's live reflection is the authoritative signature check.
 

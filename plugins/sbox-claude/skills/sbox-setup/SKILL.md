@@ -16,14 +16,26 @@ A short, friendly orientation for someone who just connected the bridge. A few b
 **1. Welcome**
 > 👋 Thanks for using the s&box Claude Bridge — let's get you oriented in about 30 seconds.
 
-**2. Confirm the bridge is live**
-Call `mcp__sbox__get_bridge_status`. If it's not connected, stop and help fix it first:
-- IPC-dir mismatch → set `SBOX_BRIDGE_IPC_DIR` on both sides (see `TROUBLESHOOTING.md`).
-- The **Claude Bridge dock must be open/visible** in s&box, or the frame loop won't run.
-- Make sure s&box is running with the addon installed.
+**2. Confirm the native server is live**
+The editor ships its own MCP server, on by default at `http://127.0.0.1:7269/mcp`. Quickest check: call `mcp__sbox__search_tools` (or `list_toolsets`) — if it answers, you're connected. (A raw `initialize`/`list_toolsets` probe against the endpoint proves the same thing.) Not registered with Claude Code yet? One line:
+
+```
+claude mcp add --transport http sbox http://127.0.0.1:7269/mcp
+```
+
+Recommended second entry — the **lifeline** keeps `read_log` / `get_compile_errors` / docs search working when the editor is down (the native server dies with the editor):
+
+```
+claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2 --lifeline
+```
+
+If the endpoint doesn't answer, stop and help fix it first:
+- Check **Editor → Preferences → MCP Server** — it should be on (it's the default), port 7269.
+- Editor log says `[MCP] Couldn't start MCP server on port 7269`? A stale HTTP.sys registration from a dying editor instance is holding the port — restart the editor once the stale process exits.
+- Make sure s&box is running with the `claudebridge` library installed — that's what puts the bridge tools on the server.
 
 **3. Detect their libraries**
-Call `mcp__sbox__list_libraries` and summarize in plain language. Call out the useful ones:
+Call `list_libraries` (via `call_tool`) and summarize in plain language. Call out the useful ones:
 - A character controller — `fish.scc` (Shrimple) or `facepunch.playercontroller` → "I can wire up player movement with this, no code from scratch."
 - World/build tools — splines, roads, interiors, tree/asset browsers → mention they're on hand.
 - `claudebridge` — that's me, the bridge itself.
@@ -35,7 +47,7 @@ Based on what's installed and whether the scene is empty (peek with `get_scene_h
 - "Set the mood — `apply_atmosphere`, fog, a skybox."
 
 **5. Help + feedback**
-- **Troubleshooting:** I can read my own errors (`read_log`, `get_compile_errors`), and there's a full `TROUBLESHOOTING.md`. Just ask me here anytime — that's what I'm for.
+- **Troubleshooting:** I can read my own errors (`read_log`, `get_compile_errors` — they live on the lifeline server, so they work even when the editor is down), and there's a full `TROUBLESHOOTING.md`. Just ask me here anytime — that's what I'm for.
 - **Bugs / feedback:** GitHub issues — https://github.com/LouSputthole/Sbox-Claude/issues
 - Built by **sboxskins.gg**.
 
@@ -43,5 +55,5 @@ Based on what's installed and whether the scene is empty (peek with `get_scene_h
 > What do you want to build first?
 
 ## Notes
-- Use `screenshot_from` to *show* results — `take_screenshot` is locked to the scene's Main Camera, so it won't be aimed at what you changed.
+- Use `capture_view` (or its alias `screenshot_from`) to *show* results framed on what you changed — `take_screenshot` is the main camera's view (the player's view in play mode), so it may not be aimed at it. Screenshots come back **inline in the tool result** — just look at the returned image.
 - This is a guide, not a script. Read the room: a returning power user doesn't need the welcome.

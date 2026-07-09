@@ -177,7 +177,7 @@ private void TryPurchaseOrder( RestaurantComponent restaurant, Dictionary<string
 
 ## Verify live
 
-Reflection is authoritative for the installed SDK. Confirm members before you write code: `mcp__sbox__describe_type SyncFlags`, `mcp__sbox__search_types ResourceLibrary`, `mcp__sbox__describe_type GameObject` (for `NetworkSpawn`/`Network.Active`/`IsProxy`), and `mcp__sbox__describe_type Sandbox.Services.Stats`.
+Reflection is authoritative for the installed SDK. Confirm members before you write code: `describe_type SyncFlags`, `search_types ResourceLibrary`, `describe_type GameObject` (for `NetworkSpawn`/`Network.Active`/`IsProxy`), and `describe_type Sandbox.Services.Stats`.
 
 Cross-link: use **sbox-api** for exact type/member signatures, and **sbox-build-feature** for the screenshot-driven build-and-iterate loop when wiring the shop UI.
 

@@ -151,7 +151,7 @@ Verbatim from elevator (`ShopInteraction.cs:19-27`), gated behind a `ShopConfirm
 
 ## Verify live
 
-The reflected SDK is authoritative — confirm types/signatures before coding: `mcp__sbox__search_types "GameResource"`, `mcp__sbox__describe_type "Sandbox.Services.Stats"`, `mcp__sbox__describe_type "ResourceLibrary"`. API drifts between SDK versions; reflection beats memory.
+The reflected SDK is authoritative — confirm types/signatures before coding: `search_types "GameResource"`, `describe_type "Sandbox.Services.Stats"`, `describe_type "ResourceLibrary"`. API drifts between SDK versions; reflection beats memory.
 
 Cross-links: see the **sbox-api** skill for resolving exact type/member signatures, and the **sbox-build-feature** skill for the screenshot-driven build loop when wiring the kiosk UI.
 

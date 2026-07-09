@@ -325,5 +325,5 @@ A `static readonly` per-`Connection` cooldown gate that guards your buy/upgrade/
 - **barrelproto.ragroll** (`Code/mode/achievements/`, `mode/score/ModeScore.cs`) — achievements as event-listeners + combo-multiplier accumulator.
 
 ---
-**Verify live:** the installed SDK is authoritative — confirm `GameResource`, `[AssetType]`, `Sync`/`SyncFlags`, `Rpc.Host`, `NetList<T>`, `Sandbox.Services.Stats`, and `FileSystem.Data` with `mcp__sbox__describe_type` / `mcp__sbox__search_types` before relying on a signature. Reflection beats training data; the API shifts between versions.
+**Verify live:** the installed SDK is authoritative — confirm `GameResource`, `[AssetType]`, `Sync`/`SyncFlags`, `Rpc.Host`, `NetList<T>`, `Sandbox.Services.Stats`, and `FileSystem.Data` with `describe_type` / `search_types` before relying on a signature. Reflection beats training data; the API shifts between versions.
 **See also:** `sbox-api` (look up exact type/method signatures) and `sbox-build-feature` (the screenshot-driven build-and-iterate loop).

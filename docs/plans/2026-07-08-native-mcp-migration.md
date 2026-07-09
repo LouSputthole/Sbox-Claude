@@ -274,6 +274,23 @@ complex objects map to `JsonNode`; arrays map to `T[]`. Handlers keep doing the 
 - Fold conventions: adopt `limit`/`offset` paging + comma-string-first vector docs everywhere.
 - Loopback multi-instance watch (v1.21.0 item) unaffected — orthogonal.
 
+## Release sequence (v2.0.0 — user-gated steps marked 👤)
+
+The GitHub marketplace serves the plugin from `main` — pushing early would hand v2 skills
+to v1.20 users. Everything below happens in ONE release session, in order:
+
+1. Version bumps: `sbox-mcp-server/package.json` → 2.0.0, `BridgeVersion` const → 2.0.0,
+   plugin `plugin.json` + marketplace.json → 2.x, CHANGELOG `[Unreleased]` → `[2.0.0]`.
+2. Plugin `.mcp.json` flip: `sbox` → `{type:"http", url:"http://127.0.0.1:7269/mcp"}`,
+   add `sbox-lifeline` → `npx -y sbox-mcp-server@2.0.0 --lifeline`.
+3. Gates: audit-parity, audit-mcp-quality, npm test, codegen freshness, verify-native-mcp
+   (live editor), execute_csharp live QA (template fix), lifeline handshake.
+4. 👤 `npm publish` (2.0.0).
+5. `git push` main + tag v2.0.0 (marketplace updates now — after npm exists).
+6. 👤 s&box Asset Library republish of the addon (GUI step, Org sboxskinsgg).
+7. Post-release: `claude mcp add --transport http` smoke test from a clean machine profile;
+   graph regen (`scripts/regen-graph.ps1 -RepoRoot ...`).
+
 ## Risks / open questions
 
 | Risk | Mitigation |
