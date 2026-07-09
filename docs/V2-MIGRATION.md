@@ -4,13 +4,16 @@ v2.0.0 moves the bridge onto **s&box's built-in editor MCP server** (shipped in 
 since July 2026, on by default at `http://127.0.0.1:7269/mcp`). The file-IPC transport and
 the big stdio tool server are replaced by `[McpTool]` methods the engine discovers itself.
 
+> For the big picture — why the rebuild, what creators can now do, the roadmap — see the
+> **[relaunch overview](RELAUNCH.md)**. This page is the practical upgrade guide.
+
 ## What you get
 
 | | v1.x (file IPC) | v2.0 (native) |
 |---|---|---|
 | Transport | 50 ms file polling in %TEMP% | streamable HTTP, loopback-only |
 | Screenshots | temp-file path you read back | **inline PNG in the tool result** |
-| Tool discovery | 228 tools flat in tools/list | `search_tools` / 25 described toolsets |
+| Tool discovery | 228 tools flat in tools/list | `search_tools` / 28 described toolsets |
 | Permission prompts | every tool | read-only tools are `[McpTool.ReadOnly]`-hinted — clients can skip prompts |
 | Errors | `{ error }` payloads in successful responses | real tool errors (thrown, readable) |
 | Editor crashed? | read_log / get_compile_errors still work | same — via the slim **lifeline** server |
@@ -66,6 +69,28 @@ return the PNG inline as an image content block — stop reading files from disk
 
 **Errors** are real tool errors now (the handler's message, thrown), not `{ error: "..." }`
 payloads inside a successful response.
+
+## New tools in the v2 surface (waves 1-4)
+
+The relaunch shipped more than transport — four waves of new tools landed alongside it. Your
+existing calls are unchanged; these are additions worth knowing about:
+
+- **Orientation & health (wave 1):** `describe_project` (one-call project orientation),
+  `find_broken_references` (scene + file-level broken-ref scan), and `batch_set_property` —
+  the first landing of the **`dryRun: true`** validate-first convention.
+- **Real prefabs & batch buildout (wave 2):** `create_prefab` / `instantiate_prefab` now do a
+  full engine serialization + true instantiation (guid-remapped, collision-free);
+  `batch_delete` / `batch_add_component` / `batch_reparent` round out `bridge_batch`;
+  `playtest_abort` stops a stuck run.
+- **Scene checkpoints & orientation (wave 3):** the new `bridge_workflow` toolset —
+  `checkpoint_scene` / `restore_checkpoint` / `list_checkpoints`, the **agent-side undo** —
+  plus `describe_scene`, `create_team_assigner`, and `create_idle_income`.
+- **Vehicles (wave 4):** the new `bridge_vehicle` toolset — `create_vehicle_controller`
+  (drivable raycast car with a built-in driver seat), `create_seat_system`, `tune_vehicle`
+  (arcade/drift/offroad/race presets), and `create_physics_grab_tool`.
+
+Browse them all in the generated [TOOLSETS.md](TOOLSETS.md); the plain-English tour is
+[ECOSYSTEM.md](ECOSYSTEM.md).
 
 ## Conventions (align with the native server)
 

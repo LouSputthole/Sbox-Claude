@@ -61,6 +61,65 @@ Checklist per tool:
       `search_tools "<name>"` finds it → `call_tool` runs it → result shape is what the
       docs promise.
 
+## Documentation standards
+
+On the native server, **the XML docs ARE the tool's schema** — the `<summary>` becomes the
+tool description agents search and read, and each `<param>` becomes that parameter's schema
+description. A vague or dishonest description is a broken tool: the agent can't find it, calls
+it wrong, or trusts a promise the handler doesn't keep. The v2.0.0 description sweep drove 156
+quality warnings to zero and corrected ~20 dishonest descriptions precisely because this is
+load-bearing. Hold new tools to the same bar (`node scripts/audit-mcp-quality.mjs` enforces it).
+
+### The `<summary>` must cover five things
+
+1. **What it does** — one clear sentence, in agent-facing words, with searchable terms (agents
+   find tools by `search_tools`, so name the domain: "raycast", "navmesh", "prefab").
+2. **What it returns** — the real shape, with the real field names, verified against the
+   handler's return statement. "Returns `{ id, name }` for matches" — not "returns the results".
+3. **What to do next** — the tool it chains into. "Pass a returned id to `set_transform` /
+   `add_component_with_properties`." This is how agents plan a chain.
+4. **Limits & truncation** — default and max `limit`, silent caps, "capped at 500 with no
+   marker that more exist". If a result can be truncated, say so.
+5. **Surprising or destructive behavior** — "Destructive and NOT undoable", "refused during
+   play mode", "SILENTLY overwrites existing content", "not applied by the handler". Honesty
+   over polish: if a param is a no-op, label it `currently not applied by the handler`.
+
+### Param docs
+
+Every parameter gets an XML `<param>` line — it becomes the schema description. State the
+form and where the value comes from: `GUID of the target GameObject (from get_scene_hierarchy
+or find_objects)`, `World position as 'x,y,z'`, `Max results. Default 50, max 500`. Fold enum
+values, vector forms, and defaults into the text. A parameter with no doc is a warning in the
+quality gate.
+
+### Good vs bad — the `find_objects` example
+
+**Bad** (vague — unsearchable, no contract, no chain):
+
+```csharp
+/// <summary>Finds objects in the scene.</summary>
+```
+
+An agent reading this doesn't know what filters exist, what it gets back, the result cap, or
+what to do with the result. It's a coin-flip whether the tool even surfaces for a relevant
+`search_tools` query.
+
+**Good** (the shipped `find_objects` description):
+
+```csharp
+/// <summary>
+/// Query the scene for GameObjects by name (case-insensitive substring), component type
+/// name, and/or tag — combine filters (AND). Returns {id,name} for matches (limit default
+/// 50, max 500). Read-only; works during play. Use it to get GUIDs to feed into
+/// align/distribute/set_tint/group/delete/etc.
+/// </summary>
+```
+
+That single summary tells the agent **what it does** (filtered scene query, AND-combined),
+**what it returns** (`{id,name}`), the **limits** (default 50, max 500), a **read-only/play-mode
+note**, and **what to do next** (feed the GUIDs into the mutating tools). It's the standard —
+match it.
+
 ## Regenerating the wrapper layer
 
 ```bash

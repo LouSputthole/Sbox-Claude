@@ -1,5 +1,13 @@
 # s&box + Claude Code MCP Integration
 
+> **⚠️ v2.0.0 "Native" shipped 2026-07-09** — the bridge now runs on s&box's built-in editor
+> MCP server (`http://127.0.0.1:7269/mcp`): 245 tools / 237 handlers / 232 native across 28
+> toolsets / 7 lifeline. Much of this file's transport/architecture detail below describes the
+> v1.x file-IPC path, which remains functional as a FALLBACK through v2.0.x (retires v2.1.0).
+> Current docs: [docs/RELAUNCH.md](docs/RELAUNCH.md) · [docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md)
+> · [docs/V2-MIGRATION.md](docs/V2-MIGRATION.md) · [CHANGELOG.md](CHANGELOG.md). A full
+> CLAUDE.md rewrite is queued post-launch.
+
 > Let non-coders build s&box games through conversation with Claude Code.
 
 ## Status: v1.20.0 -- 219 handlers / 228 tools (run `get_bridge_status` for the live tool/handler count)

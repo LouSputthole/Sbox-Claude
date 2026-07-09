@@ -13,7 +13,7 @@ export function registerVehicleTools(
   // ── create_vehicle_controller ────────────────────────────────────
   server.tool(
     "create_vehicle_controller",
-    "Generate a drivable raycast-car component: 4-corner spring/damper suspension, mass-scaled engine force, speed-scaled yaw steering, lateral grip (lower = drift), and a BUILT-IN driver seat (press E to enter — the host assigns the driver network ownership for smooth driving — E to exit, controller input auto-disabled/restored). Attach it plus a Rigidbody and collider to any prop and it drives. Returns { created, path, className, nextSteps } — follow with trigger_hotload + compile_status, then batch_add_component the parts. Apply handling presets with tune_vehicle. HONEST LIMIT: compiles + runs is verified; driving FEEL needs a human playtest — tune from the inspector while playing",
+    "Generate a drivable raycast-car component: 4-corner spring/damper suspension, mass-scaled engine force, speed-scaled yaw steering, lateral grip (lower = drift), and a BUILT-IN driver seat (press E to enter — the driver is hidden while driving so their controller can't fight the vehicle transform, the host assigns them ownership, and a chase camera follows the car — E to exit). Attach it plus a Rigidbody and collider to any prop and it drives. Returns { created, path, className, nextSteps } — follow with trigger_hotload + compile_status, then batch_add_component the parts. Apply handling presets with tune_vehicle. HONEST LIMIT: compiles + runs is verified; driving FEEL needs a human playtest — tune from the inspector while playing",
     {
       name: z
         .string()
@@ -30,7 +30,7 @@ export function registerVehicleTools(
       steerStrength: z
         .number()
         .optional()
-        .describe("Yaw steering torque (mass-scaled). Default 4000"),
+        .describe("Yaw rate in rad/s at full speed factor. Default 2.0"),
       grip: z
         .number()
         .optional()

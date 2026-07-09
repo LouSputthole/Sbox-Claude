@@ -17,6 +17,13 @@ Claude: *creates scripts, builds the scene, sets the lighting and fog, adds a pl
 
 Claude Code connects to the **live s&box editor** through the editor's **native MCP server**. It can create GameObjects, write and hotload scripts, compose scenes, sculpt terrain, set up networking and UI, drive characters, bake navmesh, read its own compile errors, and — crucially — **screenshot what it built and look at it** so it can close the build-and-check loop instead of guessing.
 
+> ### 🚀 New in v2.0.0 — the "Native" relaunch
+> The bridge now runs on s&box's own editor MCP server. Start here:
+> **[docs/RELAUNCH.md](docs/RELAUNCH.md)** (what changed and why) ·
+> **[docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md)** (how an agent works the platform) ·
+> **[docs/ECOSYSTEM.md](docs/ECOSYSTEM.md)** (plain-English tour of all 28 toolsets) ·
+> **[docs/FAQ.md](docs/FAQ.md)** (do my old workflows still work, can an agent modify my project, what's next).
+
 ---
 
 ## What's new in v2.0.0
@@ -25,7 +32,7 @@ v2 moves the bridge off the file-IPC transport and onto **s&box's built-in edito
 
 - **Inline PNG screenshots** — `take_screenshot`, `capture_view`, `screenshot_from`, and `screenshot_orbit` return the image *inside the tool result*. Claude sees it directly; there is no file path to read back.
 - **Permission-free reads** — read-only tools carry the `[McpTool.ReadOnly]` hint, so clients can run them without permission prompts.
-- **Live tool discovery** — agents find tools with `search_tools` and browse the 26 described toolsets with `list_toolsets` / `describe_toolset`, instead of scrolling a 200-tool flat list.
+- **Live tool discovery** — agents find tools with `search_tools` and browse the 28 described toolsets with `list_toolsets` / `describe_toolset`, instead of scrolling a 200-tool flat list.
 - **Real error semantics** — failures are actual tool errors (thrown, readable), not `{ error }` payloads buried inside successful responses.
 - **New wave-1 tools** — `find_broken_references` (scene health scan), `batch_set_property` with `dryRun: true` validation (bulk edits across many objects), and `describe_project` (one-call project orientation).
 - **No Node.js on the main path** — the editor hosts the server; Node is only needed for the optional lifeline.
@@ -177,7 +184,7 @@ Then ask for the real thing: *"Create a first-person player controller with WASD
 
 - **Stuck?** Start with **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** — port 7269 not answering, stale HTTP.sys registrations, bridge tools missing from `search_tools`, external addon edits not recompiling, play-mode refusals, modal-dialog stalls. For engine limitations you work *around* rather than fix, see **[docs/BRIDGE_GOTCHAS.md](docs/BRIDGE_GOTCHAS.md)**. Claude can also read its own errors even when the editor is dead: the lifeline's `read_log` / `get_compile_errors`.
 - **Bugs & feature requests:** **[github.com/LouSputthole/Sbox-Claude/issues](https://github.com/LouSputthole/Sbox-Claude/issues)**.
-- **Deeper docs:** [CLAUDE.md](CLAUDE.md) (architecture, verified APIs, lessons learned), [CHANGELOG.md](CHANGELOG.md) (full feature history), and [docs/ADDING-A-TOOL.md](docs/ADDING-A-TOOL.md) (a new tool = one static method + XML docs).
+- **Deeper docs:** [docs/RELAUNCH.md](docs/RELAUNCH.md) (the v2 relaunch hub), [docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md) (the agent working loop), [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md) (toolset tour), [docs/FAQ.md](docs/FAQ.md), [CLAUDE.md](CLAUDE.md) (architecture, verified APIs, lessons learned), [CHANGELOG.md](CHANGELOG.md) (full feature history), and [docs/ADDING-A-TOOL.md](docs/ADDING-A-TOOL.md) (a new tool = one static method + XML docs).
 
 ### Known issues (short list)
 - **Particles:** runtime `ParticleEffect` tools don't render through the bridge — use `spawn_vpcf`. No flame `.vpcf` currently ships in a bridge-loadable form (under investigation).

@@ -4,6 +4,9 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 
 ## [2.0.0] -- 2026-07-09 "Native"
 
+> Handler/tool counts below are as-of-each-wave snapshots; the FINAL release totals are
+> **245 tools / 237 handlers / 232 native across 28 toolsets / 7 lifeline tools**.
+
 **The bridge migrates onto s&box's NATIVE editor MCP server (`http://127.0.0.1:7269/mcp`, shipped in the editor since 2026-07-06). The full tool surface becomes `[McpTool]` static methods discovered by the engine's ToolRegistry — streamable HTTP instead of 50 ms file polling, inline PNG screenshots instead of temp-file paths, XML docs as the schema, `[McpTool.ReadOnly]` permission hints, and hotload = live tool re-registration. All 219 handlers stay; a generated wrapper layer (`Editor/Mcp/`) delegates to the existing dispatch through one gate. Plan + Phase 0/1 live-verification results: `docs/plans/2026-07-08-native-mcp-migration.md`.**
 
 ### Added (so far)

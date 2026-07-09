@@ -29,7 +29,7 @@ public class CreateVehicleControllerHandler : IBridgeHandler
 				return Task.FromResult<object>( err );
 
 			float engine = p.TryGetProperty( "engineForce", out var ef ) && ef.TryGetSingle( out var eff ) ? eff : 900f;
-			float steer  = p.TryGetProperty( "steerStrength", out var ss ) && ss.TryGetSingle( out var ssf ) ? ssf : 4000f;
+			float steer  = p.TryGetProperty( "steerStrength", out var ss ) && ss.TryGetSingle( out var ssf ) ? ssf : 2.0f;
 			float grip   = p.TryGetProperty( "grip", out var g ) && g.TryGetSingle( out var gf ) ? gf : 0.85f;
 
 			ScaffoldHelpers.WriteCode( fullPath, BuildCode( className, engine, steer, grip ) );
@@ -65,7 +65,8 @@ using System;
 /// {className} — makes a Rigidbody prop drivable: a 4-corner raycast car with
 /// spring/damper suspension, engine force, yaw steering, and lateral grip
 /// (lower grip = drift). Built-in driver seat: press E (use) to enter — the
-/// host assigns the driver network ownership so driving is smooth — E to exit.
+/// driver is hidden while driving (no controller transform fights), the host
+/// assigns them vehicle ownership, and a chase camera follows — E to exit.
 /// Requires a Rigidbody + collider on the same GameObject. Tune from the
 /// inspector while playing; tune_vehicle applies ready-made presets.
 /// </summary>
@@ -73,13 +74,14 @@ public sealed class {className} : Component, Component.IPressable
 {{
 	[Property, Group( ""Engine"" )] public float EngineForce {{ get; set; }} = {engine.ToString( ci )}f;
 	[Property, Group( ""Engine"" )] public float MaxSpeed {{ get; set; }} = 800f;
-	[Property, Group( ""Steering"" )] public float SteerStrength {{ get; set; }} = {steer.ToString( ci )}f;
+	[Property, Group( ""Steering"" )] public float SteerStrength {{ get; set; }} = {steer.ToString( ci )}f;   // yaw rate, rad/s at full speed factor
 	[Property, Group( ""Handling"" ), Range( 0f, 1f )] public float GripFactor {{ get; set; }} = {grip.ToString( ci )}f;
 	[Property, Group( ""Suspension"" )] public float SuspensionRest {{ get; set; }} = 24f;
 	[Property, Group( ""Suspension"" )] public float SuspensionStrength {{ get; set; }} = 90f;
 	[Property, Group( ""Suspension"" )] public float SuspensionDamping {{ get; set; }} = 8f;
-	[Property, Group( ""Seat"" )] public Vector3 SeatOffset {{ get; set; }} = new( 0, 0, 40 );
 	[Property, Group( ""Seat"" )] public Vector3 ExitOffset {{ get; set; }} = new( 0, 80, 20 );
+	[Property, Group( ""Camera"" )] public float CameraDistance {{ get; set; }} = 260f;
+	[Property, Group( ""Camera"" )] public float CameraHeight {{ get; set; }} = 110f;
 
 	[Sync] public Guid DriverId {{ get; set; }}
 
@@ -87,8 +89,8 @@ public sealed class {className} : Component, Component.IPressable
 	public static event Action<GameObject, bool> OnDriverChanged; // (vehicle, entered)
 
 	Rigidbody _rb;
-	GameObject _driver;
 	Vector3[] _corners;
+	TimeSince _sinceEnter;
 
 	protected override void OnStart()
 	{{
@@ -122,44 +124,60 @@ public sealed class {className} : Component, Component.IPressable
 	{{
 		var presser = Scene.Directory.FindByGuid( pressGuid );
 		if ( presser == null ) return;
+		if ( HasDriver && DriverId != pressGuid ) return;
 
 		if ( DriverId == pressGuid )
 		{{
-			// Exit: restore the driver and place them beside the vehicle.
-			SetDriverControls( presser, true );
-			presser.SetParent( null, true );
-			presser.WorldPosition = WorldPosition + WorldRotation * ExitOffset;
-			DriverId = Guid.Empty;
-			GameObject.Network.DropOwnership();
-			OnDriverChanged?.Invoke( GameObject, false );
+			Exit( presser );
 			return;
 		}}
-		if ( HasDriver ) return;
 
+		// Enter: hide the player entirely while driving — parenting a live
+		// PlayerController to a moving vehicle makes two systems fight over the
+		// transform (the classic seat jitter). Hidden driver + chase camera instead.
 		DriverId = pressGuid;
+		_sinceEnter = 0;
 		var owner = presser.Network.Owner;
 		if ( owner != null ) GameObject.Network.AssignOwnership( owner );
-		presser.SetParent( GameObject, true );
-		presser.LocalPosition = SeatOffset;
-		SetDriverControls( presser, false );
+		presser.Enabled = false;
 		OnDriverChanged?.Invoke( GameObject, true );
 	}}
 
-	static void SetDriverControls( GameObject driver, bool enabled )
+	void Exit( GameObject driver )
 	{{
-		foreach ( var comp in driver.Components.GetAll() )
+		DriverId = Guid.Empty;
+		if ( driver != null )
 		{{
-			if ( comp is null ) continue;
-			var type = Game.TypeLibrary?.GetType( comp.GetType() );
-			var prop = type?.Properties?.FirstOrDefault( pr => pr.Name == ""UseInputControls"" );
-			prop?.SetValue( comp, enabled );
+			driver.WorldPosition = WorldPosition + WorldRotation * ExitOffset;
+			driver.Enabled = true;   // their controller re-takes the camera next frame
 		}}
+		GameObject.Network.DropOwnership();
+		OnDriverChanged?.Invoke( GameObject, false );
+	}}
+
+	// Chase camera while driving (runs on the driver's client — they own the vehicle).
+	protected override void OnPreRender()
+	{{
+		if ( IsProxy || !HasDriver ) return;
+		var cam = Scene.Camera;
+		if ( cam == null ) return;
+
+		var targetPos = WorldPosition - WorldRotation.Forward.WithZ( 0 ).Normal * CameraDistance + Vector3.Up * CameraHeight;
+		cam.WorldPosition = cam.WorldPosition.LerpTo( targetPos, MathX.Clamp( Time.Delta * 6f, 0f, 1f ) );
+		cam.WorldRotation = Rotation.LookAt( ( WorldPosition + Vector3.Up * 30f - cam.WorldPosition ).Normal, Vector3.Up );
 	}}
 
 	// ── Driving (vehicle owner only) ─────────────────────────────────
 	protected override void OnFixedUpdate()
 	{{
 		if ( _rb == null || IsProxy || !HasDriver ) return;
+
+		// E again to exit (edge-guarded so the entering press cannot instantly exit).
+		if ( _sinceEnter > 0.4f && Input.Pressed( ""use"" ) )
+		{{
+			RequestSeat( DriverId );
+			return;
+		}}
 
 		var dt = Time.Delta;
 		var input = Input.AnalogMove;   // x = forward/back, y = left/right
@@ -189,13 +207,14 @@ public sealed class {className} : Component, Component.IPressable
 		if ( MathF.Abs( input.x ) > 0.01f && speed < MaxSpeed )
 			_rb.ApplyForce( forward * input.x * EngineForce * _rb.Mass );
 
-		// Steering: yaw torque scaled by how fast we're rolling (no curb-spinning).
-		if ( MathF.Abs( input.y ) > 0.01f )
-		{{
-			var speedFactor = MathX.Clamp( speed / 200f, 0.2f, 1f );
-			var direction = _rb.Velocity.Dot( forward ) < -10f ? -1f : 1f;   // reverse steers mirrored
-			_rb.ApplyTorque( Vector3.Up * input.y * SteerStrength * speedFactor * direction * _rb.Mass );
-		}}
+		// Steering: set yaw angular velocity directly — arcade-reliable, immune to the
+		// prop's moment of inertia (torque was far too weak on heavy boxes — playtested).
+		var steerFactor = MathX.Clamp( speed / 150f, 0.25f, 1f );
+		var direction = _rb.Velocity.Dot( forward ) < -10f ? -1f : 1f;   // reverse steers mirrored
+		var yawRate = MathF.Abs( input.y ) > 0.01f
+			? input.y * SteerStrength * steerFactor * direction
+			: 0f;
+		_rb.AngularVelocity = _rb.AngularVelocity.WithZ( MathX.Lerp( _rb.AngularVelocity.z, yawRate, MathX.Clamp( dt * 12f, 0f, 1f ) ) );
 
 		// Lateral grip: kill a fraction of sideways velocity each tick. Low grip = drift.
 		var right = WorldRotation.Right.WithZ( 0 ).Normal;
@@ -330,10 +349,10 @@ public class TuneVehicleHandler : IBridgeHandler
 {
 	static readonly Dictionary<string, Dictionary<string, float>> Presets = new( StringComparer.OrdinalIgnoreCase )
 	{
-		["arcade"]  = new() { ["EngineForce"] = 900f,  ["MaxSpeed"] = 800f,  ["SteerStrength"] = 4000f, ["GripFactor"] = 0.85f, ["SuspensionStrength"] = 90f,  ["SuspensionDamping"] = 8f },
-		["drift"]   = new() { ["EngineForce"] = 1100f, ["MaxSpeed"] = 900f,  ["SteerStrength"] = 5200f, ["GripFactor"] = 0.35f, ["SuspensionStrength"] = 80f,  ["SuspensionDamping"] = 6f },
-		["offroad"] = new() { ["EngineForce"] = 750f,  ["MaxSpeed"] = 600f,  ["SteerStrength"] = 3200f, ["GripFactor"] = 0.7f,  ["SuspensionStrength"] = 130f, ["SuspensionDamping"] = 12f },
-		["race"]    = new() { ["EngineForce"] = 1400f, ["MaxSpeed"] = 1400f, ["SteerStrength"] = 3600f, ["GripFactor"] = 0.95f, ["SuspensionStrength"] = 110f, ["SuspensionDamping"] = 10f },
+		["arcade"]  = new() { ["EngineForce"] = 900f,  ["MaxSpeed"] = 800f,  ["SteerStrength"] = 2.0f, ["GripFactor"] = 0.85f, ["SuspensionStrength"] = 90f,  ["SuspensionDamping"] = 8f },
+		["drift"]   = new() { ["EngineForce"] = 1100f, ["MaxSpeed"] = 900f,  ["SteerStrength"] = 2.8f, ["GripFactor"] = 0.35f, ["SuspensionStrength"] = 80f,  ["SuspensionDamping"] = 6f },
+		["offroad"] = new() { ["EngineForce"] = 750f,  ["MaxSpeed"] = 600f,  ["SteerStrength"] = 1.5f, ["GripFactor"] = 0.7f,  ["SuspensionStrength"] = 130f, ["SuspensionDamping"] = 12f },
+		["race"]    = new() { ["EngineForce"] = 1400f, ["MaxSpeed"] = 1400f, ["SteerStrength"] = 1.7f, ["GripFactor"] = 0.95f, ["SuspensionStrength"] = 110f, ["SuspensionDamping"] = 10f },
 	};
 
 	public Task<object> Execute( JsonElement p )

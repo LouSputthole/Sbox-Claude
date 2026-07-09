@@ -47,17 +47,17 @@ public static class BridgeVehicleTools
 	/// <summary>
 	/// Generate a drivable raycast-car component: 4-corner spring/damper suspension, mass-scaled engine
 	/// force, speed-scaled yaw steering, lateral grip (lower = drift), and a BUILT-IN driver seat
-	/// (press E to enter — the host assigns the driver network ownership for smooth driving — E to
-	/// exit, controller input auto-disabled/restored). Attach it plus a Rigidbody and collider to any
-	/// prop and it drives. Returns { created, path, className, nextSteps } — follow with
-	/// trigger_hotload + compile_status, then batch_add_component the parts. Apply handling presets
-	/// with tune_vehicle. HONEST LIMIT: compiles + runs is verified; driving FEEL needs a human
-	/// playtest — tune from the inspector while playing.
+	/// (press E to enter — the driver is hidden while driving so their controller can't fight the
+	/// vehicle transform, the host assigns them ownership, and a chase camera follows the car — E to
+	/// exit). Attach it plus a Rigidbody and collider to any prop and it drives. Returns { created,
+	/// path, className, nextSteps } — follow with trigger_hotload + compile_status, then
+	/// batch_add_component the parts. Apply handling presets with tune_vehicle. HONEST LIMIT: compiles
+	/// + runs is verified; driving FEEL needs a human playtest — tune from the inspector while playing.
 	/// </summary>
 	/// <param name="name">Class/file name (default 'VehicleController' -&gt; Code/VehicleController.cs). Errors if the file exists.</param>
 	/// <param name="directory">Directory for the .cs file. Default 'Code'.</param>
 	/// <param name="engineForce">Engine force (mass-scaled). Default 900.</param>
-	/// <param name="steerStrength">Yaw steering torque (mass-scaled). Default 4000.</param>
+	/// <param name="steerStrength">Yaw rate in rad/s at full speed factor. Default 2.0.</param>
 	/// <param name="grip">Lateral grip 0-1 — fraction of sideways velocity killed per tick; lower = drift. Default 0.85.</param>
 	[McpTool( "create_vehicle_controller" )]
 	public static Task<object> CreateVehicleController( string name = null, string directory = null, double? engineForce = null, double? steerStrength = null, double? grip = null )

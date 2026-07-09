@@ -79,6 +79,15 @@ You should see the `bridge_*` toolsets discoverable (Claude finds them via `sear
 
 (`describe_project` gives one-call orientation.) If both work, you're set. If anything fails, jump to **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** — the first two entries cover the port-7269 failure modes.
 
+### Next steps
+
+Now that you're connected:
+
+- **[docs/RELAUNCH.md](docs/RELAUNCH.md)** — what v2.0.0 is, why the rebuild, and what you can now build.
+- **[docs/ECOSYSTEM.md](docs/ECOSYSTEM.md)** — a plain-English tour of all 28 toolsets, with example prompts.
+- **[docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md)** — how an agent works the platform (the inspect → checkpoint → modify → validate → test loop).
+- **[docs/FAQ.md](docs/FAQ.md)** — do my old workflows still work, can an agent modify my project, what's next.
+
 ---
 
 ## Updating

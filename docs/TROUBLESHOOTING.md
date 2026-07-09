@@ -2,10 +2,11 @@
 
 The known failure modes of the v2.0.0 native transport, each as **Symptom → Diagnosis → Fix**.
 
-Two companion docs:
+Companion docs:
 
 - **[BRIDGE_GOTCHAS.md](BRIDGE_GOTCHAS.md)** — engine limitations you work *around*, not fix (input synthesis, asset shadowing, Razor transpiler quirks, whitelist errors, GPU stalls).
 - The root **[TROUBLESHOOTING.md](../TROUBLESHOOTING.md)** — the legacy file-IPC transport (still compiled-in as a fallback through v2.0.x; retires v2.1.0).
+- **[RELAUNCH.md](RELAUNCH.md)** (what v2.0.0 is) · **[FAQ.md](FAQ.md)** (common questions) · **[INSTALL.md](../INSTALL.md)** (setup) if you landed here before finishing setup.
 
 ---
 

@@ -8,7 +8,7 @@ This plugin bundles:
 
 | Component | What it does |
 |---|---|
-| **MCP server registration** (`sbox` from npm) | 209 tools to drive the s&box editor — GameObjects, scripts, scenes, components, physics, networking, UI, world-gen, lighting & atmosphere, characters, lipsync, scene layout, navmesh & spatial queries, particles, animation, NPC brains, playable-game scaffolds, game-feel juice (camera shake / flicker lights / floating combat text), networking & scene inspection/lint, save & services queries, scatter & object utilities, self-diagnosis, console/C# execution, live docs search, type discovery, debug-draw visualization, play-mode time-scale & profiler, and a playtest harness that runs a scripted gameplay loop and asserts the result in-frame |
+| **MCP server registration** (`sbox` = the editor's NATIVE MCP server over HTTP, plus the `sbox-lifeline` stdio server for editor-down diagnostics) | 232 native tools across 28 toolsets to drive the s&box editor — GameObjects, scripts, scenes, components, physics, networking, UI, world-gen, lighting & atmosphere, characters, lipsync, scene layout, navmesh & spatial queries, particles, animation, NPC brains, playable-game scaffolds, game-feel juice (camera shake / flicker lights / floating combat text), networking & scene inspection/lint, save & services queries, scatter & object utilities, self-diagnosis, console/C# execution, live docs search, type discovery, debug-draw visualization, play-mode time-scale & profiler, and a playtest harness that runs a scripted gameplay loop and asserts the result in-frame |
 | **Skill: `sbox-build-feature`** | Codifies the screenshot-driven iteration workflow — bridge check, brainstorm gate, API research, hotload verify, screenshot read. Prevents the "guess and check" loop |
 | **Skill: `sbox-api`** | Schema-grounded s&box API knowledge — Unity→s&box translation table, the Ten Rules, and curated component/UI/networking/physics references. Stops Unity-pattern hallucination; repointed to verify signatures via the bridge's live `describe_type`. Adapted from [claude-sbox](https://github.com/gavogavogavo/claude-sbox) (MIT © David Ryan) |
 | **Skill: `sbox-cookbook`** | A master **router** of code-grounded recipes mined from 51 current (2026) open-source s&box games + the modern engine repos -- **11 engine**, **18 system**, and **20 genre** references. Ask "how do I build a tycoon / an inventory / a save system?" and it routes to a grounded how-to |
@@ -18,7 +18,7 @@ This plugin bundles:
 
 ## What this plugin does NOT include
 
-This plugin gives Claude the **MCP server side** of the bridge. To actually drive the s&box editor, you also need the **bridge addon** installed in your s&box **project's** `Libraries/` folder. The addon and the MCP server work together over file IPC.
+This plugin gives Claude the **MCP server side** of the bridge. To actually drive the s&box editor, you also need the **bridge addon** installed in your s&box **project's** `Libraries/` folder. From v2.0.0 the addon's tools are served by **s&box's built-in editor MCP server** (`http://127.0.0.1:7269/mcp`, on by default) — the plugin registers that endpoint plus the `sbox-lifeline` stdio server for editor-down diagnostics.
 
 **Install the bridge addon separately** — see the [main repo's INSTALL.md](https://github.com/LouSputthole/Sbox-Claude/blob/main/INSTALL.md). The 30-second version:
 
@@ -54,10 +54,10 @@ In a new Claude Code session, ask:
 Check the bridge status.
 ```
 
-Claude should invoke `mcp__sbox__get_bridge_status` and report whether the bridge addon is connected (you'll see `connected: true` with a healthy `handlerCount` if the addon side is also installed and s&box is running).
+Claude should call `search_tools` / `get_bridge_status` through the native server and report the `bridge_*` toolsets. `connected: true` with a healthy `handlerCount` means the addon is compiled and live.
 
-If it says "tool not found": the MCP server isn't registered — try `/reload-plugins` or check `~/.claude/plugins/`.
-If it says "connection refused" or times out: the bridge addon side isn't installed in your project (see above) or s&box isn't running.
+If the endpoint doesn't answer: s&box isn't running, or the MCP server is disabled (Editor → Preferences → MCP Server).
+If `search_tools` finds no `bridge_*` toolsets: the bridge addon isn't installed in your project's `Libraries/` (see above) or isn't compiling.
 
 ## Using the skill
 
@@ -89,23 +89,24 @@ The agent runs the `sbox-build-feature` skill as its default workflow.
 
 ## What's bundled vs. fetched
 
-- The MCP server (`sbox-mcp-server`) is fetched from npm on first use via `npx -y`
-- The skill and agent are bundled with the plugin
-- The bridge **addon** (the s&box-side C# code) is **not bundled** — install it into your s&box project via the install script (see above)
+- The main tool surface is served by the **editor itself** (native MCP server) — nothing to fetch
+- The `sbox-lifeline` stdio server is fetched from npm on first use via `npx -y sbox-mcp-server@2.0.0 --lifeline` (the only part that needs Node)
+- The skills and agent are bundled with the plugin
+- The bridge **addon** (the s&box-side C# code) is **not bundled** — install it from the s&box Asset Library or via the install script (see above)
 
 ## Version compatibility
 
-- This plugin is **v1.19.0**. **The MCP server version is pinned in the plugin's `.mcp.json`** (currently `sbox-mcp-server@1.19.0`) so the addon/server pair can't silently drift. Keep the bridge **addon** at a matching `1.19.x` (`BridgeVersion` `1.19.0`) -- `get_bridge_status` warns if the server and addon versions diverge.
-- The bridge addon and MCP server are major-version-compatible — a `1.x` addon works with a `1.x` MCP server. If you upgrade one, upgrade both.
+- This plugin is **v2.0.0**. The `sbox` entry points at the editor's native MCP server (no version to pin — it ships with the engine); the `sbox-lifeline` pin (`sbox-mcp-server@2.0.0`) is in the plugin's `.mcp.json`. Keep the bridge **addon** at a matching `2.x` (`BridgeVersion` `2.0.0`) — `get_bridge_status` reports the live addon version.
+- File IPC and the full stdio server remain functional through v2.0.x as a fallback for older engine builds; they retire in v2.1.0.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `mcp__sbox__*` tools not available in Claude | Plugin not installed or session not reloaded | `/reload-plugins`, restart Claude Code |
-| Bridge times out at 30s | s&box not running, or no project loaded | Open s&box with your project — the bridge runs on a **static** frame handler, so the dock does **not** need to be open (since v1.3.0) |
+| Port 7269 doesn't answer / tools time out | s&box not running, MCP server disabled, or a stale HTTP.sys registration holds the port | Open s&box with your project; check Editor → Preferences → MCP Server; restart the editor if the log shows `[MCP] Couldn't start MCP server on port 7269` |
 | `Couldn't add project` on s&box startup | Project has both a local-dev `Libraries/claudebridge/` AND an asset-library-installed `Libraries/sboxskinsgg.claudebridge/` claiming the same compiler name | Either set the local one's `Org` to `local`, or remove the asset-library copy. See `TROUBLESHOOTING.md` |
-| `Unknown command: get_compile_errors` (or similar) | You're on an old MCP server with phantom tools | Upgrade: `npx sbox-mcp-server@latest` (or `/reload-plugins`) |
+| `get_compile_errors` / `read_log` not found on the native server | They live on the **lifeline** server (editor-down diagnostics) | Ensure the `sbox-lifeline` entry is registered (`/reload-plugins`) |
 | Compile error in s&box editor that nothing in your `.cs` files explains | Hot-load cache is stuck | Touch the file and re-hotload, or restart s&box |
 
 For deeper issues see the main repo's [TROUBLESHOOTING.md](https://github.com/LouSputthole/Sbox-Claude/blob/main/TROUBLESHOOTING.md).
