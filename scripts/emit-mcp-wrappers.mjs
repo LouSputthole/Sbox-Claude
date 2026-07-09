@@ -57,6 +57,7 @@ const MODULE_TOOLSET = {
   assets: "bridge_asset",
   audit: "bridge_validation",
   batch: "bridge_batch",
+  workflow: "bridge_workflow",
   audio: "bridge_audio",
   characters: "bridge_character",
   cinematics: "bridge_scaffold_polish",
@@ -117,6 +118,9 @@ const TOOL_TOOLSET = {
   ensure_input_action: "bridge_project",
   batch_set_property: "bridge_batch",
   describe_project: "bridge_project",
+  describe_scene: "bridge_scene",
+  create_team_assigner: "bridge_scaffold_gameplay",
+  create_idle_income: "bridge_scaffold_gameplay",
 };
 
 const TOOLSET_META = {
@@ -239,6 +243,11 @@ const TOOLSET_META = {
     description:
       "Wire and control Sandbox.MovieMaker cutscene playback: list .movie clips, add MoviePlayer components, play and stop clips.",
   },
+  bridge_workflow: {
+    class: "BridgeWorkflowTools",
+    description:
+      "Agent workflow safety net: snapshot the whole scene to temp storage before risky changes (checkpoint_scene), browse snapshots (list_checkpoints), and roll the scene back (restore_checkpoint). The undo story for bridge mutations while the engine's snapshot API stays addon-inaccessible.",
+  },
   bridge_batch: {
     class: "BridgeBatchTools",
     description:
@@ -252,7 +261,7 @@ const RO_PREFIXES = /^(get_|list_|search_|find_|describe_|measure_|is_|inspect_)
 const RO_EXTRA = new Set([
   "read_file", "raycast", "raycast_terrain", "physics_overlap", "scene_validate",
   "networking_lint", "sandbox_lint", "razor_lint", "save_inspect", "services_query",
-  "playtest_status", "drive_player_status", "validate_project",
+  "playtest_status", "drive_player_status", "validate_project", "checkpoint_scene",
 ]);
 // Tools matching an RO prefix that are NOT read-only would go here. (None today.)
 const RO_DENY = new Set([]);

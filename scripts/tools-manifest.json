@@ -1,5 +1,5 @@
 {
-  "toolCount": 235,
+  "toolCount": 241,
   "tools": [
     {
       "module": "assets",
@@ -8079,6 +8079,121 @@
           "optional": true,
           "type": {
             "kind": "color"
+          }
+        }
+      ]
+    },
+    {
+      "module": "workflow",
+      "name": "checkpoint_scene",
+      "description": "Snapshot the ENTIRE open scene (every root GameObject, full serialization) to temp storage OUTSIDE the project. The agent-side undo: checkpoint before risky batch edits or experimental changes, roll back with restore_checkpoint if they go wrong. Returns { checkpointed, id, label, scene, rootObjects, sizeBytes } — keep the id. Refused during play mode (runtime state would poison the snapshot). Snapshots survive editor restarts (temp dir, subject to OS cleanup); browse them with list_checkpoints",
+      "params": [
+        {
+          "name": "label",
+          "description": "Short label baked into the checkpoint id (e.g. 'before-batch-tint'). Defaults to 'checkpoint'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "workflow",
+      "name": "create_idle_income",
+      "description": "Generate a host-authoritative passive income component: every tickSeconds the host grants incomePerTick × Multiplier, auto-wiring the first sibling component with an AddMoney(int) method (a create_economy_wallet scaffold plugs in with zero code) or an overridable Grant() seam; TotalEarned is [Sync(FromHost)] and static OnIncomeTick fires per grant. The idle-game kit: wallet (create_economy_wallet) + this + create_offline_progress. Writes a .cs file and returns { created, path, className, nextSteps } — follow with trigger_hotload + compile_status",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class/file name (default 'IdleIncome' -> Code/IdleIncome.cs). Errors if the file exists",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Directory for the .cs file. Default 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "incomePerTick",
+          "description": "Amount granted per tick. Default 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "tickSeconds",
+          "description": "Seconds between grants. Default 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        }
+      ]
+    },
+    {
+      "module": "workflow",
+      "name": "create_team_assigner",
+      "description": "Generate a host-authoritative balanced team assigner component (smallest-bucket draft): AssignSmallest(steamId) drops a joining player into the emptiest team, announces via [Rpc.Broadcast] so every client's roster agrees, and fires static OnTeamAssigned(steamId, index, name); plus Rebalance(), GetTeam, GetMembers. Writes a .cs file and returns { created, path, className, teams, nextSteps } — follow with trigger_hotload + compile_status, attach to your game manager, call AssignSmallest from your join hook (e.g. INetworkListener.OnActive)",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class/file name (default 'TeamAssigner' -> Code/TeamAssigner.cs). Errors if the file exists",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Directory for the .cs file. Default 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "teams",
+          "description": "Team names in index order. Default [\"Red\", \"Blue\"]",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "module": "workflow",
+      "name": "describe_scene",
+      "description": "One-call orientation for the OPEN scene (works in edit and play mode): total/root object counts, component histogram (top 20 types), every camera with position, light count, tag histogram (top 12), and the aggregate world bounds of renderable content. Returns a structured summary — orient here, then find_objects by component/tag, get_scene_hierarchy for structure, find_broken_references for health, screenshot_orbit to look at something. Complements describe_project (project-level). Read-only",
+      "params": []
+    },
+    {
+      "module": "workflow",
+      "name": "list_checkpoints",
+      "description": "List this project's scene checkpoints (newest first). Returns { total, checkpoints } — each { id, createdUtc, sizeBytes }. Pass an id to restore_checkpoint to roll the scene back, or create one first with checkpoint_scene. Read-only; no limit (checkpoints are few)",
+      "params": []
+    },
+    {
+      "module": "workflow",
+      "name": "restore_checkpoint",
+      "description": "REPLACE the open scene's entire contents with a checkpoint_scene snapshot: destroys every current root object, then rebuilds the snapshot's tree (guids preserved, so internal references stay wired). DESTRUCTIVE — requires an explicit id (from checkpoint_scene or list_checkpoints), never guesses. Returns { restored, id, destroyedRoots, restoredRoots }. The scene FILE on disk is untouched until save_scene. Scene-mutating: refused during play mode",
+      "params": [
+        {
+          "name": "id",
+          "description": "Checkpoint id to restore (e.g. 'cp_20260709_153000_before-batch-tint')",
+          "optional": false,
+          "type": {
+            "kind": "string"
           }
         }
       ]

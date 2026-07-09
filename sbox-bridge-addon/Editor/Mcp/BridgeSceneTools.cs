@@ -28,6 +28,18 @@ public static class BridgeSceneTools
 		=> McpGate.Run( "create_scene", McpGate.Args( ( "path", path ), ( "name", name ), ( "includeDefaults", includeDefaults ) ) );
 
 	/// <summary>
+	/// One-call orientation for the OPEN scene (works in edit and play mode): total/root object counts,
+	/// component histogram (top 20 types), every camera with position, light count, tag histogram (top
+	/// 12), and the aggregate world bounds of renderable content. Returns a structured summary — orient
+	/// here, then find_objects by component/tag, get_scene_hierarchy for structure,
+	/// find_broken_references for health, screenshot_orbit to look at something. Complements
+	/// describe_project (project-level). Read-only.
+	/// </summary>
+	[McpTool.ReadOnly( "describe_scene" )]
+	public static Task<object> DescribeScene()
+		=> McpGate.Run( "describe_scene", McpGate.Args() );
+
+	/// <summary>
 	/// Open a scene in the s&amp;box editor by its path.
 	/// </summary>
 	/// <param name="path">Relative path to the .scene file (e.g. 'scenes/main.scene').</param>

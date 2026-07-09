@@ -189,6 +189,14 @@ public static class ClaudeBridge
 		Register( "batch_add_component",    () => new BatchAddComponentHandler() );
 		Register( "batch_reparent",         () => new BatchReparentHandler() );
 		Register( "playtest_abort",         () => new PlaytestAbortHandler() );
+
+		// ── Batch 53: workflow checkpoints + scene orientation + Tier-2 scaffolds (v2 wave 3) ──
+		Register( "checkpoint_scene",       () => new CheckpointSceneHandler() );
+		Register( "restore_checkpoint",     () => new RestoreCheckpointHandler() );
+		Register( "list_checkpoints",       () => new ListCheckpointsHandler() );
+		Register( "describe_scene",         () => new DescribeSceneHandler() );
+		Register( "create_team_assigner",   () => new CreateTeamAssignerHandler() );
+		Register( "create_idle_income",     () => new CreateIdleIncomeHandler() );
 		Register( "list_project_files",  () => new ListProjectFilesHandler() );
 		Register( "read_file",           () => new ReadFileHandler() );
 		Register( "write_file",          () => new WriteFileHandler() );
@@ -518,6 +526,7 @@ public static class ClaudeBridge
 	private static readonly HashSet<string> _sceneMutatingCommands = new()
 	{
 		"batch_set_property", "batch_delete", "batch_add_component", "batch_reparent",
+		"restore_checkpoint",
 		"add_light", "set_fog", "add_post_process", "set_skybox", "apply_atmosphere", "apply_post_fx_look", "add_envmap_probe",
 		"spawn_particle", "add_trail", "add_beam", "create_particle_effect",
 		"spawn_model", "spawn_citizen", "dress_citizen", "set_bodygroup", "pose_citizen",

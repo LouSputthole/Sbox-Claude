@@ -33,7 +33,7 @@ Two companion docs:
 
 **Symptom:** `search_tools` finds the native built-ins (`scene_tree`, `asset_search`, …) but no bridge tools; `list_toolsets` shows no `bridge_*` toolsets.
 
-**Diagnosis:** The bridge's 222 tools are `[McpTool]` methods discovered from the **claudebridge addon's compiled editor assembly**. If the library isn't installed in the *open* project, or its C# isn't compiling, the engine has nothing to discover. (Also check location: the addon must live in `<project>/Libraries/` — the global `addons/` folder silently refuses to compile custom C#.)
+**Diagnosis:** The bridge's 228 tools are `[McpTool]` methods discovered from the **claudebridge addon's compiled editor assembly**. If the library isn't installed in the *open* project, or its C# isn't compiling, the engine has nothing to discover. (Also check location: the addon must live in `<project>/Libraries/` — the global `addons/` folder silently refuses to compile custom C#.)
 
 **Fix:**
 1. Confirm the library is installed in this project: **Editor → Library Manager** → `sboxskinsgg.claudebridge`.

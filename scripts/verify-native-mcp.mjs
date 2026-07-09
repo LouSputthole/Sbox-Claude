@@ -259,6 +259,60 @@ try {
   } catch (e) {
     check("find_broken_references file scan", false, e.message.slice(0, 120));
   }
+
+  // wave 3: describe_scene
+  try {
+    const ds = await callTool("describe_scene", {});
+    check("describe_scene", /componentHistogram/.test(ds.text) && /totalObjects/.test(ds.text),
+      ds.text.match(/"totalObjects": \d+/)?.[0] ?? ds.text.slice(0, 80));
+  } catch (e) {
+    check("describe_scene", false, e.message.slice(0, 120));
+  }
+
+  // wave 3: checkpoint round-trip — the undo safety net, proven end to end:
+  // create probe → checkpoint → delete probe → restore → probe is back.
+  try {
+    const probe = (await callTool("create_gameobject", { name: "__cp_probe", position: "0,0,7000" })).text.match(/[0-9a-f-]{36}/i)[0];
+    const cp = await callTool("checkpoint_scene", { label: "gate-roundtrip" });
+    const cpId = cp.text.match(/"id": "(cp_[^"]+)"/)?.[1];
+    check("checkpoint_scene", !!cpId, cpId ?? cp.text.slice(0, 80));
+    await callTool("delete_gameobject", { id: probe });
+    const lc = await callTool("list_checkpoints", {});
+    check("list_checkpoints", new RegExp(cpId).test(lc.text), `found ${cpId}`);
+    const rs = await callTool("restore_checkpoint", { id: cpId });
+    const restoredOk = /"restored": true/.test(rs.text);
+    const back = await callTool("find_objects", { name: "__cp_probe" });
+    const probeBack = /"__cp_probe"/.test(back.text);
+    check("restore_checkpoint round-trip (deleted object resurrected)", restoredOk && probeBack,
+      rs.text.match(/"restoredRoots": \d+/)?.[0] ?? rs.text.slice(0, 100));
+    const backId = back.text.match(/[0-9a-f-]{36}/i)?.[0];
+    if (backId) await callTool("delete_gameobject", { id: backId });
+  } catch (e) {
+    check("checkpoint/restore round-trip", false, e.message.slice(0, 200));
+  }
+
+  // wave 3: scaffolds — generate → hotload → compile clean → cleanup.
+  try {
+    const ta = await callTool("create_team_assigner", { name: "__GateTeamAssigner" });
+    const ii = await callTool("create_idle_income", { name: "__GateIdleIncome" });
+    const genOk = /"created": true/.test(ta.text) && /"created": true/.test(ii.text);
+    check("wave-3 scaffolds generate", genOk, genOk ? "both .cs written" : (ta.text + ii.text).slice(0, 120));
+    await callTool("trigger_hotload", {});
+    let compiled = false, lastStatus = "";
+    for (let i = 0; i < 18; i++) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const cs = await rpc("tools/call", { name: "call_tool", arguments: { name: "compile_status", arguments: {} } });
+      lastStatus = (cs.content ?? []).map((c) => c.text).join(" ");
+      if (/Failed|error CS/i.test(lastStatus)) { compiled = false; break; }
+      if (/success|compiled|ok|idle|complete/i.test(lastStatus)) { compiled = true; break; }
+    }
+    check("wave-3 scaffolds compile clean", compiled, lastStatus.replace(/\s+/g, " ").slice(0, 100));
+    await callTool("delete_script", { path: "Code/__GateTeamAssigner.cs" });
+    await callTool("delete_script", { path: "Code/__GateIdleIncome.cs" });
+    await callTool("trigger_hotload", {});
+  } catch (e) {
+    check("wave-3 scaffolds", false, e.message.slice(0, 200));
+  }
 } catch (e) {
   console.error(`FATAL: ${e.message}`);
   process.exit(2);

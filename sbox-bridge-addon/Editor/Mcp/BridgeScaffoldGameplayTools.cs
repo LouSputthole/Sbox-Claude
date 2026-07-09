@@ -247,6 +247,22 @@ public static class BridgeScaffoldGameplayTools
 		=> McpGate.Run( "create_hold_to_confirm", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "action", action ), ( "holdSeconds", holdSeconds ), ( "decayOnRelease", decayOnRelease ), ( "targetId", targetId ) ) );
 
 	/// <summary>
+	/// Generate a host-authoritative passive income component: every tickSeconds the host grants
+	/// incomePerTick × Multiplier, auto-wiring the first sibling component with an AddMoney(int) method
+	/// (a create_economy_wallet scaffold plugs in with zero code) or an overridable Grant() seam;
+	/// TotalEarned is [Sync(FromHost)] and static OnIncomeTick fires per grant. The idle-game kit:
+	/// wallet (create_economy_wallet) + this + create_offline_progress. Writes a .cs file and returns {
+	/// created, path, className, nextSteps } — follow with trigger_hotload + compile_status.
+	/// </summary>
+	/// <param name="name">Class/file name (default 'IdleIncome' -&gt; Code/IdleIncome.cs). Errors if the file exists.</param>
+	/// <param name="directory">Directory for the .cs file. Default 'Code'.</param>
+	/// <param name="incomePerTick">Amount granted per tick. Default 1.</param>
+	/// <param name="tickSeconds">Seconds between grants. Default 1.</param>
+	[McpTool( "create_idle_income" )]
+	public static Task<object> CreateIdleIncome( string name = null, string directory = null, double? incomePerTick = null, double? tickSeconds = null )
+		=> McpGate.Run( "create_idle_income", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "incomePerTick", incomePerTick ), ( "tickSeconds", tickSeconds ) ) );
+
+	/// <summary>
 	/// Generate a Component.IPressable interactable: the built-in PlayerController 'use' key drives
 	/// Press()/Hover()/Blur() with no custom player code. Includes a static OnPressed event, an
 	/// optional cooldown (TimeUntil), and a private OnPress() extensionpoint for effects. For
@@ -516,6 +532,21 @@ public static class BridgeScaffoldGameplayTools
 	[McpTool( "create_stat_modifier_system" )]
 	public static Task<object> CreateStatModifierSystem( string name = null, string directory = null, JsonNode stats = null, string targetId = null )
 		=> McpGate.Run( "create_stat_modifier_system", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "stats", stats ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate a host-authoritative balanced team assigner component (smallest-bucket draft):
+	/// AssignSmallest(steamId) drops a joining player into the emptiest team, announces via
+	/// [Rpc.Broadcast] so every client's roster agrees, and fires static OnTeamAssigned(steamId, index,
+	/// name); plus Rebalance(), GetTeam, GetMembers. Writes a .cs file and returns { created, path,
+	/// className, teams, nextSteps } — follow with trigger_hotload + compile_status, attach to your
+	/// game manager, call AssignSmallest from your join hook (e.g. INetworkListener.OnActive).
+	/// </summary>
+	/// <param name="name">Class/file name (default 'TeamAssigner' -&gt; Code/TeamAssigner.cs). Errors if the file exists.</param>
+	/// <param name="directory">Directory for the .cs file. Default 'Code'.</param>
+	/// <param name="teams">Team names in index order. Default ["Red", "Blue"].</param>
+	[McpTool( "create_team_assigner" )]
+	public static Task<object> CreateTeamAssigner( string name = null, string directory = null, string[] teams = null )
+		=> McpGate.Run( "create_team_assigner", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "teams", teams ) ) );
 
 	/// <summary>
 	/// Generate a trigger-zone Component (Component.ITriggerListener): auto-adds a trigger BoxCollider

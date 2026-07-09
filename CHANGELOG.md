@@ -17,6 +17,13 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 - **`scripts/verify-native-mcp.mjs`** — live verify-gate over streamable HTTP: toolset inventory, search discovery, read-only spot-runs, nullable-binding check, mutating GUID round-trip, inline-image check, error semantics.
 - **`docs/ADDING-A-TOOL.md`** — the new-tool factory: template, checklist, naming conventions, regeneration workflow.
 
+### Added — wave-3 tools (Batch 53: scene checkpoints, scene orientation, idle/team scaffolds)
+
+- **NEW `bridge_workflow` toolset — the agent-side undo.** `checkpoint_scene` snapshots every root GameObject (full serialization) to temp storage outside the project; `restore_checkpoint` replaces the scene contents from a snapshot (explicit id required — destructive, never guesses; the scene FILE stays untouched until save_scene); `list_checkpoints` browses them. Checkpoint before risky batch edits, roll back if they go wrong — the practical answer to the engine's addon-inaccessible undo (see Known limitations).
+- **`describe_scene`** (bridge_scene, read-only) — one-call scene orientation: component histogram, cameras with positions, light count, tag histogram, aggregate content bounds. The scene-level partner to describe_project; works in play mode too.
+- **`create_team_assigner`** (bridge_scaffold_gameplay) — host-authoritative smallest-bucket team draft: AssignSmallest(steamId), [Rpc.Broadcast]-mirrored roster, static OnTeamAssigned, Rebalance/GetTeam/GetMembers.
+- **`create_idle_income`** (bridge_scaffold_gameplay) — host-auth passive income ticker that auto-wires any sibling wallet with AddMoney(int) via TypeLibrary reflection (zero compile-time coupling), [Sync(FromHost)] TotalEarned, overridable Grant() seam. Completes the idle kit: create_economy_wallet + this + create_offline_progress.
+
 ### Added — wave-2 tools (Batch 52: real prefabs, batch buildout, playtest control)
 
 - **Prefabs are REAL now.** `create_prefab` writes a FULL engine serialization (every component with its property values, all children — the same JSON the editor writes; the old handler wrote a minimal descriptor that dropped both). `instantiate_prefab` actually recreates the tree: engine `GameObject.Clone` for registered prefabs, with a guid-remapped deserialize fallback for freshly-written files (repeat instantiations never collide). `get_prefab_info` returns a structured tree summary (per-node component types, referenced prefabs, depth) instead of a raw JSON dump.
