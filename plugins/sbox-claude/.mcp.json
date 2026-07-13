@@ -8,7 +8,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "sbox-mcp-server@2.0.0",
+        "sbox-mcp-server@2.1.0",
         "--lifeline"
       ]
     }
