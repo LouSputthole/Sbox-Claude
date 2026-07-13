@@ -28,16 +28,16 @@ described `bridge_*` toolsets, with XML docs as the schema, `[McpTool.ReadOnly]`
 and hotload = live re-registration. You connect Claude Code once and everything the
 addon exposes shows up through the server's search.
 
-**The final v2.0.0 surface:**
+**The current surface** (v2.0.0 "Native" plus the v2.1.0 Tier-2 + gameplay-recording + cinematic waves — see the CHANGELOG's `[2.1.0]`):
 
 | | Count |
 |---|---|
-| Tools on the native surface | **232** |
+| Tools on the native surface | **262** |
 | Toolsets (`bridge_*`) | **28** |
 | Read-only tools (no permission prompt) | **53** |
 | Lifeline tools (editor-down diagnostics) | **7** |
 | Handed to native built-ins (same names) | **6** |
-| **Total tools** | **245** (232 native + 7 lifeline + 6 built-in-served) / **237 handlers** |
+| **Total tools** | **275** (262 native + 7 lifeline + 6 built-in-served) / **267 handlers** |
 
 The generated **[TOOLSETS.md](TOOLSETS.md)** is the authoritative inventory — read it,
 don't memorize it. Agents browse it live with `list_toolsets` / `describe_toolset` and
@@ -180,16 +180,23 @@ this is in v2.0.0:
   TS tool layer (everything except the lifeline) are compiled-in and functional through
   v2.0.x as a fallback for older engine builds, and **retire in v2.1.0** once the native
   path proves out across the Asset Library user base.
-- **Remaining Tier-2 scaffolds** — the rest of the mined 51-game backlog, by theme.
-- **Loopback multiplayer test harness** — spawn N loopback clients, drive each via
-  `playtest`, assert sync. **Blocked on the engine:** the local loopback socket is merged
-  upstream but not yet in the shipping build (`search_types "loopback"` still returns 0).
-  Ships when the engine ships it.
+- **Remaining Tier-2 scaffolds** — ✅ **largely done**: the v2.1.0 waves
+  (2026-07-12/13) complete the Tier-2 backlog by theme — economy & saves, stats &
+  achievements, round-flow & UI, world & render, AI & systems, plus the cinematic wave
+  (lipsync dialogue, camera effects, clip authoring, recorded playtests, killcams) — with
+  the few leftovers deliberately skipped for verified reasons (see TOOL_BACKLOG.md).
+- **Multiplayer test harness** — spawn N local clients, drive each via `playtest`, assert
+  sync. **Likely unblocked** (docs-audit finding 2026-07-13): the official
+  testing-multiplayer docs now describe "Join via new instance" plus `connect local` /
+  `reconnect` console commands, so the engine's local test path appears to have shipped —
+  one live verification session away; the top next-wave candidate (see TOOL_BACKLOG.md).
 - **Typed DTO returns** for hot read tools (`get_scene_hierarchy`, `find_objects`,
   `get_bridge_status`) → `outputSchema` + `structuredContent`, so agents plan around
   fields instead of parsing text.
-- **`MovieRecorder`** — record-gameplay-to-clip for `Sandbox.MovieMaker`. (The MovieMaker
-  *playback* family already shipped in v1.20.0; recording is the uncovered piece.)
+- **`MovieRecorder`** — ✅ **shipped in v2.1.0**: the engine's
+  `MovieRecorder` reached the shipping build (2026-07-12) and the bridge covers it end to
+  end — `record_gameplay_clip` / `stop_gameplay_recording` / `gameplay_recording_status`,
+  E2E-proven recording live gameplay and replaying it through `play_movie`.
 
 ---
 

@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v2.0.0</strong> · <strong>232 native tools</strong> · <strong>28 toolsets</strong> (+ 7 lifeline tools) · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v2.0.0</strong> · <strong>262 native tools</strong> · <strong>28 toolsets</strong> (+ 7 lifeline tools) · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -56,7 +56,7 @@ Upgrading from v1.x? **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)** is the mig
 | Piece | What it is | Where it lives |
 |---|---|---|
 | **Native MCP server** | Facepunch's editor-hosted MCP server — streamable HTTP, loopback-only, on by default (**Editor → Preferences → MCP Server**, port 7269) | ships with s&box |
-| **Editor addon** | The bridge: a C# editor library whose 232 tools are `[McpTool]` methods the engine auto-discovers, each dispatching into the bridge's handler layer on the main editor thread | installed via the s&box **Asset Library / Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
+| **Editor addon** | The bridge: a C# editor library whose 262 tools are `[McpTool]` methods the engine auto-discovers, each dispatching into the bridge's handler layer on the main editor thread | installed via the s&box **Asset Library / Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
 | **Lifeline server** *(optional)* | A slim stdio server for editor-down diagnostics — the native server dies with the editor; the lifeline doesn't | npm package `sbox-mcp-server@2`, run with `--lifeline` |
 
 **Invocation pattern.** The native server exposes a handful of entry points — `search_tools`, `call_tool`, `call_tools`, `list_toolsets`, `describe_toolset` — and discovers everything else live from the addon:
@@ -95,12 +95,12 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 
 ## Tools & features
 
-**232 native tools across 28 `bridge_*` toolsets**, plus the **7 lifeline tools**. The full generated inventory — every tool, its toolset, and its read-only status — is **[docs/TOOLSETS.md](docs/TOOLSETS.md)**. Upgraders: **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)**.
+**262 native tools across 28 `bridge_*` toolsets**, plus the **7 lifeline tools**. The full generated inventory — every tool, its toolset, and its read-only status — is **[docs/TOOLSETS.md](docs/TOOLSETS.md)**. Upgraders: **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)**.
 
 | Toolset | What it covers |
 |---|---|
 | `bridge_asset` | Asset library search, package install, metadata, dependency-closure copies, recompiles |
-| `bridge_audio` | `.sound` events, sound components, editor previews |
+| `bridge_audio` | `.sound` events, sound components, editor previews, TTS voices (`Sandbox.Speech.Synthesizer`, viseme data exposed) |
 | `bridge_batch` | Bulk operations across many GameObjects — `batch_set_property` with `dryRun` validation |
 | `bridge_character` | Spawn/dress/pose citizens, animations, animgraph params, ragdolls, lipsync, attachments |
 | `bridge_component` | Add/configure/inspect components, properties, cross-component refs, invoke methods and `[Button]`s |
@@ -108,23 +108,23 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 | `bridge_discovery` | Live API reflection — `describe_type`, `search_types`, method signatures, `list_libraries`, project grep |
 | `bridge_gameobject` | GameObject lifecycle, hierarchy, transforms, tags, selection, bulk layout |
 | `bridge_material` | Models, `.vmat` authoring, material assignment and properties |
-| `bridge_moviemaker` | `Sandbox.MovieMaker` playback — `.movie` clips, `MoviePlayer` wiring |
+| `bridge_moviemaker` | `Sandbox.MovieMaker` playback *and recording* — `.movie` clips, `MoviePlayer` wiring, record live gameplay to a replayable clip (`record_gameplay_clip`) |
 | `bridge_navigation` | Navmesh baking + walkable-path queries |
 | `bridge_networking` | Multiplayer setup + codegen — `[Sync]`, RPCs (broadcast/host/targeted), ownership, host migration |
-| `bridge_npc` | NPC brains, spawners, patrol routes, perception simulation |
+| `bridge_npc` | NPC brains, spawners, patrol routes, perception simulation, utility AI, daily schedule brains |
 | `bridge_physics` | Rigidbodies, colliders, joints, raycasts, overlap queries |
 | `bridge_playmode` | Enter/exit play mode, play state, runtime property read/write |
 | `bridge_playtest` | Scripted gameplay verification with in-frame assertions (`playtest`), `drive_player`, `simulate_input` |
 | `bridge_prefab` | Create/instantiate/inspect prefabs, wire prefab refs |
 | `bridge_project` | Project info/config, file read/write, C# script authoring, hotload, input actions — incl. `describe_project` |
-| `bridge_scaffold_gameplay` | Compile-verified gameplay codegen: controllers, health, inventory, saves, economy, loot, rounds, interaction… |
-| `bridge_scaffold_polish` | Game feel: camera shake, flicker lights, combat text, combo meters, nametags, cutscenes, dialogue |
+| `bridge_scaffold_gameplay` | Compile-verified gameplay codegen: controllers, health, inventory, saves (signed + meta-progression), economy (wallets, ledgers, idle), loot (incl. data-asset tables), achievements & leaderboard stats, Elo, rounds & map votes, needs systems, event buses, interaction… |
+| `bridge_scaffold_polish` | Game feel: camera shake, flicker lights, combat text, combo meters, nametags, cutscenes, dialogue, round-timer HUDs |
 | `bridge_scene` | Create and load `.scene` files |
 | `bridge_screenshot` | Inline-PNG screenshots: main camera, framed object, free camera, multi-angle orbit |
-| `bridge_ui` | Razor UI panels — screen-space HUDs, world panels, `PanelComponent` scaffolds |
+| `bridge_ui` | Razor UI panels — screen-space HUDs, world panels, `PanelComponent` scaffolds, `add_panel_buildhash` (patch a BuildHash override into an existing panel) |
 | `bridge_validation` | Lints and health checks: networking footguns, whitelist scans, Razor footguns, scene validation, `find_broken_references` |
-| `bridge_visuals` | Lighting, fog, post-FX, skyboxes, envmap probes, `.vpcf` particles, atmosphere presets |
-| `bridge_world` | Terrain sculpting, forests, caves, trails, path-based placement |
+| `bridge_visuals` | Lighting, fog, post-FX, skyboxes, envmap probes, `.vpcf` particles, atmosphere presets, render-target cameras (CCTV/mirrors), day-night sun arcs |
+| `bridge_world` | Terrain sculpting, forests, caves, trails, path-based placement, swimmable water volumes |
 
 **Six tools moved to the native built-ins.** `spawn_model`, `list_scenes`, `save_scene`, `undo`, `redo`, and `remove_component` were dropped from the bridge surface because the native server ships built-ins with the **same names and semantics** — your workflows keep the same names; Facepunch's implementations serve them. The native server also gives you `spawn_models` (batch), `scene_tree`, `find_game_objects`, `get_game_object`/`set_game_object`, `add_component`/`set_component`, the `asset_*` family, `play_start`/`play_stop`, `read_console`, and `compile_status` for free.
 

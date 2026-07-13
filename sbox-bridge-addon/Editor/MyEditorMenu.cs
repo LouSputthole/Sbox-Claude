@@ -32,7 +32,7 @@ public static class ClaudeBridge
 
 	// Bridge build version — surfaced in status.json + the Status menu so a
 	// marketplace-addon-vs-MCP-server skew is visible at a glance.
-	internal const string BridgeVersion = "2.0.0";
+	internal const string BridgeVersion = "2.1.0";
 
 	// status.json doubles as a heartbeat. _startedAtIso is stamped once at start;
 	// the heartbeat timestamp is refreshed from the frame loop at most once per
@@ -203,6 +203,56 @@ public static class ClaudeBridge
 		Register( "create_seat_system",         () => new CreateSeatSystemHandler() );
 		Register( "tune_vehicle",               () => new TuneVehicleHandler() );
 		Register( "create_physics_grab_tool",   () => new CreatePhysicsGrabToolHandler() );
+
+		// ── Batch 55: Economy & Save family (Tier-2 wave A) ─────────────
+		Register( "create_currency_account",     () => new CreateCurrencyAccountHandler() );
+		Register( "create_idle_economy",         () => new CreateIdleEconomyHandler() );
+		Register( "create_signed_save",          () => new CreateSignedSaveHandler() );
+		Register( "create_meta_progression",     () => new CreateMetaProgressionHandler() );
+		Register( "add_steam_stat_currency",     () => new AddSteamStatCurrencyHandler() );
+		Register( "create_loot_table_resource",  () => new CreateLootTableResourceHandler() );
+
+		// ── Batch 56: Stats & Achievements family (Tier-2 wave B) ───────
+		Register( "add_leaderboard_stat",        () => new AddLeaderboardStatHandler() );
+		Register( "create_achievement_set",      () => new CreateAchievementSetHandler() );
+		Register( "add_achievement_trigger",     () => new AddAchievementTriggerHandler() );
+		Register( "create_speedrun_leaderboard", () => new CreateSpeedrunLeaderboardHandler() );
+		Register( "create_elo_rating_system",    () => new CreateEloRatingSystemHandler() );
+
+		// ── Batch 57: Round-flow & UI family (Tier-2 wave C) ────────────
+		Register( "create_round_timer_hud",      () => new CreateRoundTimerHudHandler() );
+		Register( "scaffold_map_vote_flow",      () => new ScaffoldMapVoteFlowHandler() );
+		Register( "add_panel_buildhash",         () => new AddPanelBuildhashHandler() );
+
+		// ── Batch 58: World & Render family (Tier-2 wave D) ─────────────
+		Register( "add_water_body",              () => new AddWaterBodyHandler() );
+		Register( "add_render_target_camera",    () => new AddRenderTargetCameraHandler() );
+		Register( "add_daynight_sun",            () => new AddDayNightSunHandler() );
+
+		// ── Batch 59: AI & Systems family (Tier-2 wave E) ───────────────
+		Register( "create_needs_system",         () => new CreateNeedsSystemHandler() );
+		Register( "create_utility_ai",           () => new CreateUtilityAiHandler() );
+		Register( "create_npc_schedule_brain",   () => new CreateNpcScheduleBrainHandler() );
+		Register( "create_event_bus",            () => new CreateEventBusHandler() );
+		Register( "add_tts_voice",               () => new AddTtsVoiceHandler() );
+
+		// ── Batch 60: Gameplay Recording family (MovieRecorder engine-watch #2) ──
+		// NOT scene-mutating: recording only exists in play mode (same precedent as play_movie)
+		Register( "record_gameplay_clip",        () => new RecordGameplayClipHandler() );
+		Register( "stop_gameplay_recording",     () => new StopGameplayRecordingHandler() );
+		Register( "gameplay_recording_status",   () => new GameplayRecordingStatusHandler() );
+
+		// ── Batch 61: Dialogue & Camera FX pair (cinematic wave) ────────
+		Register( "generate_lipsync_dialogue",   () => new GenerateLipsyncDialogueHandler() );
+		Register( "create_camera_effects",       () => new CreateCameraEffectsHandler() );
+
+		// ── Batch 62: Movie authoring (cinematic wave) ──────────────────
+		Register( "author_movie_clip",           () => new AuthorMovieClipHandler() );
+
+		// ── Batch 63: Playtest recording + killcam (cinematic wave) ─────
+		// record_playtest NOT scene-mutating: must run during play (Batch 60 precedent)
+		Register( "record_playtest",             () => new RecordPlaytestHandler() );
+		Register( "create_killcam",              () => new CreateKillcamHandler() );
 		Register( "list_project_files",  () => new ListProjectFilesHandler() );
 		Register( "read_file",           () => new ReadFileHandler() );
 		Register( "write_file",          () => new WriteFileHandler() );
@@ -576,6 +626,13 @@ public static class ClaudeBridge
 		"create_gacha_drop_table", "create_currency_pickup", "create_offline_progress",
 		"create_worldpanel_ui", "create_proxy_nametag", "create_combo_meter",
 		"create_cutscene_director", "create_dialogue_system",
+		"create_currency_account", "create_idle_economy", "create_signed_save", "create_meta_progression", "add_steam_stat_currency", "create_loot_table_resource",
+		"add_leaderboard_stat", "create_achievement_set", "add_achievement_trigger", "create_speedrun_leaderboard", "create_elo_rating_system",
+		"create_round_timer_hud", "scaffold_map_vote_flow", "add_panel_buildhash",
+		"add_water_body", "add_render_target_camera", "add_daynight_sun",
+		"create_needs_system", "create_utility_ai", "create_npc_schedule_brain", "create_event_bus", "add_tts_voice",
+		"generate_lipsync_dialogue", "create_camera_effects", "author_movie_clip",
+		"create_killcam",
 	};
 
 	internal static bool IsSceneMutating( string command ) => _sceneMutatingCommands.Contains( command );

@@ -14,7 +14,7 @@ surfaces directly.
 
 ## 1. Discovery — find the tool, then call it
 
-The native server does **not** hand you a flat list of 232 tools. It gives you a few entry
+The native server does **not** hand you a flat list of 262 tools. It gives you a few entry
 points and lets you search:
 
 | Entry point | Use it to |

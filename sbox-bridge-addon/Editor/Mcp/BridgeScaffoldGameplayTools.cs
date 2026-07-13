@@ -16,6 +16,38 @@ using Editor.Mcp;
 public static class BridgeScaffoldGameplayTools
 {
 	/// <summary>
+	/// SCENE-MUTATING: generate a data-driven achievement trigger-zone component AND create its
+	/// GameObject now (named zone with a sized BoxCollider, IsTrigger=true, at the given position).
+	/// When an object tagged triggerTag enters, the component calls
+	/// &lt;achievementSetClass&gt;.Instance.Progress(achievementId, amount) — or Unlock() when
+	/// unlock=true — with a once-only latch and optional destroy-after-fire. Returns { created, path,
+	/// className, achievementSetClass, achievementId, gameObject, attached, note, nextSteps }. The
+	/// generated component only attaches to the zone after trigger_hotload — until then `attached` is
+	/// false and nextSteps carries the exact add_component_with_properties follow-up. The generated
+	/// code references the set class BY NAME: run create_achievement_set first or the project will not
+	/// compile (the result warns via `note`). Re-running with the same name fails unless
+	/// reuseClass=true, which skips codegen and just places another zone (attaching + configuring
+	/// immediately since the class is already compiled). Refused during play mode.
+	/// </summary>
+	/// <param name="achievementId">Id of the achievement to progress/unlock (sanitized to [a-z0-9_-]).</param>
+	/// <param name="name">Class name for the generated trigger component. Defaults to 'AchievementTrigger'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="achievementSetClass">Class name of the achievement set the zone reports to (from create_achievement_set). Defaults to 'AchievementSet'.</param>
+	/// <param name="amount">Progress amount added per fire (ignored when unlock=true). Defaults to 1.</param>
+	/// <param name="unlock">Call Unlock() instead of Progress(). Defaults to false.</param>
+	/// <param name="triggerTag">Tag the entering object must carry (put it on the player via set_tags). Defaults to 'player'.</param>
+	/// <param name="onceOnly">Only the first tagged entry fires. Defaults to true.</param>
+	/// <param name="destroyAfterFire">Destroy the zone GameObject after firing. Defaults to false.</param>
+	/// <param name="createObject">Create the zone GameObject now (with BoxCollider). Defaults to true; false = code-gen only.</param>
+	/// <param name="objectName">Name for the zone GameObject. Defaults to '&lt;name&gt;Zone'.</param>
+	/// <param name="position">World position of the zone GameObject. As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="scale">BoxCollider size — uniform number, object {x,y,z}, or comma string "x,y,z". Defaults to 100,100,100. As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="reuseClass">If the .cs already exists, skip codegen and just place another zone with the existing class. Defaults to false.</param>
+	[McpTool( "add_achievement_trigger" )]
+	public static Task<object> AddAchievementTrigger( string achievementId, string name = null, string directory = null, string achievementSetClass = null, double? amount = null, bool? unlock = null, string triggerTag = null, bool? onceOnly = null, bool? destroyAfterFire = null, bool? createObject = null, string objectName = null, string position = null, string scale = null, bool? reuseClass = null )
+		=> McpGate.Run( "add_achievement_trigger", McpGate.Args( ( "achievementId", achievementId ), ( "name", name ), ( "directory", directory ), ( "achievementSetClass", achievementSetClass ), ( "amount", amount ), ( "unlock", unlock ), ( "triggerTag", triggerTag ), ( "onceOnly", onceOnly ), ( "destroyAfterFire", destroyAfterFire ), ( "createObject", createObject ), ( "objectName", objectName ), ( "position", position ), ( "scale", scale ), ( "reuseClass", reuseClass ) ) );
+
+	/// <summary>
 	/// Generate an eye-traced interaction-prompt HUD — a PanelComponent (.razor + .razor.scss pair,
 	/// like create_leaderboard_panel) that every frame traces a ray from the scene camera
 	/// (Scene.Trace.Ray, out to [Property] float Range) and, when the crosshair is on a component
@@ -60,6 +92,81 @@ public static class BridgeScaffoldGameplayTools
 		=> McpGate.Run( "add_interaction_station", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "graceSeconds", graceSeconds ), ( "requiredLevel", requiredLevel ), ( "targetId", targetId ) ) );
 
 	/// <summary>
+	/// Generate a batched write-side stat reporter component for Sandbox.Services.Stats — the write
+	/// partner of create_leaderboard_panel. Gameplay code calls the static &lt;Name&gt;.Report("kills",
+	/// 1) from anywhere; amounts accumulate locally and flush as Stats.Increment deltas on a timer
+	/// (default every 12 s, also on disable/destroy). Baseline-delta bookkeeping means a partial flush
+	/// retries the un-sent remainder instead of double-counting, and deltas larger than maxChunk are
+	/// sent in chunks. Returns { created, path, className, placedOn, note, nextSteps }. Place ONE in
+	/// the scene after trigger_hotload (add_component_to_new_object), or pass targetId to attach
+	/// immediately when the type is already compiled. Stats are PER LOCAL PLAYER (each client reports
+	/// its own) and only exist on leaderboards once the stat is registered for the project ident on
+	/// sbox.game. Fails if the file already exists.
+	/// </summary>
+	/// <param name="name">Class name for the generated component. Defaults to 'StatReporter'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="flushIntervalSeconds">Seconds between batched flushes to the backend. Defaults to 12, clamped to &gt;= 1.</param>
+	/// <param name="maxChunk">Largest amount sent in a single Stats.Increment call; bigger deltas are chunked. Defaults to 1000, clamped to &gt;= 1.</param>
+	/// <param name="targetId">GUID of a GameObject to attach to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "add_leaderboard_stat" )]
+	public static Task<object> AddLeaderboardStat( string name = null, string directory = null, double? flushIntervalSeconds = null, double? maxChunk = null, string targetId = null )
+		=> McpGate.Run( "add_leaderboard_stat", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "flushIntervalSeconds", flushIntervalSeconds ), ( "maxChunk", maxChunk ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate a currency component (sealed) persisted over Sandbox.Services.Stats — Steam-cloud
+	/// persistence, per Steam account, per package ident, with NO local save file. The stat stores the
+	/// ABSOLUTE balance: every Add(double)/TrySpend(double) pushes Stats.SetValue(statName, balance);
+	/// Flush() (and OnDestroy) pushes the buffered writes. On start it reads the balance back
+	/// asynchronously via Stats.GetLocalPlayerStats(ident) -&gt; Refresh() -&gt; Get(statName).Value
+	/// and fires the static OnBalanceLoaded(double); wait for IsLoaded before showing the balance.
+	/// CLOUD SEMANTICS (surprising): stat writes are buffered/rate-limited by the backend and apply
+	/// ONLY to the LOCAL Steam user — calling this for another player silently does nothing, so attach
+	/// it to the LOCAL player's GameObject (IsProxy guards keep remote copies inert); read-back is
+	/// eventually consistent and can lag minutes behind writes — the in-session Balance property is the
+	/// runtime truth. Dev sessions without a real published package ident may read back nothing
+	/// (balance starts 0 with a log line). packageIdent defaults to the running package (Game.Ident).
+	/// Returns { created, path, className, statName, packageIdent, flushEveryChange, placedOn, note,
+	/// nextSteps }. Next: trigger_hotload, attach to the local player, bind OnBalanceChanged for the
+	/// HUD. Refused during play mode. Use create_economy_wallet/create_currency_account for in-run
+	/// networked money, create_signed_save for offline local persistence; pair with
+	/// create_leaderboard_panel (the same stat can back a leaderboard).
+	/// </summary>
+	/// <param name="name">Class name for the generated component. Defaults to 'SteamStatCurrency'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="statName">Sandbox.Services stat that stores the balance (the stat-name string is the contract between write and read-back). Defaults to 'currency'.</param>
+	/// <param name="packageIdent">Package ident to read stats from. Omit/empty = the running package (Game.Ident).</param>
+	/// <param name="flushEveryChange">Call Stats.Flush() after every balance change instead of relying on the buffered flush + OnDestroy flush (the backend rate-limits flushes). Defaults to false.</param>
+	/// <param name="targetId">GUID of the LOCAL player's GameObject to attach to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "add_steam_stat_currency" )]
+	public static Task<object> AddSteamStatCurrency( string name = null, string directory = null, string statName = null, string packageIdent = null, bool? flushEveryChange = null, string targetId = null )
+		=> McpGate.Run( "add_steam_stat_currency", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "statName", statName ), ( "packageIdent", packageIdent ), ( "flushEveryChange", flushEveryChange ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate an achievement engine: a component with an AchievementDef list
+	/// (id/title/description/target), per-achievement progress persisted via FileSystem.Data JSON
+	/// (survives restarts), Progress(id, amount) / Unlock(id) API on a static Instance, a static
+	/// OnAchievementUnlocked event, and an optional Stats.Increment mirror ('ach-&lt;id&gt;' += 1) on
+	/// unlock. Also emits a Razor unlock-toast HUD (&lt;Name&gt;Toast.razor + .razor.scss, razor_lint
+	/// clean) unless makeToast=false. Returns { created, path, className, toastRazorPath,
+	/// toastScssPath, toastClassName, achievements, placedOn, note, nextSteps }. Ids are sanitized to
+	/// [a-z0-9_-]; omitting achievements bakes 3 editable samples. After trigger_hotload: place ONE set
+	/// in the scene, and host the toast under a ScreenPanel (add_screen_panel). Pair with
+	/// add_achievement_trigger for world-trigger unlocks. LOCAL-only: achievements belong to each
+	/// client's local player. Fails if the .cs or toast .razor already exists.
+	/// </summary>
+	/// <param name="name">Class name for the generated engine component (toast panel becomes &lt;name&gt;Toast). Defaults to 'AchievementSet'.</param>
+	/// <param name="directory">Subdirectory for all generated files. Defaults to 'Code'.</param>
+	/// <param name="achievements">Achievement definitions baked into the component. Omit for 3 editable samples (first_steps, collector, veteran). JSON array.</param>
+	/// <param name="fileName">Save file name inside FileSystem.Data. Defaults to 'achievements.json'.</param>
+	/// <param name="mirrorToStats">Mirror each unlock into Sandbox.Services.Stats as 'ach-&lt;id&gt;' += 1. Defaults to true.</param>
+	/// <param name="makeToast">Also emit the &lt;name&gt;Toast.razor + .razor.scss unlock toast HUD. Defaults to true.</param>
+	/// <param name="toastSeconds">Seconds each unlock toast stays on screen. Defaults to 4, clamped to &gt;= 0.5.</param>
+	/// <param name="targetId">GUID of a GameObject to attach the engine to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "create_achievement_set" )]
+	public static Task<object> CreateAchievementSet( string name = null, string directory = null, JsonNode achievements = null, string fileName = null, bool? mirrorToStats = null, bool? makeToast = null, double? toastSeconds = null, string targetId = null )
+		=> McpGate.Run( "create_achievement_set", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "achievements", achievements ), ( "fileName", fileName ), ( "mirrorToStats", mirrorToStats ), ( "makeToast", makeToast ), ( "toastSeconds", toastSeconds ), ( "targetId", targetId ) ) );
+
+	/// <summary>
 	/// Generate a first-person pickup / carry / throw component (sealed Component) for physics props.
 	/// Attach it to the PLAYER (the object that owns the camera). It eye-traces from Scene.Camera for a
 	/// Rigidbody-bearing GameObject tagged [Property] CarryTag (default 'carryable') within [Property]
@@ -85,6 +192,30 @@ public static class BridgeScaffoldGameplayTools
 	[McpTool( "create_carry_system" )]
 	public static Task<object> CreateCarrySystem( string name = null, string directory = null, double? range = null, double? throwForce = null, string carryTag = null, string targetId = null )
 		=> McpGate.Run( "create_carry_system", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "range", range ), ( "throwForce", throwForce ), ( "carryTag", carryTag ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate a host-authoritative currency ACCOUNT component (sealed) — the audited sibling of
+	/// create_economy_wallet (wallet = simple money, account = money + a ledger). Balance is
+	/// [Sync(SyncFlags.FromHost)] so clients can't author their own money; host-guarded Deposit(amount,
+	/// reason), Withdraw(amount, reason) -&gt; bool, and TryTransfer(otherAccount, amount, reason)
+	/// -&gt; bool each record a Transaction { Time (Time.Now), signed Amount, Reason, BalanceAfter }
+	/// into a fixed-size ring buffer (historySize, default 32; oldest entries overwritten SILENTLY).
+	/// GetRecentTransactions(max) returns them NEWEST FIRST — the ledger is HOST-SIDE ONLY and does not
+	/// replicate (Balance does); proxies get an empty list. Bind the instance OnBalanceChanged(long)
+	/// for HUD labels. Single-player safe. Returns { created, path, className, startingBalance,
+	/// historySize, placedOn, note, nextSteps }. Next: trigger_hotload, then attach via targetId re-run
+	/// or add_component_to_new_object. Refuses if the file already exists; refused during play mode.
+	/// Use create_economy_wallet when you don't need the audit trail; pair with create_idle_economy (it
+	/// auto-wires this account's Money/TrySpend).
+	/// </summary>
+	/// <param name="name">Class name for the generated component. Defaults to 'CurrencyAccount'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="startingBalance">Balance the account opens with (host seeds it in OnStart). Defaults to 0.</param>
+	/// <param name="historySize">Transaction ring-buffer capacity (clamped 1..4096); fixed once the first transaction is recorded, oldest overwritten silently after that. Defaults to 32.</param>
+	/// <param name="targetId">GUID of a per-player/bank GameObject to attach to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "create_currency_account" )]
+	public static Task<object> CreateCurrencyAccount( string name = null, string directory = null, int? startingBalance = null, int? historySize = null, string targetId = null )
+		=> McpGate.Run( "create_currency_account", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "startingBalance", startingBalance ), ( "historySize", historySize ), ( "targetId", targetId ) ) );
 
 	/// <summary>
 	/// Generate a networked coin / currency pickup component (sealed, Component.ITriggerListener).
@@ -143,6 +274,52 @@ public static class BridgeScaffoldGameplayTools
 	[McpTool( "create_economy_wallet" )]
 	public static Task<object> CreateEconomyWallet( string name = null, string directory = null, int? startingMoney = null, string targetId = null )
 		=> McpGate.Run( "create_economy_wallet", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "startingMoney", startingMoney ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate a self-contained, host-authoritative elo rating component: standard elo math (expected
+	/// = 1/(1+10^((Rb-Ra)/400)), delta = K * (score - expected)) with a [Property] K-factor, ratings in
+	/// a [Sync(SyncFlags.FromHost)] NetDictionary&lt;long,float&gt; keyed by SteamId, and host-side
+	/// persistence via FileSystem.Data JSON. API on a static Instance: ReportMatch(winnerSteamId,
+	/// loserSteamId) for 1v1 and ReportTeamMatch(winnerIds, loserIds) for teams (team-average elo,
+	/// uniform delta per member) — both are IsProxy-guarded no-ops on clients; GetRating(steamId) works
+	/// anywhere (unknown players = defaultRating); the static OnRatingChanged(steamId, newRating) fires
+	/// on EVERY machine via an [Rpc.Broadcast]. Returns { created, path, className, kFactor,
+	/// defaultRating, placedOn, note, nextSteps }. After trigger_hotload: place ONE in the scene and
+	/// network its GameObject (network_spawn) or the [Sync] never replicates. Only the HOST's disk
+	/// holds the ratings ledger. Fails if the file already exists.
+	/// </summary>
+	/// <param name="name">Class name for the generated component. Defaults to 'EloRatingSystem'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="kFactor">Elo K-factor — how far one result moves ratings (32 = fast, 16 = stable). Defaults to 32, clamped to &gt;= 1.</param>
+	/// <param name="defaultRating">Rating assigned to players with no recorded matches. Defaults to 1000.</param>
+	/// <param name="fileName">Save file name inside FileSystem.Data (host-side ledger). Defaults to 'elo_ratings.json'.</param>
+	/// <param name="targetId">GUID of a GameObject to attach to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "create_elo_rating_system" )]
+	public static Task<object> CreateEloRatingSystem( string name = null, string directory = null, double? kFactor = null, double? defaultRating = null, string fileName = null, string targetId = null )
+		=> McpGate.Run( "create_elo_rating_system", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "kFactor", kFactor ), ( "defaultRating", defaultRating ), ( "fileName", fileName ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate a typed LOCAL pub/sub event bus: a pure STATIC class (NOT a Component — nothing to
+	/// place in the scene) with Subscribe&lt;T&gt;(owner, Action&lt;T&gt;), Unsubscribe(owner) (removes
+	/// all of that owner's handlers across every event type), Publish&lt;T&gt;(evt) (synchronous,
+	/// exact-type-T subscribers only, snapshot-iterated so handlers may subscribe/unsubscribe
+	/// mid-publish), Count&lt;T&gt;() and Clear(), keyed by a plain Dictionary&lt;Type,
+	/// List&lt;(object, Delegate)&gt;&gt; — plus a tiny example event record ({name}Ping). Decouples
+	/// game systems: the quest system publishes 'EnemyDied', UI and achievements subscribe, neither
+	/// knows the other. Returns {created, path, className, exampleEvent, api[], note}. Next:
+	/// trigger_hotload + get_compile_errors, then Subscribe in components' OnStart and — REQUIRED —
+	/// Unsubscribe(this) in OnDestroy: handler lists hold PLAIN references (no weak refs), so a
+	/// component that never unsubscribes leaks itself for the scene's life; call Clear() on scene
+	/// teardown. Limits: LOCAL only — Publish reaches the calling machine's subscribers, NOT other
+	/// clients; for networked events pair with [Rpc.Broadcast]/[Rpc.Host] methods that Publish on
+	/// arrival. No base-type dispatch (Publish&lt;Base&gt; won't reach Subscribe&lt;Derived&gt;).
+	/// Refuses to overwrite an existing file; refused during play mode.
+	/// </summary>
+	/// <param name="name">Static class/file name. Defaults to 'EventBus'. The example event record is named {name}Ping. Sanitized to a valid C# identifier.</param>
+	/// <param name="directory">Subdirectory under the project root for the .cs file. Defaults to 'Code'.</param>
+	[McpTool( "create_event_bus" )]
+	public static Task<object> CreateEventBus( string name = null, string directory = null )
+		=> McpGate.Run( "create_event_bus", McpGate.Args( ( "name", name ), ( "directory", directory ) ) );
 
 	/// <summary>
 	/// Generate a generalized L4D-style AI/pacing director component (host-authoritative). On a
@@ -247,6 +424,35 @@ public static class BridgeScaffoldGameplayTools
 		=> McpGate.Run( "create_hold_to_confirm", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "action", action ), ( "holdSeconds", holdSeconds ), ( "decayOnRelease", decayOnRelease ), ( "targetId", targetId ) ) );
 
 	/// <summary>
+	/// Generate a geometric idle-economy component (sealed): generators on the classic BaseCost *
+	/// Growth^Owned cost curve with Buy 1 / Buy N / Buy Max — CostOf(index, count),
+	/// MaxAffordable(index), TryBuy(index, count) and BuyMax(index) all use the CLOSED-FORM geometric
+	/// series (cost = c0*(g^n-1)/(g-1), buyMax = floor(log_g(funds*(g-1)/c0+1))) — no per-copy loops,
+	/// Buy 1000 is the same math as Buy 1. Wallet wiring is TypeLibrary reflection with NO compile-time
+	/// wallet dependency (the shipped create_idle_income pattern): each income tick invokes
+	/// AddMoney(long|int) on the first sibling component that has one, purchases invoke
+	/// TrySpend(long|int), Buy Max reads the sibling's Money (or Balance) property — works out of the
+	/// box next to create_economy_wallet or create_currency_account; with NO wallet sibling, purchases
+	/// are refused with a Log.Warning (never silent) while TotalEarned still accumulates.
+	/// Host-authoritative: mutations IsProxy-guarded; owned counts are HOST-SIDE state (not
+	/// replicated); TotalEarned is [Sync(FromHost)]. Static events OnPurchased(index, count, cost) and
+	/// OnIncomeTick(amount, total). BuyMax steps down once past a whole-currency rounding edge rather
+	/// than failing. Returns { created, path, className, generators, tickSeconds, placedOn, note,
+	/// nextSteps }. Next: trigger_hotload, place it NEXT TO a wallet on the same GameObject, tune the
+	/// parallel GeneratorNames/BaseCosts/Growths/IncomesPerSecond lists with set_property. Refused
+	/// during play mode. Pair with create_offline_progress for away-time earnings; use
+	/// create_idle_income for a bare income ticker with no purchasing.
+	/// </summary>
+	/// <param name="name">Class name for the generated component. Defaults to 'IdleEconomy'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="tickSeconds">Seconds between income grants (floored at 0.1). Defaults to 1.</param>
+	/// <param name="generators">Baked-in generator defaults (inspector-tunable after generation). Omit for a starter trio: Cursor 15/1.15/0.5, Farm 200/1.15/4, Factory 3000/1.12/30. JSON array.</param>
+	/// <param name="targetId">GUID of the GameObject to attach to — put it on the SAME GameObject as the wallet so the reflection wiring finds it (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "create_idle_economy" )]
+	public static Task<object> CreateIdleEconomy( string name = null, string directory = null, double? tickSeconds = null, JsonNode generators = null, string targetId = null )
+		=> McpGate.Run( "create_idle_economy", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "tickSeconds", tickSeconds ), ( "generators", generators ), ( "targetId", targetId ) ) );
+
+	/// <summary>
 	/// Generate a host-authoritative passive income component: every tickSeconds the host grants
 	/// incomePerTick × Multiplier, auto-wiring the first sibling component with an AddMoney(int) method
 	/// (a create_economy_wallet scaffold plugs in with zero code) or an overridable Grant() seam;
@@ -312,6 +518,87 @@ public static class BridgeScaffoldGameplayTools
 	[McpTool( "create_leaderboard_panel" )]
 	public static Task<object> CreateLeaderboardPanel( string name = null, string directory = null, string statName = null, string title = null, int? maxRows = null )
 		=> McpGate.Run( "create_leaderboard_panel", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "statName", statName ), ( "title", title ), ( "maxRows", maxRows ) ) );
+
+	/// <summary>
+	/// Generate GameResource-based loot tables — the data-asset sibling of create_weighted_loot_table.
+	/// One .cs file containing THREE types: an entry POCO { Name, Weight, optional NestedTable
+	/// reference }, a [AssetType]-registered GameResource loot-table class (designers author '.loot'
+	/// files in the editor asset browser — New &gt; Loot Table — after the hotload; NOTE:
+	/// [AssetType(Name=..., Extension=..., Category=...)] is used because GameResourceAttribute is
+	/// [Obsolete] on this SDK), and a '&lt;name&gt;Resolver' Component that rolls an assigned table by
+	/// cumulative weight. Nested tables: an entry with a NestedTable rolls INTO that table instead of
+	/// dropping its Name, capped at maxDepth (default 4) with a self-reference guard so cycles
+	/// terminate (at the cap the deepest entry's Name is returned). Resolver.Roll() returns the item
+	/// name (null + warning when no Table is assigned or the table is empty; entries with weight &lt;=
+	/// 0 never win; all-zero weights fall back to the first entry) and fires the static
+	/// OnLoot(GameObject, item) event; roll HOST-SIDE and replicate the result yourself. targetId
+	/// attaches the RESOLVER (the resource is an asset type, not a component). SURPRISING: pick an
+	/// extension that is NOT a suffix of a built-in one (e.g. avoid 'cfg') or ResourceLibrary picks up
+	/// engine files as phantom instances. Returns { created, path, className, resolverClass, extension,
+	/// maxDepth, placedOn, note, nextSteps }. Next: trigger_hotload -&gt; author .loot assets in the
+	/// editor -&gt; assign the resolver's Table (set_property with the asset path). Refused during play
+	/// mode. Use create_weighted_loot_table for a single inline component with no asset files;
+	/// create_gacha_drop_table for pity + duplicate mechanics.
+	/// </summary>
+	/// <param name="name">Class name for the generated GameResource (the resolver becomes '&lt;name&gt;Resolver'). Defaults to 'LootTableResource'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="extension">Asset file extension (lowercase alphanumerics; avoid suffixes of built-in extensions like 'cfg'). Defaults to 'loot'.</param>
+	/// <param name="title">Display name of the asset type in the editor's New-asset menu. Defaults to 'Loot Table'.</param>
+	/// <param name="maxDepth">Default nested-table resolve depth cap baked into the resolver (clamped 0..16; also a [Property]). Defaults to 4.</param>
+	/// <param name="targetId">GUID of a GameObject to attach the RESOLVER component to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "create_loot_table_resource" )]
+	public static Task<object> CreateLootTableResource( string name = null, string directory = null, string extension = null, string title = null, int? maxDepth = null, string targetId = null )
+		=> McpGate.Run( "create_loot_table_resource", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "extension", extension ), ( "title", title ), ( "maxDepth", maxDepth ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate a between-runs roguelite meta-progression component (sealed, owner-only): persistent
+	/// meta-currency + an unlock-flag dictionary saved to FileSystem.Data JSON (dirty-flag autosave +
+	/// OnDestroy, the create_save_system shape). API: Grant(long), TrySpend(long) -&gt; bool,
+	/// Unlock(key) (idempotent — the static OnUnlocked(key) event fires only on the FIRST unlock, and
+	/// unlocks write through to disk immediately), IsUnlocked(key) -&gt; bool, and the run-end seam
+	/// BankRun(int earned) which converts a finished run's earnings into meta-currency, bumps
+	/// RunsBanked, and saves immediately — call it from your round machine's end-of-run transition
+	/// (create_round_state_machine / create_round_phase_machine). Instance OnCurrencyChanged(long)
+	/// drives meta-shop balance labels. Versioned payload: old-version files start fresh.
+	/// IsProxy-guarded — in multiplayer each machine banks only its own local meta file (this is
+	/// per-machine persistence, not a server economy). Returns { created, path, className, fileName,
+	/// version, placedOn, note, nextSteps }. Next: trigger_hotload, attach to a persistent
+	/// hub/menu-scene manager GameObject, gate content with IsUnlocked when building the player.
+	/// Refused during play mode. Pair with create_currency_account (in-run money) and
+	/// create_signed_save (if the meta file needs tamper evidence — this one is unsigned).
+	/// </summary>
+	/// <param name="name">Class name for the generated component. Defaults to 'MetaProgression'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="fileName">FileSystem.Data path the meta state is written to. Defaults to 'meta.json'.</param>
+	/// <param name="version">Payload version; mismatched files start fresh. Defaults to 1.</param>
+	/// <param name="autosaveSeconds">Dirty-flag autosave cadence in seconds; 0 disables the heartbeat (unlocks and BankRun still write through immediately). Defaults to 10.</param>
+	/// <param name="targetId">GUID of a persistent manager GameObject to attach to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "create_meta_progression" )]
+	public static Task<object> CreateMetaProgression( string name = null, string directory = null, string fileName = null, int? version = null, double? autosaveSeconds = null, string targetId = null )
+		=> McpGate.Run( "create_meta_progression", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "fileName", fileName ), ( "version", version ), ( "autosaveSeconds", autosaveSeconds ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate a sim/tycoon needs engine component: a [Property] list of need definitions (name, decay
+	/// rate/s, critical threshold, weight) with per-need 0..100 values that decay over Time.Delta,
+	/// Satisfy(name, amount) to restore, an aggregate Happiness (weighted mean, [Sync(FromHost)] when
+	/// networked), and static OnNeedCritical (edge-triggered: fires once crossing below threshold,
+	/// re-arms above) + OnHappinessChanged (&gt;0.25-point moves) events. Returns {created, path,
+	/// className, needs[], propertyNames[], note}. Next: trigger_hotload, get_compile_errors, then
+	/// attach via targetId re-call or add_component_with_properties; drive from game code (e.g. a
+	/// create_interactable that calls Satisfy). Limits: per-need values live on the simulating machine
+	/// only (host) — sync per-need UI yourself via RPCs; events fire on the simulating machine only;
+	/// networked default true means a no-session solo playtest won't tick (everything is a proxy) —
+	/// pass networked:false to iterate solo. Refused during play mode; refuses to overwrite an existing
+	/// file.
+	/// </summary>
+	/// <param name="name">Class/file name. Defaults to 'NeedsSystem'. Sanitized to a valid C# identifier.</param>
+	/// <param name="directory">Subdirectory under the project root for the .cs file. Defaults to 'Code'.</param>
+	/// <param name="needs">Need definitions baked as inspector-editable defaults. Defaults to the classic sim trio: Hunger(0.8/s), Energy(0.5/s), Fun(0.3/s). JSON array.</param>
+	/// <param name="networked">true (default): host-authoritative (IsProxy guard) + [Sync(FromHost)] Happiness — needs a host session. false: local build that ticks in a solo playtest.</param>
+	/// <param name="targetId">GUID of a GameObject to attach the component to (only attaches if the type is already in the TypeLibrary — hotload first, then re-call or use add_component_with_properties).</param>
+	[McpTool( "create_needs_system" )]
+	public static Task<object> CreateNeedsSystem( string name = null, string directory = null, JsonNode needs = null, bool? networked = null, string targetId = null )
+		=> McpGate.Run( "create_needs_system", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "needs", needs ), ( "networked", networked ), ( "targetId", targetId ) ) );
 
 	/// <summary>
 	/// Generate an NPC controller script with NavMeshAgent pathfinding. Supports patrol, chase, and
@@ -515,6 +802,61 @@ public static class BridgeScaffoldGameplayTools
 		=> McpGate.Run( "create_save_system", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "fileName", fileName ), ( "version", version ), ( "autosaveSeconds", autosaveSeconds ), ( "targetId", targetId ) ) );
 
 	/// <summary>
+	/// Generate a tamper-evident, versioned save-system component (sealed, owner-only). The SaveData
+	/// payload POCO is serialized to JSON (Sandbox.Json), FNV-1a-64 hashed over payload + version +
+	/// salt, and written as a signed envelope { Version, Payload, Signature } to FileSystem.Data.
+	/// Load() re-verifies: a signature mismatch (hand-edited/corrupt file) triggers a FORCED RESET —
+	/// the save file is DELETED, defaults are used, and the static OnTampered(reason) event fires
+	/// (destructive and deliberate; tell the player). A version mismatch starts fresh without the
+	/// tamper event (add migrations in Load). Loaded values pass a Sanitize() clamp hook so even a
+	/// re-signed save can't smuggle absurd values. Dirty-flag autosave (autosaveSeconds, default 10;
+	/// MarkDirty() to arm) + a final save in OnDestroy. HONEST LIMIT: the salt ships inside the game
+	/// assembly, so this is tamper-EVIDENT (stops notepad edits), NOT cryptographically secure. If you
+	/// omit salt, a unique random one is baked into the generated file — changing it later invalidates
+	/// existing saves. Returns { created, path, className, fileName, version, autosaveSeconds,
+	/// placedOn, note, nextSteps }. Next: trigger_hotload, attach, add your fields to SaveData + clamps
+	/// to Sanitize(), bump version on shape changes. Refused during play mode. Use create_save_system
+	/// for a plain unsigned save, create_save_slots for multi-slot UI flows, create_meta_progression
+	/// for roguelite meta-state.
+	/// </summary>
+	/// <param name="name">Class name for the generated component. Defaults to 'SignedSave'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="fileName">FileSystem.Data path the signed envelope is written to. Defaults to 'save_signed.json'.</param>
+	/// <param name="version">Save-shape version baked into the file and the signature; mismatched files start fresh. Defaults to 1.</param>
+	/// <param name="salt">Signing salt baked into the generated code. Omit to bake a unique random salt (recommended); changing it later invalidates existing saves.</param>
+	/// <param name="autosaveSeconds">Dirty-flag autosave cadence in seconds; 0 disables the heartbeat (OnDestroy still saves). Defaults to 10.</param>
+	/// <param name="targetId">GUID of a save-manager GameObject to attach to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "create_signed_save" )]
+	public static Task<object> CreateSignedSave( string name = null, string directory = null, string fileName = null, int? version = null, string salt = null, double? autosaveSeconds = null, string targetId = null )
+		=> McpGate.Run( "create_signed_save", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "fileName", fileName ), ( "version", version ), ( "salt", salt ), ( "autosaveSeconds", autosaveSeconds ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Generate a speedrun timer component plus a leaderboard display panel. The timer
+	/// (&lt;Name&gt;.cs) is TimeSince-based with a static Instance: StartTimer() at run start,
+	/// StopTimer() at the finish (pairs with a trigger zone), ResetTimer() to abort. StopTimer persists
+	/// the local best via FileSystem.Data and submits Stats.SetValue(statName, seconds) ONLY when the
+	/// run beats it — configure the stat with MIN aggregation on sbox.game so the global board keeps
+	/// best times. The panel (&lt;Name&gt;Panel.razor + .razor.scss, razor_lint clean) fetches via
+	/// Leaderboards.GetFromStat with min aggregation + ascending sort, has a clickable Friends-only
+	/// filter button, and overlays a local-best row read from the same save file. Returns { created,
+	/// path, className, panelRazorPath, panelScssPath, panelClassName, statName, placedOn, note,
+	/// nextSteps }. After trigger_hotload: place ONE timer (add_component_to_new_object or targetId)
+	/// and host the panel under a ScreenPanel/WorldPanel (add_screen_panel). maxRows clamps to 1..50;
+	/// makePanel=false skips the panel files. Fails if the .cs or panel .razor already exists.
+	/// </summary>
+	/// <param name="name">Class name for the generated timer component (panel becomes &lt;name&gt;Panel). Defaults to 'SpeedrunTimer'.</param>
+	/// <param name="directory">Subdirectory for all generated files. Defaults to 'Code'.</param>
+	/// <param name="statName">Sandbox.Services stat the best time is written to (sanitized to [a-z0-9_-]). Defaults to 'best_time'.</param>
+	/// <param name="fileName">Save file name inside FileSystem.Data for the local best. Defaults to 'speedrun.json'.</param>
+	/// <param name="title">Panel title text. Defaults to 'Best Times'.</param>
+	/// <param name="maxRows">Leaderboard rows fetched/shown. Defaults to 10, clamped to 1..50.</param>
+	/// <param name="makePanel">Also emit the &lt;name&gt;Panel.razor + .razor.scss display panel. Defaults to true.</param>
+	/// <param name="targetId">GUID of a GameObject to attach the timer to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "create_speedrun_leaderboard" )]
+	public static Task<object> CreateSpeedrunLeaderboard( string name = null, string directory = null, string statName = null, string fileName = null, string title = null, double? maxRows = null, bool? makePanel = null, string targetId = null )
+		=> McpGate.Run( "create_speedrun_leaderboard", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "statName", statName ), ( "fileName", fileName ), ( "title", title ), ( "maxRows", maxRows ), ( "makePanel", makePanel ), ( "targetId", targetId ) ) );
+
+	/// <summary>
 	/// Generate an enum-keyed stat modifier system with three modifier layers: SET
 	/// (highest-priority-wins hard override), ADD (summed bonuses), MULT (multiplied factors applied
 	/// last). Modifier storage uses parallel private Lists of primitive types (serialization-safe).
@@ -580,4 +922,34 @@ public static class BridgeScaffoldGameplayTools
 	[McpTool( "create_weighted_loot_table" )]
 	public static Task<object> CreateWeightedLootTable( string name = null, string directory = null, JsonNode entries = null, bool? pity = null, string targetId = null )
 		=> McpGate.Run( "create_weighted_loot_table", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "entries", entries ), ( "pity", pity ), ( "targetId", targetId ) ) );
+
+	/// <summary>
+	/// Scaffold an end-of-round map vote. Three files: &lt;Name&gt;.cs (sealed host-authoritative
+	/// controller) + &lt;Name&gt;Panel.razor + &lt;Name&gt;Panel.razor.scss (vote UI: one button per
+	/// map, live tallies, countdown, own-pick highlight, winner banner). Flow: host calls StartVote()
+	/// (usually from a post-round phase/state, or set the AutoStart [Property]) -&gt; clients click
+	/// -&gt; votes route client-to-host via [Rpc.Host] SubmitVote with the caller re-resolved HOST-SIDE
+	/// from Rpc.Caller (null-checked — Connection has no IsValid on this SDK) and the map index
+	/// re-validated (re-votes overwrite, keyed by SteamId) -&gt; tallies replicate via [Sync(FromHost)]
+	/// NetList&lt;int&gt; -&gt; when the [Sync] TimeUntil countdown expires the host picks the winner
+	/// (most votes; ties break deterministically via one LCG scramble of a time seed — no
+	/// System.Random) -&gt; after resultLingerSeconds the HOST calls Scene.LoadFromFile(winner) (API
+	/// verified live on this SDK; clients follow via the scene networking layer — verify the client
+	/// hand-off in a real multi-client session). Static event OnVoteFinished(sceneFile) fires on every
+	/// machine. Returns { created, componentPath, razorPath, scssPath, className, panelClassName, maps,
+	/// voteDurationSeconds, resultLingerSeconds, autoStart, note, nextSteps }. REQUIREMENTS: the
+	/// controller must sit on a NETWORK-SPAWNED object in multiplayer or [Sync] never replicates; if
+	/// maps is omitted the MapScenes list is generated EMPTY and StartVote() refuses with a warning
+	/// until you fill it in the inspector. Follow with trigger_hotload, attach via
+	/// add_component_with_properties, host the panel under add_screen_panel.
+	/// </summary>
+	/// <param name="name">Class name for the controller; the panel is generated as &lt;Name&gt;Panel. Defaults to 'MapVote'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs + .razor + .razor.scss. Defaults to 'Code'.</param>
+	/// <param name="maps">Scene files to vote between, e.g. ["scenes/arena.scene", "scenes/docks.scene"] (find them with list_scenes). Baked into the MapScenes [Property] list, editable later in the inspector. Defaults to an EMPTY list (StartVote() then refuses until it's filled).</param>
+	/// <param name="voteDurationSeconds">Seconds the vote stays open once StartVote() is called (clamped to &gt;= 3). Defaults to 20.</param>
+	/// <param name="resultLingerSeconds">Seconds the winner banner shows before the host loads the winning scene (clamped to &gt;= 0). Defaults to 4.</param>
+	/// <param name="autoStart">Start the vote automatically on spawn (host only). Usually false — call StartVote() from your round machine's post-round state instead. Defaults to false.</param>
+	[McpTool( "scaffold_map_vote_flow" )]
+	public static Task<object> ScaffoldMapVoteFlow( string name = null, string directory = null, string[] maps = null, double? voteDurationSeconds = null, double? resultLingerSeconds = null, bool? autoStart = null )
+		=> McpGate.Run( "scaffold_map_vote_flow", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "maps", maps ), ( "voteDurationSeconds", voteDurationSeconds ), ( "resultLingerSeconds", resultLingerSeconds ), ( "autoStart", autoStart ) ) );
 }

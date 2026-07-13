@@ -33,6 +33,45 @@ public static class BridgeScaffoldPolishTools
 		=> McpGate.Run( "add_flicker_light", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "style", style ), ( "intensity", intensity ), ( "speed", speed ), ( "lightId", lightId ) ) );
 
 	/// <summary>
+	/// Generate static conveniences over the SDK's BUILT-IN camera effects —
+	/// CameraComponent.AddShake(amplitude, frequency, duration), AddPunch(Vector3 direction, amplitude,
+	/// frequency, duration, fovAmplitude), AddPunch(Angles, ...) and AddTilt(Angles, duration,
+	/// easeTime), all fire-and-forget, self-expiring, whitelist-verified in sandboxed game code
+	/// 2026-07-13: a sealed Component exposing {name}.Shake/ShakeAt/Punch/PunchAngles/Tilt statics that
+	/// resolve the main camera (Scene.Camera, else IsMainCamera search, else first camera; warn +
+	/// return null when the scene has none) and return the live Sandbox.CameraEffectSystem.BaseEffect
+	/// (Stop()/IsDone; ShakeAt sets Epicenter+Radius for distance falloff), plus one-word preset
+	/// triggers — HitPunch() / ExplosionShake() / ExplosionShakeAt(position, radius) / LandingTilt() —
+	/// driven by [Property] tunables. Statics work with NO instance placed; place the component only to
+	/// tune presets in the inspector. RELATIONSHIP: create_camera_shake is the CONTINUOUS trauma model
+	/// (AddTrauma accumulates and decays); these built-ins are ONE-SHOT engine effects — they compose
+	/// safely, but don't fire both for the same event or hits feel doubled. Returns {created, path,
+	/// className, staticApi[], presetTriggers[], propertyNames[], note}. Next: trigger_hotload +
+	/// get_compile_errors, call the statics from game code (e.g. {name}.Shake(4, 25, 0.8) on explosion)
+	/// or attach via targetId and trigger presets. Limits &amp; honesty: compile + camera resolution
+	/// verified; the editor cannot judge FEEL — tune amplitudes in a human playtest; effects are LOCAL
+	/// visuals (wrap in [Rpc.Broadcast] for everyone). Refused during play mode; refuses to overwrite
+	/// an existing file.
+	/// </summary>
+	/// <param name="name">Class/file name. Defaults to 'CameraFx'. Sanitized to a valid C# identifier.</param>
+	/// <param name="directory">Subdirectory under the project root for the .cs file. Defaults to 'Code'.</param>
+	/// <param name="hitPunchDirection">HitPunch preset: punch direction. Defaults to Vector3.Backward (camera kicks back). As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="hitPunchAmplitude">HitPunch preset: positional kick strength. Defaults to 8.</param>
+	/// <param name="hitPunchFrequency">HitPunch preset: oscillation frequency. Defaults to 20.</param>
+	/// <param name="hitPunchDuration">HitPunch preset: seconds. Defaults to 0.25.</param>
+	/// <param name="hitPunchFovAmplitude">HitPunch preset: FOV kick amount (0 = none). Defaults to 3.</param>
+	/// <param name="explosionShakeAmplitude">ExplosionShake preset: shake strength. Defaults to 5.</param>
+	/// <param name="explosionShakeFrequency">ExplosionShake preset: oscillation frequency. Defaults to 25.</param>
+	/// <param name="explosionShakeDuration">ExplosionShake preset: seconds. Defaults to 0.8.</param>
+	/// <param name="landingTiltAngles">LandingTilt preset as {x: pitch, y: yaw, z: roll} degrees (or 'p,y,r'). Defaults to 5 pitch / 0 yaw / 2 roll. As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="landingTiltDuration">LandingTilt preset: seconds the tilt lasts. Defaults to 0.35.</param>
+	/// <param name="landingTiltEase">LandingTilt preset: ease-in/out time within the duration. Defaults to 0.15.</param>
+	/// <param name="targetId">GUID of a GameObject to attach the component to — only needed to tune presets in the inspector; the statics work with no instance (only attaches if the type is already in the TypeLibrary — hotload first).</param>
+	[McpTool( "create_camera_effects" )]
+	public static Task<object> CreateCameraEffects( string name = null, string directory = null, string hitPunchDirection = null, double? hitPunchAmplitude = null, double? hitPunchFrequency = null, double? hitPunchDuration = null, double? hitPunchFovAmplitude = null, double? explosionShakeAmplitude = null, double? explosionShakeFrequency = null, double? explosionShakeDuration = null, string landingTiltAngles = null, double? landingTiltDuration = null, double? landingTiltEase = null, string targetId = null )
+		=> McpGate.Run( "create_camera_effects", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "hitPunchDirection", hitPunchDirection ), ( "hitPunchAmplitude", hitPunchAmplitude ), ( "hitPunchFrequency", hitPunchFrequency ), ( "hitPunchDuration", hitPunchDuration ), ( "hitPunchFovAmplitude", hitPunchFovAmplitude ), ( "explosionShakeAmplitude", explosionShakeAmplitude ), ( "explosionShakeFrequency", explosionShakeFrequency ), ( "explosionShakeDuration", explosionShakeDuration ), ( "landingTiltAngles", landingTiltAngles ), ( "landingTiltDuration", landingTiltDuration ), ( "landingTiltEase", landingTiltEase ), ( "targetId", targetId ) ) );
+
+	/// <summary>
 	/// Generate a trauma-based camera shake component (the standard game-feel model: events add Trauma
 	/// 0..1, shake magnitude = Trauma², smooth Perlin offsets — not white-noise jitter — and Trauma
 	/// decays every frame, so explosions slam and footsteps barely register). Attach the generated
@@ -179,6 +218,30 @@ public static class BridgeScaffoldPolishTools
 		=> McpGate.Run( "create_proxy_nametag", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "maxDistance", maxDistance ), ( "heightOffset", heightOffset ) ) );
 
 	/// <summary>
+	/// Generate a Razor screen-panel HUD (.razor + .razor.scss) showing the active round/phase time
+	/// remaining as mm:ss with the phase/state name above it. NO code coupling to your round machine:
+	/// at runtime it discovers one by TypeLibrary property reflection — same-GameObject components
+	/// first, then the whole scene, re-scanning every 2s while unbound — matching either shipped
+	/// machine shape: create_round_phase_machine output (a [Sync] TimeUntil 'PhaseTimer' +
+	/// 'CurrentPhase' enum for the label) or create_round_state_machine output (a manager with
+	/// 'StateIndex' + 'Current', whose active state carries a [Sync] TimeUntil 'TimeLeft' +
+	/// 'Identifier'). First matching component wins; any hand-written machine exposing those member
+	/// names also binds. Adaptive BuildHash folds the WHOLE second remaining so the panel re-renders at
+	/// 1 Hz, not every frame. Optional low-time warning: at/below lowTimeSeconds the clock gets the
+	/// 'low' CSS class (red by default). Shows '--:--' (and fades out via the 'unbound' class) until a
+	/// machine exists. Returns { created, razorPath, scssPath, className, lowTimeSeconds, note,
+	/// nextSteps }. Renders NOTHING without a ScreenPanel host: follow with trigger_hotload, then
+	/// add_screen_panel, then add_component_with_properties (component=className) on the same object;
+	/// verify with capture_view (renderUI=true) in play mode.
+	/// </summary>
+	/// <param name="name">Class name for the generated panel. Defaults to 'RoundTimerHud'.</param>
+	/// <param name="directory">Subdirectory for the generated .razor + .razor.scss. Defaults to 'Code/UI'.</param>
+	/// <param name="lowTimeSeconds">Remaining-seconds threshold at/below which the clock gets the 'low' warning class (clamped to &gt;= 0; 0 disables). Editable per-instance via the LowTimeSeconds [Property]. Defaults to 10.</param>
+	[McpTool( "create_round_timer_hud" )]
+	public static Task<object> CreateRoundTimerHud( string name = null, string directory = null, double? lowTimeSeconds = null )
+		=> McpGate.Run( "create_round_timer_hud", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "lowTimeSeconds", lowTimeSeconds ) ) );
+
+	/// <summary>
 	/// Generate a diegetic, clickable world-space UI: a Razor PanelComponent (+ .razor.scss) meant to
 	/// sit on a GameObject that ALSO carries a Sandbox.WorldPanel — the WorldPanel is the world-space
 	/// render surface (PanelSize / RenderScale / InteractionRange), this component is the actual UI it
@@ -200,4 +263,49 @@ public static class BridgeScaffoldPolishTools
 	[McpTool( "create_worldpanel_ui" )]
 	public static Task<object> CreateWorldpanelUi( string name = null, string directory = null, string title = null )
 		=> McpGate.Run( "create_worldpanel_ui", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "title", title ) ) );
+
+	/// <summary>
+	/// Generate a lipsync dialogue performer — NPCs SPEAK their lines with MOVING MOUTHS: a sealed
+	/// Component holding a [Property] line list (speaker GameObject name + text) that, per line, (a)
+	/// mirrors the line into a generated create_dialogue_system HUD when one exists (loose TypeLibrary
+	/// capability bind: List&lt;string&gt; Lines + Begin() + bool IsActive — neither system references
+	/// the other), (b) speaks the text via Sandbox.Speech.Synthesizer positionally AT the speaker
+	/// (per-speaker voice name/gender/age/rate via the Voices list), (c) drives the speaker's
+	/// SkinnedModelRenderer mouth morphs from the live viseme stream — Handle.LipSync.Visemes
+	/// (IReadOnlyList&lt;float&gt; in the engine's 15-viseme order, read live from
+	/// Sandbox.LipSync.VisemeNames 2026-07-13) multiplied through the model's own baked
+	/// viseme-&gt;morph table (Model.GetVisemeMorph — verified nonzero on Citizen, e.g. viseme_AA -&gt;
+	/// openjawL/R; NOT a hand-guessed morph map), with MorphScale + smoothing, and (d) advances when
+	/// the audio handle stops (LineGapSeconds pause, LineTimeoutSeconds safety-skip, Skip() to cut a
+	/// line short, StopDialogue() to abort). Static events: OnLineStarted(dialogue, lineIndex, speaker)
+	/// + OnDialogueFinished(dialogue). Returns {created, path, className, lineCount, voiceCount,
+	/// propertyNames[], note}. Next: trigger_hotload + get_compile_errors, attach (targetId re-call or
+	/// add_component_with_properties), fill Lines/Voices in the inspector or bake them via params, call
+	/// Begin() from game code (or autoStart:true; pair with create_interactable). Limits &amp; honesty:
+	/// the editor cannot playtest audio, so the LIVE viseme stream is RUNTIME-UNVERIFIED — the
+	/// generated LogVisemes() helper + DebugLogVisemes property confirm it in seconds in play mode (the
+	/// API surface and mapping data ARE live-verified); models without baked viseme data log a warning
+	/// and stay audio-only (Citizen has it); voices are machine/OS-specific and TrySetVoice is
+	/// best-effort; LOCAL-only — call Begin() inside an [Rpc.Broadcast] for everyone; a bound HUD's own
+	/// advance input stays active (it only ends that HUD's display, not the audio). Refused during play
+	/// mode; refuses to overwrite an existing file.
+	/// </summary>
+	/// <param name="name">Class/file name. Defaults to 'LipsyncDialogue'. Sanitized to a valid C# identifier.</param>
+	/// <param name="directory">Subdirectory under the project root for the .cs file. Defaults to 'Code'.</param>
+	/// <param name="lines">Dialogue lines baked as inspector-editable defaults. Defaults to a two-line demo on the own GameObject. JSON array.</param>
+	/// <param name="voices">Per-speaker voice settings baked as defaults. Defaults to empty (every speaker uses the OS default voice). JSON array.</param>
+	/// <param name="volume">Playback volume for spoken lines. Defaults to 1.</param>
+	/// <param name="positional">true (default): 3D audio parented to the speaker GameObject. false: flat 2D narrator voice.</param>
+	/// <param name="driveMouth">true (default): drive the speaker's SkinnedModelRenderer mouth morphs from the viseme stream. false: audio-only.</param>
+	/// <param name="morphScale">Multiplier on viseme-derived morph weights (same idea as Sandbox.LipSync.MorphScale). Defaults to 1.</param>
+	/// <param name="mouthSmoothSeconds">Seconds of exponential smoothing on mouth morphs (0 = raw viseme weights). Defaults to 0.05.</param>
+	/// <param name="lineGapSeconds">Pause between a line's audio ending and the next line starting. Defaults to 0.2.</param>
+	/// <param name="lineTimeoutSeconds">Safety: a line whose audio never starts (synthesis pending/failed) is skipped after this many seconds. Defaults to 20.</param>
+	/// <param name="bindHud">true (default): loosely bind a create_dialogue_system HUD in the scene (TypeLibrary capability match) and mirror each line into it. false: no HUD mirroring.</param>
+	/// <param name="autoStart">true: Begin() fires in OnStart. Defaults to false (call Begin() from game code).</param>
+	/// <param name="debugLogVisemes">true: log the live viseme stream ~4x/second while speaking — the fast way to runtime-verify the mouth drive. Defaults to false.</param>
+	/// <param name="targetId">GUID of a GameObject to attach the component to (only attaches if the type is already in the TypeLibrary — hotload first, then re-call or use add_component_with_properties).</param>
+	[McpTool( "generate_lipsync_dialogue" )]
+	public static Task<object> GenerateLipsyncDialogue( string name = null, string directory = null, JsonNode lines = null, JsonNode voices = null, double? volume = null, bool? positional = null, bool? driveMouth = null, double? morphScale = null, double? mouthSmoothSeconds = null, double? lineGapSeconds = null, double? lineTimeoutSeconds = null, bool? bindHud = null, bool? autoStart = null, bool? debugLogVisemes = null, string targetId = null )
+		=> McpGate.Run( "generate_lipsync_dialogue", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "lines", lines ), ( "voices", voices ), ( "volume", volume ), ( "positional", positional ), ( "driveMouth", driveMouth ), ( "morphScale", morphScale ), ( "mouthSmoothSeconds", mouthSmoothSeconds ), ( "lineGapSeconds", lineGapSeconds ), ( "lineTimeoutSeconds", lineTimeoutSeconds ), ( "bindHud", bindHud ), ( "autoStart", autoStart ), ( "debugLogVisemes", debugLogVisemes ), ( "targetId", targetId ) ) );
 }

@@ -1,7 +1,7 @@
 {
   "name": "sbox-claude",
   "description": "Build s&box games by talking to Claude — now on s&box's NATIVE editor MCP server (streamable HTTP, no Node required for the main path). 232 bridge tools across 28 organized toolsets, discovered live via search_tools: full-round-trip prefabs (serialize/instantiate with components+children), batch operations with dry-run validation (set-property/delete/add-component/reparent), scene checkpoints (snapshot + rollback — the agent-side undo), scene & project health scans (find_broken_references, describe_project, lints), inline-PNG screenshots (single, framed, multi-angle orbit), a playtest harness that runs scripted gameplay in play mode with in-frame assertions (+ abort), 40+ compile-verified gameplay scaffolds (economy/rounds/saves/inventory/loot/cinematics/dialogue/game-feel), networking codegen + lints, terrain/forest/cave world tools, vehicles (drivable raycast cars with driver seats, handling presets, physgun grab), and character/citizen authoring. Read-only tools carry permission hints; scene mutations are play-mode guarded. Ships a lifeline stdio server for editor-down diagnostics (read_log/get_compile_errors), the sbox-build-feature screenshot-driven workflow skill, the schema-grounded sbox-api skill, the sbox-cookbook recipe router (51 open-source games), a sbox-scaffold-game starter, and the sbox-game-dev specialist agent. The s&box editor addon installs from the Asset Library (see README).",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": {
     "name": "sboxskins.gg",
     "url": "https://sboxskins.gg"

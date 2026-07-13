@@ -109,6 +109,34 @@ public static class BridgeWorldTools
 		=> McpGate.Run( "add_terrain_trail", McpGate.Args( ( "from", from ), ( "to", to ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
+	/// Create a swimmable/buoyant water region: a GameObject with a WaterVolume (s&amp;box's buoyancy +
+	/// drag physics volume, region defined by a trigger BoxCollider sized to `size`) plus, by default,
+	/// a simple flat translucent-blue surface box at the water line so it's visible. HONEST LIMIT: the
+	/// visual is a tinted dev-box stand-in, NOT a Gerstner/water shader — the dev material may render
+	/// the tint opaque; swap in a real water material later. Only the WaterVolume properties you pass
+	/// are set (engine defaults otherwise). Returns {created, gameObject{id,...}, size,
+	/// appliedProperties[], surface{id,...}|null, note, nextSteps[]}. Next: start_play and drop a
+	/// physics prop in to verify buoyancy; tune FluidDensity/LinearDrag/WaveAmplitude etc. with
+	/// set_property on the WaterVolume. Scene-mutating — refused during play mode.
+	/// </summary>
+	/// <param name="name">GameObject name. Defaults to 'Water'.</param>
+	/// <param name="position">World position of the volume's CENTRE (the surface sits at z + size.z/2 + surfaceOffset). As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="size">Full extents of the volume as 'x,y,z' world units. Defaults to '512,512,128'.</param>
+	/// <param name="density">WaterVolume.FluidDensity — higher = more buoyant. Engine default when omitted.</param>
+	/// <param name="linearDrag">WaterVolume.LinearDrag on submerged bodies. Engine default when omitted.</param>
+	/// <param name="angularDrag">WaterVolume.AngularDrag on submerged bodies. Engine default when omitted.</param>
+	/// <param name="waveAmplitude">WaterVolume.WaveAmplitude — physics wave height (does NOT animate the visual surface).</param>
+	/// <param name="waveFrequency">WaterVolume.WaveFrequency — physics wave frequency.</param>
+	/// <param name="fluidVelocity">WaterVolume.FluidVelocity — current/flow direction and speed, world units/s. As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="surfaceOffset">WaterVolume.SurfaceOffset — shifts the water line relative to the top of the box.</param>
+	/// <param name="visualSurface">Create the tinted surface box child. Defaults to true.</param>
+	/// <param name="surfaceColor">Tint of the visual surface. Defaults to translucent blue (0.15,0.35,0.55,0.6). As "r,g,b[,a]" (0-1 floats).</param>
+	/// <param name="parentId">GUID of a parent GameObject.</param>
+	[McpTool( "add_water_body" )]
+	public static Task<object> AddWaterBody( string name = null, string position = null, string size = null, double? density = null, double? linearDrag = null, double? angularDrag = null, double? waveAmplitude = null, double? waveFrequency = null, string fluidVelocity = null, double? surfaceOffset = null, bool? visualSurface = null, string surfaceColor = null, string parentId = null )
+		=> McpGate.Run( "add_water_body", McpGate.Args( ( "name", name ), ( "position", position ), ( "size", size ), ( "density", density ), ( "linearDrag", linearDrag ), ( "angularDrag", angularDrag ), ( "waveAmplitude", waveAmplitude ), ( "waveFrequency", waveFrequency ), ( "fluidVelocity", fluidVelocity ), ( "surfaceOffset", surfaceOffset ), ( "visualSurface", visualSurface ), ( "surfaceColor", surfaceColor ), ( "parentId", parentId ) ) );
+
+	/// <summary>
 	/// Build a standalone heightmap terrain mesh (a MeshComponent) from a hills/clearings JSON spec —
 	/// independent of MapBuilder. Use when you don't have a MapBuilder component in the scene and want
 	/// one-shot terrain. Returns `built`, `id` (the new GameObject's GUID), `name`, `vertices`, and

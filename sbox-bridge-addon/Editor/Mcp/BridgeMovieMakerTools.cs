@@ -32,6 +32,75 @@ public static class BridgeMovieMakerTools
 		=> McpGate.Run( "add_movie_player", McpGate.Args( ( "id", id ), ( "moviePath", moviePath ), ( "isLooping", isLooping ), ( "timeScale", timeScale ), ( "createTargets", createTargets ), ( "playOnStart", playOnStart ) ) );
 
 	/// <summary>
+	/// Author a MovieMaker .movie cutscene clip from a declarative shot list — EDIT MODE ONLY, no Movie
+	/// Maker dock, no play mode, no real-time waiting (a 30s clip bakes in one call, typically &lt;1s).
+	/// Builds a hold+blend keyframe timeline from the shots (smoothstep ease by default), steps a
+	/// camera through it, and hand-pumps MovieRecorder Advance/Capture per synthetic frame, then saves
+	/// Assets/&lt;folder&gt;/&lt;clipName&gt;.movie (registered + compiled; errors if the file exists —
+	/// the scene itself is NOT saved). Returns { authored, path, name, durationSeconds, frames,
+	/// sampleRate, shots, tracks, bakeMs, compiled, loadable, camera, nextSteps }. Camera: omit
+	/// cameraId for a temp camera (destroyed after the bake — play back with add_movie_player
+	/// createTargets:true so the missing target is recreated), or pass cameraId of an existing camera
+	/// GameObject (transform + FOV restored EXACTLY afterwards; the clip then animates THAT object on
+	/// playback). fovDegrees is baked for real (the clip carries a FieldOfView track). Authored clips
+	/// animate ONLY the camera the bake moves — other scene objects don't move in edit mode (that's
+	/// what record_gameplay_clip is for). Total timeline capped at 120s, max 32 shots. Errors during
+	/// play mode (stop_play first). Verify with list_movies; play via add_movie_player + play_movie in
+	/// play mode.
+	/// </summary>
+	/// <param name="shots">The shot list in order (1-32 shots). Timeline = hold₀, then blendᵢ + holdᵢ per following shot. JSON array.</param>
+	/// <param name="clipName">Asset name without extension (default authored_&lt;UTC timestamp&gt;; sanitized to [A-Za-z0-9_-]).</param>
+	/// <param name="folder">Assets subfolder to save into (default "movies").</param>
+	/// <param name="sampleRate">Clip samples per second (default 30, clamped 1-120).</param>
+	/// <param name="cameraId">GUID of an existing camera GameObject (must have a CameraComponent) to bake through — restored EXACTLY afterwards, and playback then animates that object. Omit for a temp camera that is destroyed after the bake.</param>
+	[McpTool( "author_movie_clip" )]
+	public static Task<object> AuthorMovieClip( JsonNode shots, string clipName = null, string folder = null, int? sampleRate = null, string cameraId = null )
+		=> McpGate.Run( "author_movie_clip", McpGate.Args( ( "shots", shots ), ( "clipName", clipName ), ( "folder", folder ), ( "sampleRate", sampleRate ), ( "cameraId", cameraId ) ) );
+
+	/// <summary>
+	/// Generate a sealed killcam Component: a rolling-buffer MovieRecorder keeps ONLY the last
+	/// MaxBufferSeconds of a target's gameplay (BufferDuration verified live: the compiled clip's
+	/// Duration equals the buffer, re-based to 0), and TriggerReplay() plays that history back through
+	/// a MoviePlayer while the main camera chase-follows the target (Scene.Camera takeover in
+	/// OnPreRender, restored exactly afterwards; static OnReplayFinished event + IsReplaying flag).
+	/// Sandbox-safe: live-verified that GAME code can construct and drive MovieRecorder/MoviePlayer at
+	/// runtime, and killcams/replays are the official recording-api use case — this is the real
+	/// MovieMaker path, not a transform-history approximation. The replay REWINDS THE LIVE TARGET
+	/// through its recorded past (classic killcam — the target is dead/inactive when it runs; disable a
+	/// still-alive controller for the duration). wholeScene:true makes the generated component default
+	/// to MovieRecorderOptions.Default (all renderers/cameras/sound points/particles — the replay
+	/// rewinds everything, killer included; heavy in dense scenes), and it stays toggleable
+	/// per-instance via the RecordWholeScene property. Returns { created, path, className,
+	/// bufferSeconds, sampleRate, cameraDistance, cameraHeight, nextSteps }. Then: trigger_hotload →
+	/// attach to a MANAGER object → set_component_reference Target to the player → arm via WatchOnStart
+	/// or StartWatching() from spawn code → call TriggerReplay() from death code (pairs with
+	/// create_health_system). LOCAL/visual-only — wrap in an [Rpc.Broadcast] for all clients. Refuses
+	/// if the file already exists.
+	/// </summary>
+	/// <param name="name">Component class/file name (default "Killcam").</param>
+	/// <param name="directory">Project folder for the .cs file (default "Code").</param>
+	/// <param name="bufferSeconds">Rolling-buffer length in seconds — the replay shows at most this much history (default 10, clamped 2-120).</param>
+	/// <param name="sampleRate">Recorder samples per second (default 30, clamped 1-120).</param>
+	/// <param name="cameraDistance">Replay chase-camera distance behind the target (default 150, clamped 10-2000).</param>
+	/// <param name="cameraHeight">Replay chase-camera height above the target (default 60, clamped 0-2000).</param>
+	/// <param name="wholeScene">Generated default for RecordWholeScene: true = buffer the WHOLE scene via MovieRecorderOptions.Default (replay rewinds everything; heavy in dense scenes), false = only the Target hierarchy (default).</param>
+	[McpTool( "create_killcam" )]
+	public static Task<object> CreateKillcam( string name = null, string directory = null, double? bufferSeconds = null, int? sampleRate = null, double? cameraDistance = null, double? cameraHeight = null, bool? wholeScene = null )
+		=> McpGate.Run( "create_killcam", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "bufferSeconds", bufferSeconds ), ( "sampleRate", sampleRate ), ( "cameraDistance", cameraDistance ), ( "cameraHeight", cameraHeight ), ( "wholeScene", wholeScene ) ) );
+
+	/// <summary>
+	/// Poll the gameplay recording job. While recording returns { recording:true, jobId, elapsedSeconds
+	/// (clip-timeline seconds), framesWithData, maxSeconds, sampleRate, capture, trackedObjectCount }
+	/// (trackedObjectCount is -1 for whole-scene capture). After an auto-stop (maxSeconds cap / play
+	/// mode ended) returns { stopped:true, pendingSave:true, reason } — the clip is in memory awaiting
+	/// stop_gameplay_recording. After a save/discard returns that last summary (assetPath etc.).
+	/// Read-only; works during play. No params.
+	/// </summary>
+	[McpTool( "gameplay_recording_status" )]
+	public static Task<object> GameplayRecordingStatus()
+		=> McpGate.Run( "gameplay_recording_status", McpGate.Args() );
+
+	/// <summary>
 	/// List the project's .movie resources (Sandbox.MovieMaker clips authored in the editor's Movie
 	/// Maker dock: Window → Movie Maker). Scans the ENTIRE Assets folder recursively and returns every
 	/// .movie found — no limit or paging. Returns { count, movies, note } where each movie has { path
@@ -60,6 +129,72 @@ public static class BridgeMovieMakerTools
 	[McpTool( "play_movie" )]
 	public static Task<object> PlayMovie( string id = null, string moviePath = null, double? positionSeconds = null, double? timeScale = null, bool? isLooping = null )
 		=> McpGate.Run( "play_movie", McpGate.Args( ( "id", id ), ( "moviePath", moviePath ), ( "positionSeconds", positionSeconds ), ( "timeScale", timeScale ), ( "isLooping", isLooping ) ) );
+
+	/// <summary>
+	/// Start recording live play-mode gameplay into a Sandbox.MovieMaker clip — REQUIRES play mode
+	/// (start_play first; errors otherwise). Captures the given GameObjects (ids — recommended: small
+	/// focused clips) or, when ids is omitted, the WHOLE scene (heavy: every object becomes tracks).
+	/// Returns { started, jobId, sampleRate, maxSeconds, capture, discarded, note } immediately;
+	/// recording runs ASYNC in the editor frame loop until stop_gameplay_recording or the maxSeconds
+	/// safety cap (default 60s of clip time, max 600s). Only one recording at a time (a second call
+	/// errors while active; a stopped-but-unsaved clip is discarded by a new start, reported in
+	/// 'discarded'). Combine with playtest or drive_player to record a SCRIPTED run, then
+	/// stop_gameplay_recording to save the .movie and play_movie to replay it.
+	/// </summary>
+	/// <param name="ids">GameObject GUIDs to capture (from get_scene_hierarchy WHILE PLAYING — play-mode ids can differ from editor ids). Omit to capture the whole scene (heavy).</param>
+	/// <param name="sampleRate">Samples per second (default 30, clamped 1-120).</param>
+	/// <param name="maxSeconds">Safety cap — auto-stops the recording once the clip timeline reaches this many seconds (default 60, clamped 1-600). The clip stays in memory until stop_gameplay_recording saves it.</param>
+	[McpTool( "record_gameplay_clip" )]
+	public static Task<object> RecordGameplayClip( string[] ids = null, int? sampleRate = null, double? maxSeconds = null )
+		=> McpGate.Run( "record_gameplay_clip", McpGate.Args( ( "ids", ids ), ( "sampleRate", sampleRate ), ( "maxSeconds", maxSeconds ) ) );
+
+	/// <summary>
+	/// Run a scripted playtest AND record the same run to a .movie clip in ONE call — automated
+	/// regression footage: a failing playtest comes with a replayable clip of exactly what happened.
+	/// REQUIRES play mode (start_play first). steps uses the EXACT playtest schema (one verb per step:
+	/// move / look / lookDelta / action / jump / set / wait / capture / assert — see the playtest tool
+	/// for the full verb reference). The recording defaults to the playtest's resolved player
+	/// hierarchy; pass ids to record other objects, or nothing resolvable falls back to whole-scene
+	/// capture (heavy). Returns { started, steps, recordingJobId, capture, sampleRate, clipName,
+	/// folder, recorderCapSeconds, note } immediately; both jobs run ASYNC in the editor frame loop and
+	/// the clip AUTO-SAVES the moment the playtest finishes (a failing or aborted run still saves its
+	/// footage; play mode ending early is also saved). THE POLL CHAIN: 1) playtest_status until
+	/// finished:true → the per-step pass/fail transcript. 2) gameplay_recording_status → the saved clip
+	/// summary { saved, assetPath, durationSeconds, trackCount } (if it still says pendingSave, the
+	/// save is a frame away — poll again; a save error there means name collision: call
+	/// stop_gameplay_recording yourself with a new name). Replay the footage with add_movie_player +
+	/// play_movie. Errors if a playtest or gameplay recording is already active. Only one at a time.
+	/// </summary>
+	/// <param name="steps">Ordered playtest step objects — identical schema to the playtest tool (move/look/lookDelta/action/jump/set/wait/capture/assert). Runs top-to-bottom in the frame loop. JSON array.</param>
+	/// <param name="id">GUID of the player/controller GameObject the playtest drives. Omit to auto-resolve the first PlayerController.</param>
+	/// <param name="component">Controller component type to target (e.g. 'PlayerController'). Omit to auto-detect.</param>
+	/// <param name="ids">GameObject GUIDs to RECORD (from get_scene_hierarchy WHILE PLAYING). Omit to record the playtest's player hierarchy (the default and usually what you want).</param>
+	/// <param name="sampleRate">Recording samples per second (default 30, clamped 1-120).</param>
+	/// <param name="clipName">Saved .movie asset name without extension (default playtest_&lt;UTC timestamp&gt;; sanitized to [A-Za-z0-9_-]).</param>
+	/// <param name="folder">Assets subfolder to save the clip into (default "recordings").</param>
+	[McpTool( "record_playtest" )]
+	public static Task<object> RecordPlaytest( JsonNode steps, string id = null, string component = null, string[] ids = null, int? sampleRate = null, string clipName = null, string folder = null )
+		=> McpGate.Run( "record_playtest", McpGate.Args( ( "steps", steps ), ( "id", id ), ( "component", component ), ( "ids", ids ), ( "sampleRate", sampleRate ), ( "clipName", clipName ), ( "folder", folder ) ) );
+
+	/// <summary>
+	/// Stop the active gameplay recording and persist it as a project .movie asset the editor can load
+	/// (written to Assets/&lt;folder&gt;/&lt;name&gt;.movie, registered + compiled — list_movies then
+	/// shows it with hasCompiledClip). Also saves a job that already auto-stopped (maxSeconds cap, or
+	/// play mode ended). Returns { saved, assetPath, durationSeconds, trackCount, sampleRate, compiled,
+	/// stopReason, wired, note } — a trackCount of 0 means nothing was captured and the response warns
+	/// about it. Pass wireToId to auto-wire a MoviePlayer on that GameObject pointed at the new clip
+	/// (during play mode that wiring is RUNTIME-ONLY and discarded on stop_play; the .movie asset
+	/// itself always persists). Errors if the target file already exists (the clip stays in memory —
+	/// retry with another name). discard:true throws the recording away instead. Replay:
+	/// add_movie_player + play_movie in play mode.
+	/// </summary>
+	/// <param name="name">Asset name without extension (default recording_&lt;UTC timestamp&gt;; sanitized to [A-Za-z0-9_-]).</param>
+	/// <param name="folder">Assets subfolder to save into (default "recordings").</param>
+	/// <param name="wireToId">GameObject GUID to auto-wire a MoviePlayer at the new clip (runtime-only if done during play mode).</param>
+	/// <param name="discard">Throw the recording away instead of saving it.</param>
+	[McpTool( "stop_gameplay_recording" )]
+	public static Task<object> StopGameplayRecording( string name = null, string folder = null, string wireToId = null, bool? discard = null )
+		=> McpGate.Run( "stop_gameplay_recording", McpGate.Args( ( "name", name ), ( "folder", folder ), ( "wireToId", wireToId ), ( "discard", discard ) ) );
 
 	/// <summary>
 	/// Stop MoviePlayer playback (the counterpart to play_movie). Targets the MoviePlayer on the given

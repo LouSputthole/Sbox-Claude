@@ -107,18 +107,24 @@ documentation standards a good tool description must meet) is in
 
 ### What's coming next?
 
-Planned for **v2.1.0** and beyond (tracked in [TOOL_BACKLOG.md](TOOL_BACKLOG.md)) — none of
-this is in v2.0.0 yet:
+Planned for **v2.1.0** and beyond (tracked in [TOOL_BACKLOG.md](TOOL_BACKLOG.md)):
 
 - **Retiring the legacy path** — the v1.x file-IPC transport and the full stdio TS tool layer
   (everything except the lifeline) are compiled-in as a fallback through v2.0.x and retire in
   v2.1.0.
-- **Remaining Tier-2 scaffolds** from the mined 51-game backlog.
-- **A loopback multiplayer test harness** — spawn N clients, drive each via `playtest`, assert
-  sync. Blocked on the engine shipping its loopback socket.
+- **Remaining Tier-2 scaffolds** — ✅ done: the staged `[Unreleased]` waves (2026-07-12/13)
+  complete the Tier-2 backlog — 30 new tools across economy & saves, stats & achievements,
+  round-flow & UI, world & render, AI & systems, gameplay recording, and the cinematic wave
+  (lipsync dialogue, camera effects, cutscene authoring, recorded playtests, killcams) —
+  with the few leftovers deliberately skipped for verified reasons.
+- **A multiplayer test harness** — spawn N clients, drive each via `playtest`, assert sync.
+  Likely unblocked: the official docs now describe local multi-instance testing ("Join via
+  new instance" + `connect local`), one live verification session away — the top next-wave
+  candidate.
 - **Typed DTO returns** for hot read tools, so agents plan around fields instead of parsing text.
-- **`MovieRecorder`** — record-gameplay-to-clip (the MovieMaker *playback* family already
-  shipped in v1.20.0; recording is the piece still missing).
+- **`MovieRecorder`** — ✅ done: the engine shipped `MovieRecorder` (2026-07-12) and the
+  staged wave covers it end to end (`record_gameplay_clip` / `stop_gameplay_recording` /
+  `gameplay_recording_status`) — record live gameplay, replay it with `play_movie`.
 
 ---
 

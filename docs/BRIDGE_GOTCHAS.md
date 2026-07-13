@@ -223,6 +223,26 @@ is broken.
 **Fix:** **Ignore it** when you intentionally have no `.razor.scss`. Don't create an empty
 file to silence it and don't treat it as the cause of a real UI bug.
 
+### 6e. Razor panels compile into a **folder-derived namespace** — sibling `.cs` classes don't
+
+**Symptom:** `search_types` returns a panel type **twice**, or code that references a
+generated panel by its bare class name fails to resolve — while the plain `.cs` class
+sitting *next to it* in the same folder resolves fine.
+
+**Why:** The Razor transpiler namespaces a panel by its **folder path** (e.g. a panel in
+`Code/UI/` becomes `Sandbox.UI.MyPanel`-style — `Sandbox.<Folder>.<Class>`), while sibling
+`.cs` classes stay in the **global namespace**. Two naming schemes in one folder — so type
+searches can surface the panel under both spellings, and a bare-name reference from global
+code may miss it. (Verified live 2026-07-12 while wiring generated HUDs.)
+
+**Fix:** Razor panels compile into a **folder-derived namespace**
+(`Sandbox.<Folder>.<Class>`) in current builds — live-verified 2026-07-12; plain sibling
+`.cs` classes stay global. Resolve generated panel types through `TypeLibrary` /
+`search_types` and use the **fully-qualified** name it reports, or add **`@namespace`** at
+the top of the `.razor` to pin one explicitly. When `search_types` shows the same panel
+twice, they're the same type seen through both spellings — not a duplicate-class compile
+problem.
+
 ---
 
 ## 7. Whitelist-blocked APIs at compile — masked by the broken-reference cascade
@@ -290,6 +310,213 @@ Assume external addon edits DON'T hotload.
 - Project `Code/` edits via `write_file`/`create_script` still hotload normally — this
   gotcha is specifically the `Libraries/` editor-assembly path.
 
+---
+
+## 10. `describe_type` is blind to STATIC members and constructors
+
+**Symptom:** `describe_type "Game"` or `describe_type "Stats"` comes back essentially
+**empty** — no members — even though the type is obviously loaded and code against it
+compiles. Or a type's known **public fields** (not properties) never show up, e.g.
+`Leaderboards+Entry`.
+
+**Why:** `describe_type` reports **instance properties and methods**. It does not report
+**static** members, **constructors**, or **public fields** — so static-API types
+(`Game`, `Sandbox.Services.Stats`, `Leaderboards`) and field-based DTOs look empty or
+incomplete. (Verified live 2026-07-12 across the Services surface.)
+
+**Fix:** For a specific member, use **`get_method_signature`** — and note its parameter
+is **`type`**, not `name`. For a full static surface, run reflection through
+`execute_csharp` (`typeof(T).GetMembers(BindingFlags.Static | ...)`). Don't conclude an
+API is missing because `describe_type` didn't list it.
+
+**The companion blind spot — read `hasDefault` before calling a param "required"
+(2026-07-13):** reflection shows you a method's parameter *list*, but a listed parameter
+is not necessarily one you must pass — `get_method_signature` reports **`hasDefault`**
+per parameter, and you must read it before documenting a parameter as required. Three
+shipped gotchas overstated requirements exactly this way (`Stats.SetValue`'s trailing
+`null, null`, `Board2.Refresh`'s CancellationToken, `SoundHandle.Stop`'s fadeTime — all
+defaults, all legally callable with fewer args; see #11 and #15). And the static
+blindness above compounds it: a static member the docs document
+(`Stats.LocalPlayer`, `MovieRecorderOptions.Default`) is invisible here — "reflection
+didn't show it" ≠ "the docs are wrong."
+
+---
+
+## 11. `Sandbox.Services` API shapes that reflection folklore gets wrong
+
+**Symptom:** Generated Services code fails to compile or misbehaves: `Stats.SetValue`
+"missing overload", `Stats.LocalPlayer` doesn't exist, a leaderboard has no
+`SetFriendsOnly`/`SetAggregationMin`, an `Entry`'s values read as missing.
+
+**Why (verified live 2026-07-12; "required param" claims corrected against
+`get_method_signature` `hasDefault` + the official docs 2026-07-13):**
+- `Stats.SetValue(name, amount, context = null, data = null)` — the trailing parameters
+  have **defaults**, so **2-arg calls are legal**. (An earlier version of this gotcha
+  claimed a missing 2-arg overload — that was the #10 `hasDefault` blind spot, not the SDK.)
+- `PlayerStats` / `PlayerStat` are **nested types** (`Stats+PlayerStats`); read values
+  with `.Get(name).Value`. The official docs (services/stats.md) document
+  **`Stats.LocalPlayer.Get("stat")`** — `Stats.LocalPlayer` is a **static**, so it's
+  reflection-invisible (#10), which is where our earlier "no LocalPlayer" claim came
+  from. Prefer it over `GetLocalPlayerStats(ident)` after one compile-probe confirms it
+  on your build.
+- `Leaderboards.GetFromStat` has **both** `(statName)` and `(packageIdent, statName)`
+  overloads and returns **`Board2`** — the *configurable* board (`SetFriendsOnly` /
+  `SetAggregationMin` / `SetSortAscending` / `CenterOnMe` / `FilterByDay`). The plain
+  `Get` path returns `Board`, which **lacks** those.
+- `Board2.Refresh(CancellationToken cancellation = default)` — bare `Refresh()` is legal.
+- `Leaderboards+Entry` exposes public **FIELDS** — invisible to `describe_type`'s
+  property list (see #10), but real.
+
+**Fix:** Code against the shapes above; when something Services-flavored "doesn't exist",
+suspect a nested type, a field, or a static member before suspecting the SDK — and check
+via `get_method_signature` (reading `hasDefault` before calling anything "required") /
+`execute_csharp` reflection, not `describe_type` alone.
+The shipped stats/leaderboard scaffolds (`add_leaderboard_stat`,
+`create_speedrun_leaderboard`, `add_steam_stat_currency`) bake all of this in.
+
+---
+
+## 12. `GameResourceAttribute` is `[Obsolete]` — use `[AssetType]`, and mind the extension
+
+**Symptom:** A custom GameResource decorated `[GameResource(...)]` compiles with an
+obsolete warning (or fails under warnings-as-errors) — or your custom asset type
+registers strangely / collides with a built-in.
+
+**Why:** The SDK deprecated `GameResourceAttribute`; the current attribute is
+**`[AssetType(Name = …, Extension = …, Category = …)]`**. Separately, the asset system
+matches extensions loosely enough that an extension which is a **suffix of a built-in
+one** confuses registration. (Verified live 2026-07-12 building `create_loot_table_resource`
+— its `.loot` extension was chosen to dodge every built-in.)
+
+**Fix:** Decorate custom resources with `[AssetType(...)]`, and pick an extension that is
+**not a suffix of any built-in extension**.
+
+---
+
+## 13. `MovieRecorder.Start()` AUTO-advances — pumping it yourself DOUBLE-COUNTS
+
+**Symptom:** A recorded gameplay clip runs roughly **twice as long** as the wall-clock
+time you recorded (verified: 5.55 s of play → a 10.80 s clip). Or a recorder built from a
+bare `new MovieRecorderOptions()` produces **zero tracks**.
+
+**Why:** In play mode, `MovieRecorder.Start()` hooks game time and **auto-advances +
+auto-captures every frame on its own**. Calling `Advance`/`Capture` manually as well means
+every frame is counted twice. Separately, a bare `new MovieRecorderOptions()` captures
+nothing **by design** — you must add capture sources. (An earlier version of this gotcha
+called `WithCaptureAll<Component>()` "inert" — that was a **misdiagnosis**: it works when
+paired with a matching `ComponentCapturer`, or start from **`MovieRecorderOptions.Default`**,
+a **static** — invisible to `describe_type`, see #10 — that captures all
+Renderers/Cameras/SoundPoints/particles. It's a record type, so `with` syntax works, and it
+compiles in sandboxed game code. Official reference: movie-maker/recording-api.)
+
+**Related surface, all verified live (2026-07-13):**
+- **`BufferDuration` is a TRUE rolling buffer** — 8.72 s recorded → exactly a 3.00 s clip,
+  re-based to 0 (the last-N-seconds killcam primitive; `create_killcam` builds on it).
+- `Compiled.MovieClip` exposes `Tracks` + `Duration` but **no `TimeRange`**.
+- `MoviePlayer` surface: `Play(IMovieClip)` / `CreateTargets` / `UpdateTargets` —
+  `UpdateTargets` applies clip state **even in EDIT mode** (how `author_movie_clip`
+  verifies without playing).
+- `WithCaptureGameObject` alone captures 5 transform tracks but **NOT camera properties** —
+  add `WithCaptureComponent(cam)` for `FieldOfView` etc. (verified: FOV decodes exactly).
+
+**Fix:** In play mode, start the recorder and **monitor only** — never pump
+`Advance`/`Capture` while play mode runs (manual `Advance`/`Capture` is the **edit-mode
+bake** idiom, which `author_movie_clip` uses). Target with `WithCaptureGameObject`
+(+ `WithCaptureComponent` for camera props) or capture the whole scene via
+`WithDefaultCaptureActions()` / `MovieRecorderOptions.Default`. The bridge's
+`record_gameplay_clip` / `stop_gameplay_recording` / `gameplay_recording_status` encode
+exactly this.
+
+---
+
+## 14. `JsonSerializerOptions { WriteIndented = true }` throws in editor context
+
+**Symptom:** Serializing to pretty-printed JSON from **editor-side** code throws
+`must specify a TypeInfoResolver` — the same code that works fine in game code.
+
+**Why:** The editor context runs System.Text.Json with reflection-based resolution
+unavailable by default, so constructing custom `JsonSerializerOptions` (e.g. for
+`WriteIndented`) demands an explicit `TypeInfoResolver`. (Hit live 2026-07-12 writing
+`.movie` resources.)
+
+**Fix:** Use plain `ToJsonString()` / `JsonSerializer.Serialize` **without** custom
+options. Give up the pretty-printing; take the working serialization.
+
+---
+
+## 15. `Sandbox.LipSync` cannot consume a TTS `SoundHandle`
+
+**Symptom:** You generate speech with `Sandbox.Speech.Synthesizer` and try to drive a
+character's mouth with `LipSync` — but there's no way to hand the TTS audio to the
+LipSync component.
+
+**Why:** `LipSync` consumes a **`Sound` (a `BaseSoundComponent`)** plus a Renderer — it
+has no input for a raw **`SoundHandle`**, which is what TTS returns. Related handle facts
+(verified live 2026-07-12): `SoundHandle.Stop(float fadeTime = 0)` — the `fadeTime` has a
+**default**, so parameterless `Stop()` *calls* are valid (an earlier version of this
+gotcha said otherwise — the #10 `hasDefault` blind spot); and `SoundHandle.LipSync` is a
+real accessor (`Enabled` / `Visemes` / `FrameNumber`).
+
+**The viseme surface, verified live (2026-07-13):**
+- `SoundHandle.LipSync.Visemes` is an **`IReadOnlyList<float>`** in the engine's
+  **15-viseme Oculus order**: `viseme_sil, PP, FF, TH, DD, KK, CH, SS, NN, RR, AA, E, I,
+  O, U` (read from `Sandbox.LipSync`'s private `VisemeNames`).
+- **`Model.GetVisemeMorph(visemeName, morphIndex)`** exposes the per-model **baked
+  viseme→morph matrix** (Citizen ships it — e.g. `viseme_AA` → `openjawL/R`).
+  **ARG ORDER MATTERS**: swapped arguments return silent zeros, not an error.
+- `Synthesizer.OnVisemeReached` is **`Action<int, TimeSpan>`** — CONFIRMED (the older
+  "delegate arg types can't be confirmed" note is stale).
+
+**Fix:** Treat TTS as **audio-only** at the `LipSync`-component level (that's why
+`add_tts_voice` is designed that way). If you need mouth movement, drive morphs from the
+viseme stream yourself — `handle.LipSync.Visemes` (exposed by `add_tts_voice`'s
+`enableVisemeData`) multiplied through `Model.GetVisemeMorph` — which is exactly what
+**`generate_lipsync_dialogue`** generates for you — or route pre-authored `.sound` assets
+through a `SoundPointComponent` where `add_lipsync` works normally.
+
+---
+
+## 16. The SDK moves under you — e.g. CameraComponent now ships `AddShake` / `AddPunch` / `AddTilt`
+
+**Symptom:** You hand-roll (or scaffold) a camera effect the engine turns out to provide
+natively — duplicated behavior, or two systems fighting over the camera.
+
+**Why:** The SDK adds surface between releases. Case in point (verified 2026-07-12):
+`CameraComponent` now has **built-in `AddShake` / `AddPunch` / `AddTilt`** effects that
+didn't exist when `create_camera_shake` shipped. Neither is *wrong* — the bridge's trauma
+model is still the richer pattern — but you should know both exist before stacking them.
+
+**Fix:** Before building any camera/feel effect, `describe_type "CameraComponent"` (and
+friends) to see what the engine already ships. Reflection over folklore — the standing
+rule, applied to *additions*, not just removals.
+
+**The verified surface (2026-07-13):** every effect returns a
+**`Sandbox.CameraEffectSystem.BaseEffect`** — a **nested** type `search_types` won't
+surface (see #10): `Stop()` / `IsDone` / `TimeAlive` / `Duration`, plus **`Epicenter`
+(`Vector3?`) + `Radius`** for distance falloff. Defaults: `AddPunch` frequency = 1,
+duration = 0.3, fovAmplitude = 0; `AddTilt` easeTime = 0.2; `AddShake` has no defaults.
+The official docs (scene/components/reference/camera-effects) also document **`EnvShake`,
+`ShakePhysics`, controller `Rumble`, and the `ICameraModifier` extension point** — surface
+the bridge does not yet cover. `create_camera_effects` wraps the covered set;
+`create_camera_shake` remains the continuous trauma model — the two compose, but don't
+fire both for the same event.
+
+---
+
+## 17. Hotload can transiently corrupt `MovieRecorder` GLOBALLY
+
+**Symptom:** Right after a hotload, `MovieRecorder.Start()` throws an NRE — from **every**
+assembly (bridge and sandboxed game code alike), on recorder code that worked minutes
+earlier and is unchanged.
+
+**Why:** Observed once (2026-07-13), not reproduced since: a hotload left the engine's
+MovieMaker recording machinery in a broken **global** state — every `Start()` NRE'd until
+the editor was restarted. Engine-internal state; nothing the addon can reach or patch.
+
+**Fix:** **`restart_editor`.** The corruption clears on a clean relaunch. If `Start()`
+suddenly NREs everywhere right after a hotload, don't debug your code first — restart,
+then retry.
+
 ## Quick reference
 
 | Symptom | Not fixable because… | Do this |
@@ -305,3 +532,12 @@ Assume external addon edits DON'T hotload.
 | `Error opening stylesheet … (File not found)` | harmless existence probe | ignore it |
 | Compile fails, no file path, generic wrapper | whitelist rejection masked by broken-reference cascade | `read_log` filter `"Error \|"`; `array.Clone()` → `.ToArray()` |
 | `take_screenshot` times out at 30 s | GPU/render stall (`ToolsStallMonitor`) | `restart_editor` (saved scene survives) |
+| `describe_type` on `Game`/`Stats` comes back empty | it doesn't report statics, constructors, or public fields | `get_method_signature` (param is `type`, not `name`) or `execute_csharp` reflection; read **`hasDefault`** before calling a param "required" |
+| Services code won't compile / members "missing" | nested `Stats+PlayerStats`; `Board2` vs `Board`; `Entry` uses fields; `Stats.LocalPlayer` is a reflection-invisible static | code the verified shapes (#11) — trailing params have defaults (`SetValue` 2-arg and bare `Refresh()` are legal); the shipped stats scaffolds bake them in |
+| `[GameResource]` obsolete warning | attribute deprecated | `[AssetType(Name/Extension/Category)]`; extension must not suffix a built-in |
+| Recorded clip is ~2× wall time / recorder captures 0 tracks | `MovieRecorder.Start()` auto-advances; bare `new MovieRecorderOptions()` captures nothing by design | in play mode monitor only — never pump Advance/Capture; `WithCaptureGameObject` (+ `WithCaptureComponent` for camera props), `WithDefaultCaptureActions()`, or `MovieRecorderOptions.Default` |
+| Editor-side JSON throws `must specify a TypeInfoResolver` | custom `JsonSerializerOptions` need an explicit resolver in editor context | plain `ToJsonString()` / `JsonSerializer.Serialize`, no options |
+| Can't lipsync TTS audio | `LipSync` wants a `BaseSoundComponent`, not a `SoundHandle` | drive morphs yourself: `handle.LipSync.Visemes` × `Model.GetVisemeMorph` (what `generate_lipsync_dialogue` generates) |
+| Panel type resolves oddly / appears twice | Razor panels get a folder-derived namespace; sibling `.cs` stays global | use the fully-qualified name from `search_types`, or pin one with `@namespace` |
+| Hand-rolled camera effect fights a built-in | SDK added `AddShake`/`AddPunch`/`AddTilt` on CameraComponent | `describe_type` before building feel effects; `create_camera_effects` wraps the built-ins — don't stack unknowingly |
+| `MovieRecorder.Start()` NREs from every assembly after a hotload | hotload transiently corrupted the recording machinery globally (seen once) | `restart_editor`, then retry — don't debug your code first |

@@ -100,6 +100,15 @@ const MODULE_TOOLSET = {
   uifeedback: "bridge_scaffold_polish",
   visuals: "bridge_visuals",
   world: "bridge_world",
+  economysave: "bridge_scaffold_gameplay",
+  statsachievements: "bridge_scaffold_gameplay",
+  roundui: "bridge_scaffold_gameplay",
+  worldrender: "bridge_visuals",
+  aisystems: "bridge_scaffold_gameplay",
+  gameplayrecorder: "bridge_moviemaker",
+  dialoguefx: "bridge_scaffold_polish",
+  movieauthoring: "bridge_moviemaker",
+  cinematicrecording: "bridge_moviemaker",
 };
 
 // tool → toolset overrides (a tool that thematically belongs elsewhere).
@@ -122,6 +131,12 @@ const TOOL_TOOLSET = {
   describe_scene: "bridge_scene",
   create_team_assigner: "bridge_scaffold_gameplay",
   create_idle_income: "bridge_scaffold_gameplay",
+  create_round_timer_hud: "bridge_scaffold_polish",
+  add_panel_buildhash: "bridge_ui",
+  add_water_body: "bridge_world",
+  create_utility_ai: "bridge_npc",
+  create_npc_schedule_brain: "bridge_npc",
+  add_tts_voice: "bridge_audio",
 };
 
 const TOOLSET_META = {

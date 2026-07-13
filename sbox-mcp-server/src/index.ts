@@ -65,6 +65,15 @@ import { registerAuditTools } from "./tools/audit.js";
 import { registerBatchTools } from "./tools/batch.js";
 import { registerWorkflowTools } from "./tools/workflow.js";
 import { registerVehicleTools } from "./tools/vehicles.js";
+import { registerEconomySaveTools } from "./tools/economysave.js";
+import { registerStatsAchievementsTools } from "./tools/statsachievements.js";
+import { registerRoundUiTools } from "./tools/roundui.js";
+import { registerWorldRenderTools } from "./tools/worldrender.js";
+import { registerAiSystemsTools } from "./tools/aisystems.js";
+import { registerGameplayRecorderTools } from "./tools/gameplayrecorder.js";
+import { registerDialogueFxTools } from "./tools/dialoguefx.js";
+import { registerMovieAuthoringTools } from "./tools/movieauthoring.js";
+import { registerCinematicRecordingTools } from "./tools/cinematicrecording.js";
 
 // ── CLI flags ──────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -264,6 +273,15 @@ registerAuditTools(server, bridge);
 registerBatchTools(server, bridge);
 registerWorkflowTools(server, bridge);
 registerVehicleTools(server, bridge);
+registerEconomySaveTools(server, bridge);
+registerStatsAchievementsTools(server, bridge);
+registerRoundUiTools(server, bridge);
+registerWorldRenderTools(server, bridge);
+registerAiSystemsTools(server, bridge);
+registerGameplayRecorderTools(server, bridge);
+registerDialogueFxTools(server, bridge);
+registerMovieAuthoringTools(server, bridge);
+registerCinematicRecordingTools(server, bridge);
 
 /** Start the MCP server on stdio and attempt initial Bridge connection. */
 async function main(): Promise<void> {

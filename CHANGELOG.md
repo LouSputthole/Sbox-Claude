@@ -2,6 +2,98 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## [2.1.0] -- 2026-07-13 "Action!"
+
+**+30 tools — Tier-2 completion + gameplay recording + the cinematic wave. 275 tools / 267 handlers / 262 native across 28 toolsets / 7 lifeline (was 245/237/232). Seven new families, all additive — no existing tool contract changed. All 30 live-verified on Gravehold (the Tier-2/recording 25 on 2026-07-12, the 5 cinematic tools e2e 2026-07-13): every handler executed for real, every generated scaffold hotload-compiled clean + TypeLibrary-load-confirmed, and the scene + project left pristine.**
+
+### Added — Economy & Save (Batch 55; bridge_scaffold_gameplay)
+
+- **`create_currency_account`** — the audited ledger the corpus keeps hand-rolling: a `[Sync(FromHost)]` balance, host-guarded `Deposit` / `Withdraw` / `TryTransfer`, and a transaction ring buffer so every mutation leaves a record.
+- **`create_idle_economy`** — the geometric bulk-buy engine: closed-form `CostOf` / `MaxAffordable` / `BuyMax` (no per-purchase loops), auto-wiring a sibling wallet via TypeLibrary reflection (zero compile-time coupling, same convention as `create_idle_income`).
+- **`create_signed_save`** — an FNV-1a tamper-EVIDENT save envelope: clamp-on-load `Sanitize`, forced reset on signature mismatch, and an `OnTampered` hook. Honest by design: tamper-*evident*, not tamper-proof.
+- **`create_meta_progression`** — roguelite meta-currency + unlock flags persisted across runs, with a `BankRun` seam for end-of-run deposits.
+- **`add_steam_stat_currency`** — currency over `Sandbox.Services.Stats`, with the cloud semantics documented honestly (batched backend flush — not a transactional store).
+- **`create_loot_table_resource`** — data-asset loot tables: an `[AssetType]` GameResource (`.loot` files) + a resolver component, nested tables with a depth cap. Designers edit assets; code rolls them.
+
+### Added — Stats & Achievements (Batch 56; bridge_scaffold_gameplay)
+
+- **`add_leaderboard_stat`** — the write-side partner to `create_leaderboard_panel`: batched 12 s flush, baseline-delta idempotency, and chunking for large increments.
+- **`create_achievement_set`** — achievement definitions + persisted progress + a static `OnAchievementUnlocked` + a Razor toast HUD.
+- **`add_achievement_trigger`** — a trigger-zone GameObject firing `Progress`/`Unlock` on entry, with a once-only latch.
+- **`create_speedrun_leaderboard`** — a run timer that submits only on improvement via `Stats.SetValue`, plus a `Board2` min-aggregation panel with a friends filter and a local-best row.
+- **`create_elo_rating_system`** — `[Sync(FromHost)]` NetDictionary ratings, `ReportMatch` / `ReportTeamMatch`, `Math.Pow` expected score, host-side persistence.
+
+### Added — Round-flow & UI (Batch 57)
+
+- **`create_round_timer_hud`** (bridge_scaffold_polish) — a Razor round-timer HUD that binds by reflection to *either* shipped round machine (phase or state), with a 1 Hz adaptive `BuildHash`.
+- **`scaffold_map_vote_flow`** (bridge_scaffold_gameplay) — end-of-round map voting: `[Rpc.Host]` votes with `Rpc.Caller` re-validation, `[Sync(FromHost)]` NetList tallies, an LCG tie-break, winner → `Scene.LoadFromFile`, plus a Razor vote panel.
+- **`add_panel_buildhash`** (bridge_ui) — a FILE-EDIT tool: patches an *existing* `.razor` to add a `BuildHash` override — `razor_lint`'s companion fixer. The `alreadyPresent` no-op path is verified.
+
+### Added — World & Render (Batch 58)
+
+- **`add_water_body`** (bridge_world) — a `WaterVolume` physics volume + trigger BoxCollider footprint + an optional tinted surface child. Honest limit: swimmable water *physics*, not a water shader.
+- **`add_render_target_camera`** (bridge_visuals) — a secondary camera rendering to a texture (`TextureBuilder`) + a generated display component wiring `camera.RenderTarget` onto a Material — the CCTV / mirror / portal-screen path.
+- **`add_daynight_sun`** (bridge_visuals) — a DirectionalLight arc + a 5-key color gradient + optional SkyBox2D tint, driven by `create_day_night_clock`'s `TimeOfDay`; refuses generation if the clock class is unknown rather than guessing.
+
+### Added — AI & Systems (Batch 59)
+
+- **`create_needs_system`** (bridge_scaffold_gameplay) — decaying needs rolled into a weighted-mean `[Sync(FromHost)]` `Happiness`, with an edge-triggered `OnNeedCritical`.
+- **`create_utility_ai`** (bridge_npc) — an abstract self-scoring `Action` base + a brain with hysteresis: emergent behaviour where the FSM (`create_npc_brain`) is scripted — the two pair.
+- **`create_npc_schedule_brain`** (bridge_npc) — a daily schedule with midnight wrap, binding **by capability** to any float-`TimeOfDay` clock (with an honest internal fallback clock when none exists), optional NavMeshAgent movement.
+- **`create_event_bus`** (bridge_scaffold_gameplay) — a typed local pub/sub static class; the must-`Unsubscribe`-in-`OnDestroy` discipline is documented in the generated code.
+- **`add_tts_voice`** (bridge_audio) — `Sandbox.Speech.Synthesizer` via its fluent API: `Say()` from game code. Audio-only **by design** — `LipSync` consumes a `BaseSoundComponent`, not a `SoundHandle`; `enableVisemeData` exposes `Handle.LipSync.Visemes` for driving mouths yourself.
+
+### Added — Gameplay Recording (Batch 60; bridge_moviemaker) — the engine-watch payoff
+
+**`Sandbox.MovieMaker.MovieRecorder` reached the shipping build** (verified 2026-07-12 — it was absent 2026-07-08), closing engine-watch item #2. The bridge now records real gameplay to `.movie` clips:
+
+- **`record_gameplay_clip`** — start a play-mode recording via a monitor-only frame job. `MovieRecorder.Start()` AUTO-advances and auto-captures with game time — manually pumping `Advance`/`Capture` too DOUBLE-COUNTS (verified: 5.55 s wall → 10.80 s clip). Pass `ids` for targeted `WithCaptureGameObject` tracks, or omit for whole-scene capture.
+- **`stop_gameplay_recording`** — `ToClip` → `MovieResource` JSON → `Assets/<folder>/<name>.movie` → `AssetSystem.RegisterFile` + compile, so the clip is immediately loadable by `list_movies` / `play_movie`; optional MoviePlayer wiring.
+- **`gameplay_recording_status`** — poll the running recording.
+- **E2E-proven on Gravehold:** recorded 6.54 s of live gameplay and replayed it through `play_movie`.
+
+### Added — The cinematic wave (Batches 61–63) — dialogue that speaks, cameras that kick, cutscenes without the dock
+
+**All five e2e-verified live on Gravehold 2026-07-13.**
+
+**Batch 61 (bridge_scaffold_polish):**
+
+- **`generate_lipsync_dialogue`** — NPCs speak their lines with MOVING MOUTHS: dialogue lines + positional TTS + data-driven mouth animation. The live `SoundHandle.LipSync.Visemes` stream (the engine's 15-viseme Oculus set) is multiplied through the model's own baked viseme→morph matrix via `Model.GetVisemeMorph` (Citizen ships the data — no hand-guessed morph map), smoothed, with a loose TypeLibrary bind to a `create_dialogue_system` HUD, plus `OnLineStarted` / `OnDialogueFinished` / `Skip()`. Honest by design: the API surface and mapping data are live-verified, but the runtime viseme stream still needs one human playtest (the generated `LogVisemes()` helper confirms it in seconds).
+- **`create_camera_effects`** — `CameraFx` statics (`Shake` / `ShakeAt` / `Punch` / `PunchAngles` / `Tilt` + `HitPunch` / `ExplosionShake` / `LandingTilt` presets) over the SDK's NEW built-in `CameraComponent.AddShake` / `AddPunch` / `AddTilt` (whitelist-callable from game code — probe-verified); `ShakeAt` uses `BaseEffect.Epicenter` + `Radius` distance falloff. Composes with `create_camera_shake`: the built-ins are ONE-SHOT engine effects, the trauma model is CONTINUOUS — don't fire both for the same event.
+
+**Batch 62 (bridge_moviemaker):**
+
+- **`author_movie_clip`** — data-driven cutscene AUTHORING with no play mode and no Movie Maker dock: a manual `Advance`/`Capture` bake (the doc-official in-editor idiom — movie-maker/recording-api) of a temp or borrowed camera through a declarative shot list (hold/blend, smoothstep/linear, FOV via an explicit `WithCaptureComponent` — live-verified decoding FOV exactly). Live: a 3-shot clip baked in 6 ms, saved as a dock-loadable `.movie`, replayed to full duration via `play_movie`; the temp camera destroyed, the borrowed camera restored byte-exact. `lookAt` GUIDs resolve to static bake-time positions — follow-cams are `record_gameplay_clip`'s job.
+
+**Batch 63 (bridge_moviemaker):**
+
+- **`record_playtest`** — one call = a scripted playtest + a gameplay recording of the SAME run — pure composition of the shipped playtest + recorder stacks; returns the verdict AND the saved clip (live: a 3-step PASS + a 1.36 s clip), so a failing playtest arrives with replayable footage of exactly what happened. Poll chain: `playtest_status` → `gameplay_recording_status`. NOT scene-mutating (the play-mode precedent).
+- **`create_killcam`** — a REAL MovieMaker killcam scaffold (no fallback needed — sandboxed game code CAN construct and drive `MovieRecorder` + `MoviePlayer`, probe-verified): `BufferDuration` is a TRUE rolling buffer (8.72 s recorded → exactly a 3.00 s clip, re-based to 0), `StartWatching` / `TriggerReplay` / `OnReplayFinished`, chase-cam takeover with byte-exact restore, `ReplayTimeScale`. The live-target fight is documented: disable the controller before replay — dead-target is the working path.
+
+### Docs audit (official-docs cross-check, 2026-07-13)
+
+A cross-check of the shipped gotchas and docs against the official Facepunch docs (sbox.game/dev/doc), live re-verified via `get_method_signature`'s `hasDefault` where noted:
+
+- **Gotcha §11's "required param" claims were overstated:** `Stats.SetValue(name, amount, context = null, data = null)` — 2-arg calls are legal (defaults, not a missing overload); `Leaderboards.GetFromStat` has BOTH `(statName)` and `(packageIdent, statName)` overloads; `Board2.Refresh(CancellationToken cancellation = default)` — bare `Refresh()` is legal. The official docs also document `Stats.LocalPlayer` (a static — reflection-invisible, the §10 blind spot); the "no LocalPlayer" claim is corrected.
+- **§15:** `SoundHandle.Stop(float fadeTime = 0)` — parameterless calls are valid; plus the verified viseme surface (15-viseme Oculus order, `Model.GetVisemeMorph` arg order, `Synthesizer.OnVisemeReached` = `Action<int, TimeSpan>` confirmed).
+- **§13's "`WithCaptureAll<T>()` is inert" was a misdiagnosis** — bare `new MovieRecorderOptions()` captures nothing BY DESIGN; `MovieRecorderOptions.Default` (a static) captures the whole scene. Rewritten with the verified MovieRecorder/MoviePlayer surface, plus a new gotcha for the transient hotload MovieRecorder corruption.
+- **New meta-gotcha (folded into §10):** read `hasDefault` on `get_method_signature` output before declaring a param "required" — three shipped gotchas overstated requirements this way.
+- **Skill + checklist fixes:** `BuildHash()` is the PRIMARY Razor re-render fix (`@ref` + `OnUpdate` is the fallback); the ENGINE's built-in `PlayerController` is Rigidbody-based — the CharacterController note applies to the `facepunch.playercontroller` LIBRARY; the Razor namespace guidance reconciled to folder-derived (`Sandbox.<Folder>.<Class>`); `docs/ADDING-A-TOOL.md` now requires a `search_docs` pass and a `hasDefault` check.
+- **Counts updated everywhere:** **275 total / 262 native / 267 handlers.**
+
+### Fixed
+
+- **Latent quote-escaping bug in the shipped `create_npc_brain` codegen** — the `TargetTag` literal is now verbatim-escaped, so a tag containing quotes can no longer break the generated code.
+
+### Deliberately skipped from the Tier-2 backlog (reasons verified live)
+
+`add_network_visible_cull` (`INetworkVisible` is absent from this SDK), `create_minigame_mode` (no game-side Gamemode type to subclass), `create_daynight_cycle` (duplicate — the clock shipped in v1.11.0; the visual half is `add_daynight_sun`), `create_grass_streamer` (GPU-instancing risk), `create_genetics_system` (niche), `create_primitive_builder` (MeshComponent procedural materials are broken); plus the variants folded by shipped tools — six save variants, `create_economy_balance`, `create_stat_tracker` / `wire_services_stats`, the interaction router/interface/modal trio, and `create_loot_table_system`. Full reasons in `docs/TOOL_BACKLOG.md`.
+
+### Roadmap / engine-watch
+
+- **`MovieRecorder` — DONE** (Batch 60 above). **Live lipsync — addressed** (Batch 61): `generate_lipsync_dialogue` drives mouths from the live viseme stream through each model's baked viseme→morph data; a bake-visemes-to-asset path still needs a public API.
+- **Multiplayer test harness — likely SHIPPED** (docs-audit finding 2026-07-13): `networking/testing-multiplayer.md` now documents "Join via new instance" (the header network icon) plus `connect local` / `reconnect` console commands — the earlier "still absent" verdict keyed off `search_types "loopback"` returning 0, which misses console-command surface. Needs one live verification session; promoted to the TOP next-wave candidate. See `docs/TOOL_BACKLOG.md`.
+
 ## [2.0.0] -- 2026-07-09 "Native"
 
 > Handler/tool counts below are as-of-each-wave snapshots; the FINAL release totals are

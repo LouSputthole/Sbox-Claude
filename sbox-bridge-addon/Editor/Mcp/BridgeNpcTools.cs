@@ -61,6 +61,37 @@ public static class BridgeNpcTools
 		=> McpGate.Run( "create_npc_brain", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "behavior", behavior ), ( "targetTag", targetTag ), ( "moveSpeed", moveSpeed ), ( "chaseSpeed", chaseSpeed ), ( "sightRange", sightRange ), ( "fovDegrees", fovDegrees ), ( "eyeHeight", eyeHeight ), ( "hearingRadius", hearingRadius ), ( "giveUpTime", giveUpTime ), ( "searchRadius", searchRadius ), ( "waypointStopDistance", waypointStopDistance ), ( "canFlee", canFlee ), ( "fleeHealthFrac", fleeHealthFrac ), ( "networked", networked ) ) );
 
 	/// <summary>
+	/// Generate a daily-routine NPC brain: a [Property] list of schedule entries (startHour/endHour
+	/// 0..24, taskName, target = named scene GameObject or fixed position), the hour read from any
+	/// create_day_night_clock component (capability match: a float TimeOfDay property, same GameObject
+	/// first then scene-wide) with an HONEST fallback to its own internal clock when none exists (check
+	/// the generated UsingClockComponent bool), walking the NPC to the active entry's target and idling
+	/// outside the schedule, plus a static OnTaskChanged(brain, taskName) event and [Sync(FromHost)]
+	/// CurrentTask. Entries with endHour &lt; startHour wrap past midnight. Returns {created, path,
+	/// className, tasks[], propertyNames[], note}. Next: trigger_hotload + get_compile_errors, attach
+	/// (targetId or add_component_with_properties), create the named target GameObjects (e.g.
+	/// 'WorkSpot'), pair with create_day_night_clock for shared time, verify via get_runtime_property
+	/// CurrentTask in play mode. Limits: default movement is a direct transform walk (walks through
+	/// walls) — pass useNavMeshAgent:true for pathfinding (then bake_navmesh is REQUIRED); a clock with
+	/// a different shape (e.g. 0..1 DayProgress) will NOT bind; networked default true won't tick in a
+	/// no-session solo playtest (networked:false to iterate). Refused during play mode; refuses to
+	/// overwrite an existing file.
+	/// </summary>
+	/// <param name="name">Class/file name. Defaults to 'NpcScheduleBrain'. Sanitized to a valid C# identifier.</param>
+	/// <param name="directory">Subdirectory under the project root for the .cs file. Defaults to 'Code'.</param>
+	/// <param name="schedule">Schedule entries baked as inspector-editable defaults. Defaults to Work 8-17 @ 'WorkSpot', Relax 17-22 @ 'HomeSpot' (idles/sleeps otherwise). JSON array.</param>
+	/// <param name="moveSpeed">Walk speed in world units/s. Defaults to 100.</param>
+	/// <param name="arriveDistance">Distance at which the NPC counts as arrived and idles at the spot. Defaults to 32.</param>
+	/// <param name="useNavMeshAgent">true: move via NavMeshAgent.MoveTo (real pathfinding — REQUIRES bake_navmesh or the NPC won't move). Defaults to false (direct transform walk, no navmesh needed, walks through walls).</param>
+	/// <param name="fallbackDayLengthSeconds">Internal fallback clock only: real seconds per 24 in-game hours when NO TimeOfDay clock component exists. Defaults to 600.</param>
+	/// <param name="fallbackStartHour">Internal fallback clock only: starting hour 0..24. Defaults to 8.</param>
+	/// <param name="networked">true (default): host-authoritative (IsProxy guard) + [Sync(FromHost)] CurrentTask. false: local build for solo iteration.</param>
+	/// <param name="targetId">GUID of the NPC GameObject to attach to (only attaches if the type is already in the TypeLibrary — hotload first).</param>
+	[McpTool( "create_npc_schedule_brain" )]
+	public static Task<object> CreateNpcScheduleBrain( string name = null, string directory = null, JsonNode schedule = null, double? moveSpeed = null, double? arriveDistance = null, bool? useNavMeshAgent = null, double? fallbackDayLengthSeconds = null, double? fallbackStartHour = null, bool? networked = null, string targetId = null )
+		=> McpGate.Run( "create_npc_schedule_brain", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "schedule", schedule ), ( "moveSpeed", moveSpeed ), ( "arriveDistance", arriveDistance ), ( "useNavMeshAgent", useNavMeshAgent ), ( "fallbackDayLengthSeconds", fallbackDayLengthSeconds ), ( "fallbackStartHour", fallbackStartHour ), ( "networked", networked ), ( "targetId", targetId ) ) );
+
+	/// <summary>
 	/// Generate a spawner Component that instantiates an NPC prefab over time / in escalating waves at
 	/// spawn points, capped by maxAlive. RUN's swarm backbone and Sasquatched's round-start spawn.
 	/// After generating: set NpcPrefab via set_prefab_ref, set SpawnPoints (reuse place_patrol_route to
@@ -81,6 +112,34 @@ public static class BridgeNpcTools
 	[McpTool( "create_npc_spawner" )]
 	public static Task<object> CreateNpcSpawner( string name = null, string directory = null, string mode = null, double? count = null, double? interval = null, double? waveCount = null, double? waveGrowth = null, double? radius = null, double? maxAlive = null, bool? networked = null )
 		=> McpGate.Run( "create_npc_spawner", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "mode", mode ), ( "count", count ), ( "interval", interval ), ( "waveCount", waveCount ), ( "waveGrowth", waveGrowth ), ( "radius", radius ), ( "maxAlive", maxAlive ), ( "networked", networked ) ) );
+
+	/// <summary>
+	/// Generate a utility-AI (scored-action) brain: one file with an abstract {name}Action : Component
+	/// base (Score() 0..1 + Begin/Tick/End lifecycle), a sealed {name}Brain that every EvaluateInterval
+	/// picks the highest-scoring sibling action (score × ScoreWeight, current action gets
+	/// +HysteresisBonus so near-ties don't flip-flop), and two example actions — {name}IdleAction
+	/// (constant fallback score) and {name}WanderAction (desire builds while idle, walks to random
+	/// points by direct transform movement, no navmesh). How it differs from create_npc_brain: the FSM
+	/// has a FIXED transition table; here behavior EMERGES from per-frame scores — add behaviors by
+	/// subclassing the base on the same GameObject, no transition wiring. Returns {created, path,
+	/// classNames[4], propertyNames[], note}. Next: trigger_hotload + get_compile_errors, attach the
+	/// brain AND example actions to one GameObject (targetId attaches only the brain), verify in play
+	/// mode via get_runtime_property CurrentActionName. Limits: networked default true =
+	/// host-authoritative (won't tick in a no-session solo playtest — use networked:false); actions
+	/// Tick on the simulating machine only. Refused during play mode; refuses to overwrite an existing
+	/// file.
+	/// </summary>
+	/// <param name="name">System prefix — generates {name}Action / {name}Brain / {name}IdleAction / {name}WanderAction in {name}Ai.cs. Defaults to 'Utility'. Sanitized to a valid C# identifier.</param>
+	/// <param name="directory">Subdirectory under the project root for the .cs file. Defaults to 'Code'.</param>
+	/// <param name="evaluateInterval">Seconds between score evaluations (the active action still Ticks every frame). Defaults to 0.25.</param>
+	/// <param name="hysteresisBonus">Score bonus the current action gets during evaluation — stickiness that prevents flip-flopping between near-tied actions. Defaults to 0.15.</param>
+	/// <param name="moveSpeed">Example WanderAction walk speed in world units/s. Defaults to 80.</param>
+	/// <param name="wanderRadius">Example WanderAction roam radius around its start position. Defaults to 300.</param>
+	/// <param name="networked">true (default): host-authoritative brain (IsProxy guard) + [Sync(FromHost)] CurrentActionName. false: local build for solo iteration.</param>
+	/// <param name="targetId">GUID of a GameObject to attach the BRAIN to (actions must be added separately; only attaches if the type is already in the TypeLibrary — hotload first).</param>
+	[McpTool( "create_utility_ai" )]
+	public static Task<object> CreateUtilityAi( string name = null, string directory = null, double? evaluateInterval = null, double? hysteresisBonus = null, double? moveSpeed = null, double? wanderRadius = null, bool? networked = null, string targetId = null )
+		=> McpGate.Run( "create_utility_ai", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "evaluateInterval", evaluateInterval ), ( "hysteresisBonus", hysteresisBonus ), ( "moveSpeed", moveSpeed ), ( "wanderRadius", wanderRadius ), ( "networked", networked ), ( "targetId", targetId ) ) );
 
 	/// <summary>
 	/// Place a set of waypoint GameObjects (tagged empties) for a patrol route and group them under a
