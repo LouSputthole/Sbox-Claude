@@ -418,7 +418,7 @@ using System.Linq;
 	[Property] public float CosFovThreshold {{ get; set; }} = {F( cosFov )};
 	[Property] public float EyeHeight     {{ get; set; }} = {F( eyeHeight )};
 	[Property] public float HearingRadius {{ get; set; }} = {F( hearingRadius )};
-	[Property] public string TargetTag    {{ get; set; }} = ""{targetTagLiteral}"";
+	[Property] public string TargetTag    {{ get; set; }} = @""{targetTagLiteral}"";
 
 	// Memory / timing
 	[Property] public float GiveUpTime   {{ get; set; }} = {F( giveUpTime )};

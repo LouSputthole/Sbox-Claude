@@ -13,6 +13,40 @@ using Editor.Mcp;
 public static class BridgeAudioTools
 {
 	/// <summary>
+	/// Generate a text-to-speech speaker component over Sandbox.Speech.Synthesizer (the OS speech
+	/// engine — dynamic NPC dialog with zero recorded VO): call &lt;class&gt;.Say("text") from game
+	/// code and it builds a Synthesizer (TrySetVoice by exact VoiceName, else gender/age hint, else OS
+	/// default) -&gt; WithText -&gt; WithRate -&gt; Play(), returning a tracked SoundHandle —
+	/// positional 3D parented to the speaker (default) or flat 2D, with stop-previous-on-say
+	/// interruption, IsSpeaking, StopSpeaking(), and LogVoices() to enumerate installed OS voices.
+	/// Returns {created, path, className, propertyNames[], note}. Next: trigger_hotload +
+	/// get_compile_errors, attach (targetId or add_component_with_properties), then Say from game code
+	/// — LOCAL audio only, wrap the Say call in an [Rpc.Broadcast] handler for everyone to hear. Limits
+	/// &amp; honesty: the editor cannot playtest audio, so RUNTIME speech is UNVERIFIED (the API
+	/// surface compiles — verify with your ears in play mode); voices are machine/OS-specific and
+	/// TrySetVoice is best-effort; LIPSYNC IS NOT AUTO-WIRED — s&amp;box's Sandbox.LipSync component
+	/// consumes a BaseSoundComponent, not the raw SoundHandle TTS produces, and
+	/// Synthesizer.OnVisemeReached's delegate arg types can't be confirmed via reflection;
+	/// enableVisemeData:true enables Handle.LipSync.Visemes for your own mouth-drive code
+	/// (runtime-unverified). Refuses to overwrite an existing file; refused during play mode.
+	/// </summary>
+	/// <param name="name">Class/file name. Defaults to 'TtsSpeaker'. Sanitized to a valid C# identifier.</param>
+	/// <param name="directory">Subdirectory under the project root for the .cs file. Defaults to 'Code'.</param>
+	/// <param name="voiceName">Exact installed OS voice name (machine-specific — the generated LogVoices() lists them at runtime). Empty = use voiceGender/voiceAge, or the OS default.</param>
+	/// <param name="voiceGender">Voice gender hint used only when voiceName is empty (e.g. 'Female', 'Male'). Must be paired with voiceAge. Passed through unvalidated.</param>
+	/// <param name="voiceAge">Voice age hint paired with voiceGender (e.g. 'Adult', 'Child', 'Senior'). Passed through unvalidated.</param>
+	/// <param name="rate">Speaking rate offset (integer): negative = slower, positive = faster. Defaults to 0 (normal).</param>
+	/// <param name="volume">Playback volume for spoken lines. Defaults to 1.</param>
+	/// <param name="positional">true (default): 3D sound parented to the speaker GameObject (follows it). false: flat 2D voice on the listener (narrator/UI style).</param>
+	/// <param name="stopPreviousOnSay">true (default): a new Say() fades out the still-playing previous line. false: lines overlap.</param>
+	/// <param name="stopFadeSeconds">Fade-out duration used when interrupting/stopping a line. Defaults to 0.1.</param>
+	/// <param name="enableVisemeData">true: sets Handle.LipSync.Enabled on each played line so custom mouth-drive code can read Handle.LipSync.Visemes. Runtime behavior unverified (editor can't playtest audio). Defaults to false.</param>
+	/// <param name="targetId">GUID of the speaker GameObject to attach to (only attaches if the type is already in the TypeLibrary — hotload first).</param>
+	[McpTool( "add_tts_voice" )]
+	public static Task<object> AddTtsVoice( string name = null, string directory = null, string voiceName = null, string voiceGender = null, string voiceAge = null, double? rate = null, double? volume = null, bool? positional = null, bool? stopPreviousOnSay = null, double? stopFadeSeconds = null, bool? enableVisemeData = null, string targetId = null )
+		=> McpGate.Run( "add_tts_voice", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "voiceName", voiceName ), ( "voiceGender", voiceGender ), ( "voiceAge", voiceAge ), ( "rate", rate ), ( "volume", volume ), ( "positional", positional ), ( "stopPreviousOnSay", stopPreviousOnSay ), ( "stopFadeSeconds", stopFadeSeconds ), ( "enableVisemeData", enableVisemeData ), ( "targetId", targetId ) ) );
+
+	/// <summary>
 	/// Attach a sound event to a GameObject via SoundPointComponent. Creates the component if needed.
 	/// Returns { assigned, id, sound, soundLoaded, playOnStart } — soundLoaded:false means the .sound
 	/// path did not resolve (the component is still added with no event; verify the path with

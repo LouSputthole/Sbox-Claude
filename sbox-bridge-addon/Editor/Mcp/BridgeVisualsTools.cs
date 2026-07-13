@@ -29,6 +29,32 @@ public static class BridgeVisualsTools
 		=> McpGate.Run( "add_beam", McpGate.Args( ( "position", position ), ( "target", target ), ( "width", width ), ( "color", color ), ( "name", name ) ) );
 
 	/// <summary>
+	/// Generate a sun/sky driver component for the clock made by create_day_night_clock — a COMPANION,
+	/// not a replacement: the clock owns TimeOfDay, this renders it. Every frame it reads
+	/// TimeOfDay/SunriseHour/SunsetHour off the clock (sibling first, else first in scene, retrying
+	/// 1/s) and drives a DirectionalLight: sunrise→sunset maps to a 0-180° pitch arc (continuing below
+	/// the horizon at night), LightColor runs a hardcoded gradient (warm dawn → white noon → orange
+	/// dusk → dim blue night, HDR-scaled by Intensity since s&amp;box lights have no Brightness field),
+	/// and optionally lerps the SkyBox2D Tint between night blue and day white. The clock CLASS NAME is
+	/// baked in as a typed reference — the call ERRORS if `clockClass` isn't found in the TypeLibrary
+	/// or any project .cs (run create_day_night_clock first; a bad token would break the whole
+	/// game-assembly compile). Returns {created, path, className, clockClass, sunYaw, intensity,
+	/// driveSkybox, placedOn, note, nextSteps[]}. Next: trigger_hotload → attach to the
+	/// DirectionalLight's GameObject → start_play, set_runtime_property TimeOfDay on the clock
+	/// (6/12/20/0) + capture_view to verify the looks. File/scene-mutating — refused during play mode.
+	/// </summary>
+	/// <param name="name">Class name for the generated component. Defaults to 'DayNightSun'.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="clockClass">Class name of the day-night clock to bind to (the `name` you gave create_day_night_clock). Defaults to 'DayNightClock'. Must already exist as a compiled type or a project .cs file.</param>
+	/// <param name="sunYaw">Compass heading of the sun's arc in degrees. Defaults to 30.</param>
+	/// <param name="intensity">Brightness multiplier on the colour gradient (HDR, &gt;1 valid; intensity = colour magnitude). Defaults to 1.</param>
+	/// <param name="driveSkybox">Also tint the scene's SkyBox2D between night blue and day white. Defaults to true.</param>
+	/// <param name="targetId">GUID of a GameObject to attach to (only attaches if the type is already loaded — hotload first).</param>
+	[McpTool( "add_daynight_sun" )]
+	public static Task<object> AddDaynightSun( string name = null, string directory = null, string clockClass = null, double? sunYaw = null, double? intensity = null, bool? driveSkybox = null, string targetId = null )
+		=> McpGate.Run( "add_daynight_sun", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "clockClass", clockClass ), ( "sunYaw", sunYaw ), ( "intensity", intensity ), ( "driveSkybox", driveSkybox ), ( "targetId", targetId ) ) );
+
+	/// <summary>
 	/// Add an environment reflection/ambient probe (EnvmapProbe) at a position with a cubic influence
 	/// volume — captures local reflections and indirect light for nearby surfaces. IMPORTANT: a placed
 	/// probe captures NOTHING until baked — follow with bake_reflections. Returns { created, gameObject
@@ -79,6 +105,40 @@ public static class BridgeVisualsTools
 	[McpTool( "add_post_process" )]
 	public static Task<object> AddPostProcess( string effect, JsonNode properties = null, string cameraId = null )
 		=> McpGate.Run( "add_post_process", McpGate.Args( ( "effect", effect ), ( "properties", properties ), ( "cameraId", cameraId ) ) );
+
+	/// <summary>
+	/// CCTV / security monitor / mirror / simple portal: creates a secondary camera
+	/// (IsMainCamera=false, Priority param) positioned/rotated or aimed at a target object, a display
+	/// surface (scaled box with a ModelRenderer), and GENERATES a sealed wiring component that at
+	/// runtime creates the render-target Texture (Texture.CreateRenderTarget builder), assigns
+	/// camera.RenderTarget and sets the texture onto an anonymous complex-shader material on the
+	/// display (attribute 'Color' = albedo; the screen is scene-lit, not emissive/unlit). Returns
+	/// {created, camera{id,...}, display{id,...}|null, className, path, generatedCode,
+	/// attachedAndWired, resolution, nextSteps[]}. FIRST call generates the .cs → follow nextSteps:
+	/// trigger_hotload, then add_component_with_properties on the display with properties
+	/// {SourceCamera: &lt;camera GUID&gt;}; a REPEAT call reusing the same `name` after the hotload
+	/// attaches AND wires everything automatically (attachedAndWired=true). The feed only renders in
+	/// play mode — verify with start_play + capture_view. If `name`'s .cs file exists but isn't
+	/// compiled yet, the call errors — hotload first. Scene/file-mutating — refused during play mode.
+	/// </summary>
+	/// <param name="name">Class name for the generated wiring component. Defaults to 'RenderTargetDisplay'. Reuse the same name for extra cameras — after a hotload the class is reused and wired in one shot.</param>
+	/// <param name="directory">Subdirectory for the generated .cs file. Defaults to 'Code'.</param>
+	/// <param name="cameraName">GameObject name for the camera. Defaults to 'RT Camera'.</param>
+	/// <param name="position">World position of the camera. As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="rotation">World rotation of the camera. As "pitch,yaw,roll" degrees.</param>
+	/// <param name="lookAtId">GUID of a GameObject to aim the camera at (overrides rotation; from get_scene_hierarchy / find_objects).</param>
+	/// <param name="priority">CameraComponent.Priority (integer). Defaults to 1.</param>
+	/// <param name="fieldOfView">Camera field of view in degrees (clamped 5-170). Engine default when omitted.</param>
+	/// <param name="resolution">Render-target size as 'width,height' pixels (min 16). Defaults to '512,512'.</param>
+	/// <param name="backgroundColor">Camera background colour. Engine default when omitted. As "r,g,b[,a]" (0-1 floats).</param>
+	/// <param name="createDisplay">Create the display surface GameObject. Defaults to true. Pass false to wire your own surface later.</param>
+	/// <param name="displayPosition">World position of the display surface. As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="displayRotation">World rotation of the display surface. As "pitch,yaw,roll" degrees.</param>
+	/// <param name="displaySize">Display box extents as 'x,y,z' world units (thin x = a wall screen facing ±x). Defaults to '4,128,72'.</param>
+	/// <param name="attribute">Material attribute that receives the texture. Defaults to 'Color' (albedo on the complex shader). Sanitized to [A-Za-z0-9_].</param>
+	[McpTool( "add_render_target_camera" )]
+	public static Task<object> AddRenderTargetCamera( string name = null, string directory = null, string cameraName = null, string position = null, string rotation = null, string lookAtId = null, double? priority = null, double? fieldOfView = null, string resolution = null, string backgroundColor = null, bool? createDisplay = null, string displayPosition = null, string displayRotation = null, string displaySize = null, string attribute = null )
+		=> McpGate.Run( "add_render_target_camera", McpGate.Args( ( "name", name ), ( "directory", directory ), ( "cameraName", cameraName ), ( "position", position ), ( "rotation", rotation ), ( "lookAtId", lookAtId ), ( "priority", priority ), ( "fieldOfView", fieldOfView ), ( "resolution", resolution ), ( "backgroundColor", backgroundColor ), ( "createDisplay", createDisplay ), ( "displayPosition", displayPosition ), ( "displayRotation", displayRotation ), ( "displaySize", displaySize ), ( "attribute", attribute ) ) );
 
 	/// <summary>
 	/// Attach a motion trail (TrailRenderer) to an existing GameObject (via targetId) so it leaves a

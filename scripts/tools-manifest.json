@@ -1,6 +1,343 @@
 {
-  "toolCount": 245,
+  "toolCount": 275,
   "tools": [
+    {
+      "module": "aisystems",
+      "name": "add_tts_voice",
+      "description": "Generate a text-to-speech speaker component over Sandbox.Speech.Synthesizer (the OS speech engine — dynamic NPC dialog with zero recorded VO): call <class>.Say(\"text\") from game code and it builds a Synthesizer (TrySetVoice by exact VoiceName, else gender/age hint, else OS default) -> WithText -> WithRate -> Play(), returning a tracked SoundHandle — positional 3D parented to the speaker (default) or flat 2D, with stop-previous-on-say interruption, IsSpeaking, StopSpeaking(), and LogVoices() to enumerate installed OS voices. Returns {created, path, className, propertyNames[], note}. Next: trigger_hotload + get_compile_errors, attach (targetId or add_component_with_properties), then Say from game code — LOCAL audio only, wrap the Say call in an [Rpc.Broadcast] handler for everyone to hear. Limits & honesty: the editor cannot playtest audio, so RUNTIME speech is UNVERIFIED (the API surface compiles — verify with your ears in play mode); voices are machine/OS-specific and TrySetVoice is best-effort; LIPSYNC IS NOT AUTO-WIRED — s&box's Sandbox.LipSync component consumes a BaseSoundComponent, not the raw SoundHandle TTS produces, and Synthesizer.OnVisemeReached's delegate arg types can't be confirmed via reflection; enableVisemeData:true enables Handle.LipSync.Visemes for your own mouth-drive code (runtime-unverified). Refuses to overwrite an existing file; refused during play mode.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class/file name. Defaults to 'TtsSpeaker'. Sanitized to a valid C# identifier.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory under the project root for the .cs file. Defaults to 'Code'.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "voiceName",
+          "description": "Exact installed OS voice name (machine-specific — the generated LogVoices() lists them at runtime). Empty = use voiceGender/voiceAge, or the OS default.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "voiceGender",
+          "description": "Voice gender hint used only when voiceName is empty (e.g. 'Female', 'Male'). Must be paired with voiceAge. Passed through unvalidated.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "voiceAge",
+          "description": "Voice age hint paired with voiceGender (e.g. 'Adult', 'Child', 'Senior'). Passed through unvalidated.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "rate",
+          "description": "Speaking rate offset (integer): negative = slower, positive = faster. Defaults to 0 (normal).",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "volume",
+          "description": "Playback volume for spoken lines. Defaults to 1.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "positional",
+          "description": "true (default): 3D sound parented to the speaker GameObject (follows it). false: flat 2D voice on the listener (narrator/UI style).",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "stopPreviousOnSay",
+          "description": "true (default): a new Say() fades out the still-playing previous line. false: lines overlap.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "stopFadeSeconds",
+          "description": "Fade-out duration used when interrupting/stopping a line. Defaults to 0.1.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "enableVisemeData",
+          "description": "true: sets Handle.LipSync.Enabled on each played line so custom mouth-drive code can read Handle.LipSync.Visemes. Runtime behavior unverified (editor can't playtest audio). Defaults to false.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of the speaker GameObject to attach to (only attaches if the type is already in the TypeLibrary — hotload first).",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "aisystems",
+      "name": "create_event_bus",
+      "description": "Generate a typed LOCAL pub/sub event bus: a pure STATIC class (NOT a Component — nothing to place in the scene) with Subscribe<T>(owner, Action<T>), Unsubscribe(owner) (removes all of that owner's handlers across every event type), Publish<T>(evt) (synchronous, exact-type-T subscribers only, snapshot-iterated so handlers may subscribe/unsubscribe mid-publish), Count<T>() and Clear(), keyed by a plain Dictionary<Type, List<(object, Delegate)>> — plus a tiny example event record ({name}Ping). Decouples game systems: the quest system publishes 'EnemyDied', UI and achievements subscribe, neither knows the other. Returns {created, path, className, exampleEvent, api[], note}. Next: trigger_hotload + get_compile_errors, then Subscribe in components' OnStart and — REQUIRED — Unsubscribe(this) in OnDestroy: handler lists hold PLAIN references (no weak refs), so a component that never unsubscribes leaks itself for the scene's life; call Clear() on scene teardown. Limits: LOCAL only — Publish reaches the calling machine's subscribers, NOT other clients; for networked events pair with [Rpc.Broadcast]/[Rpc.Host] methods that Publish on arrival. No base-type dispatch (Publish<Base> won't reach Subscribe<Derived>). Refuses to overwrite an existing file; refused during play mode.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Static class/file name. Defaults to 'EventBus'. The example event record is named {name}Ping. Sanitized to a valid C# identifier.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory under the project root for the .cs file. Defaults to 'Code'.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "aisystems",
+      "name": "create_needs_system",
+      "description": "Generate a sim/tycoon needs engine component: a [Property] list of need definitions (name, decay rate/s, critical threshold, weight) with per-need 0..100 values that decay over Time.Delta, Satisfy(name, amount) to restore, an aggregate Happiness (weighted mean, [Sync(FromHost)] when networked), and static OnNeedCritical (edge-triggered: fires once crossing below threshold, re-arms above) + OnHappinessChanged (>0.25-point moves) events. Returns {created, path, className, needs[], propertyNames[], note}. Next: trigger_hotload, get_compile_errors, then attach via targetId re-call or add_component_with_properties; drive from game code (e.g. a create_interactable that calls Satisfy). Limits: per-need values live on the simulating machine only (host) — sync per-need UI yourself via RPCs; events fire on the simulating machine only; networked default true means a no-session solo playtest won't tick (everything is a proxy) — pass networked:false to iterate solo. Refused during play mode; refuses to overwrite an existing file.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class/file name. Defaults to 'NeedsSystem'. Sanitized to a valid C# identifier.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory under the project root for the .cs file. Defaults to 'Code'.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "needs",
+          "description": "Need definitions baked as inspector-editable defaults. Defaults to the classic sim trio: Hunger(0.8/s), Energy(0.5/s), Fun(0.3/s).",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "object"
+            }
+          }
+        },
+        {
+          "name": "networked",
+          "description": "true (default): host-authoritative (IsProxy guard) + [Sync(FromHost)] Happiness — needs a host session. false: local build that ticks in a solo playtest.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach the component to (only attaches if the type is already in the TypeLibrary — hotload first, then re-call or use add_component_with_properties).",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "aisystems",
+      "name": "create_npc_schedule_brain",
+      "description": "Generate a daily-routine NPC brain: a [Property] list of schedule entries (startHour/endHour 0..24, taskName, target = named scene GameObject or fixed position), the hour read from any create_day_night_clock component (capability match: a float TimeOfDay property, same GameObject first then scene-wide) with an HONEST fallback to its own internal clock when none exists (check the generated UsingClockComponent bool), walking the NPC to the active entry's target and idling outside the schedule, plus a static OnTaskChanged(brain, taskName) event and [Sync(FromHost)] CurrentTask. Entries with endHour < startHour wrap past midnight. Returns {created, path, className, tasks[], propertyNames[], note}. Next: trigger_hotload + get_compile_errors, attach (targetId or add_component_with_properties), create the named target GameObjects (e.g. 'WorkSpot'), pair with create_day_night_clock for shared time, verify via get_runtime_property CurrentTask in play mode. Limits: default movement is a direct transform walk (walks through walls) — pass useNavMeshAgent:true for pathfinding (then bake_navmesh is REQUIRED); a clock with a different shape (e.g. 0..1 DayProgress) will NOT bind; networked default true won't tick in a no-session solo playtest (networked:false to iterate). Refused during play mode; refuses to overwrite an existing file.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class/file name. Defaults to 'NpcScheduleBrain'. Sanitized to a valid C# identifier.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory under the project root for the .cs file. Defaults to 'Code'.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "schedule",
+          "description": "Schedule entries baked as inspector-editable defaults. Defaults to Work 8-17 @ 'WorkSpot', Relax 17-22 @ 'HomeSpot' (idles/sleeps otherwise).",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "object"
+            }
+          }
+        },
+        {
+          "name": "moveSpeed",
+          "description": "Walk speed in world units/s. Defaults to 100.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "arriveDistance",
+          "description": "Distance at which the NPC counts as arrived and idles at the spot. Defaults to 32.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "useNavMeshAgent",
+          "description": "true: move via NavMeshAgent.MoveTo (real pathfinding — REQUIRES bake_navmesh or the NPC won't move). Defaults to false (direct transform walk, no navmesh needed, walks through walls).",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "fallbackDayLengthSeconds",
+          "description": "Internal fallback clock only: real seconds per 24 in-game hours when NO TimeOfDay clock component exists. Defaults to 600.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "fallbackStartHour",
+          "description": "Internal fallback clock only: starting hour 0..24. Defaults to 8.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "networked",
+          "description": "true (default): host-authoritative (IsProxy guard) + [Sync(FromHost)] CurrentTask. false: local build for solo iteration.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of the NPC GameObject to attach to (only attaches if the type is already in the TypeLibrary — hotload first).",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "aisystems",
+      "name": "create_utility_ai",
+      "description": "Generate a utility-AI (scored-action) brain: one file with an abstract {name}Action : Component base (Score() 0..1 + Begin/Tick/End lifecycle), a sealed {name}Brain that every EvaluateInterval picks the highest-scoring sibling action (score × ScoreWeight, current action gets +HysteresisBonus so near-ties don't flip-flop), and two example actions — {name}IdleAction (constant fallback score) and {name}WanderAction (desire builds while idle, walks to random points by direct transform movement, no navmesh). How it differs from create_npc_brain: the FSM has a FIXED transition table; here behavior EMERGES from per-frame scores — add behaviors by subclassing the base on the same GameObject, no transition wiring. Returns {created, path, classNames[4], propertyNames[], note}. Next: trigger_hotload + get_compile_errors, attach the brain AND example actions to one GameObject (targetId attaches only the brain), verify in play mode via get_runtime_property CurrentActionName. Limits: networked default true = host-authoritative (won't tick in a no-session solo playtest — use networked:false); actions Tick on the simulating machine only. Refused during play mode; refuses to overwrite an existing file.",
+      "params": [
+        {
+          "name": "name",
+          "description": "System prefix — generates {name}Action / {name}Brain / {name}IdleAction / {name}WanderAction in {name}Ai.cs. Defaults to 'Utility'. Sanitized to a valid C# identifier.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory under the project root for the .cs file. Defaults to 'Code'.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "evaluateInterval",
+          "description": "Seconds between score evaluations (the active action still Ticks every frame). Defaults to 0.25.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "hysteresisBonus",
+          "description": "Score bonus the current action gets during evaluation — stickiness that prevents flip-flopping between near-tied actions. Defaults to 0.15.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "moveSpeed",
+          "description": "Example WanderAction walk speed in world units/s. Defaults to 80.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "wanderRadius",
+          "description": "Example WanderAction roam radius around its start position. Defaults to 300.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "networked",
+          "description": "true (default): host-authoritative brain (IsProxy guard) + [Sync(FromHost)] CurrentActionName. false: local build for solo iteration.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach the BRAIN to (actions must be added separately; only attaches if the type is already in the TypeLibrary — hotload first).",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
     {
       "module": "assets",
       "name": "copy_asset_with_dependencies",
@@ -1058,6 +1395,138 @@
       ]
     },
     {
+      "module": "cinematicrecording",
+      "name": "create_killcam",
+      "description": "Generate a sealed killcam Component: a rolling-buffer MovieRecorder keeps ONLY the last MaxBufferSeconds of a target's gameplay (BufferDuration verified live: the compiled clip's Duration equals the buffer, re-based to 0), and TriggerReplay() plays that history back through a MoviePlayer while the main camera chase-follows the target (Scene.Camera takeover in OnPreRender, restored exactly afterwards; static OnReplayFinished event + IsReplaying flag).\nSandbox-safe: live-verified that GAME code can construct and drive MovieRecorder/MoviePlayer at runtime, and killcams/replays are the official recording-api use case — this is the real MovieMaker path, not a transform-history approximation. The replay REWINDS THE LIVE TARGET through its recorded past (classic killcam — the target is dead/inactive when it runs; disable a still-alive controller for the duration). wholeScene:true makes the generated component default to MovieRecorderOptions.Default (all renderers/cameras/sound points/particles — the replay rewinds everything, killer included; heavy in dense scenes), and it stays toggleable per-instance via the RecordWholeScene property.\nReturns { created, path, className, bufferSeconds, sampleRate, cameraDistance, cameraHeight, nextSteps }. Then: trigger_hotload → attach to a MANAGER object → set_component_reference Target to the player → arm via WatchOnStart or StartWatching() from spawn code → call TriggerReplay() from death code (pairs with create_health_system). LOCAL/visual-only — wrap in an [Rpc.Broadcast] for all clients. Refuses if the file already exists.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Component class/file name (default \"Killcam\")",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Project folder for the .cs file (default \"Code\")",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "bufferSeconds",
+          "description": "Rolling-buffer length in seconds — the replay shows at most this much history (default 10, clamped 2-120)",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "sampleRate",
+          "description": "Recorder samples per second (default 30, clamped 1-120)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "cameraDistance",
+          "description": "Replay chase-camera distance behind the target (default 150, clamped 10-2000)",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "cameraHeight",
+          "description": "Replay chase-camera height above the target (default 60, clamped 0-2000)",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "wholeScene",
+          "description": "Generated default for RecordWholeScene: true = buffer the WHOLE scene via MovieRecorderOptions.Default (replay rewinds everything; heavy in dense scenes), false = only the Target hierarchy (default)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "cinematicrecording",
+      "name": "record_playtest",
+      "description": "Run a scripted playtest AND record the same run to a .movie clip in ONE call — automated regression footage: a failing playtest comes with a replayable clip of exactly what happened. REQUIRES play mode (start_play first).\nsteps uses the EXACT playtest schema (one verb per step: move / look / lookDelta / action / jump / set / wait / capture / assert — see the playtest tool for the full verb reference). The recording defaults to the playtest's resolved player hierarchy; pass ids to record other objects, or nothing resolvable falls back to whole-scene capture (heavy).\nReturns { started, steps, recordingJobId, capture, sampleRate, clipName, folder, recorderCapSeconds, note } immediately; both jobs run ASYNC in the editor frame loop and the clip AUTO-SAVES the moment the playtest finishes (a failing or aborted run still saves its footage; play mode ending early is also saved).\nTHE POLL CHAIN: 1) playtest_status until finished:true → the per-step pass/fail transcript. 2) gameplay_recording_status → the saved clip summary { saved, assetPath, durationSeconds, trackCount } (if it still says pendingSave, the save is a frame away — poll again; a save error there means name collision: call stop_gameplay_recording yourself with a new name).\nReplay the footage with add_movie_player + play_movie. Errors if a playtest or gameplay recording is already active. Only one at a time.",
+      "params": [
+        {
+          "name": "steps",
+          "description": "Ordered playtest step objects — identical schema to the playtest tool (move/look/lookDelta/action/jump/set/wait/capture/assert). Runs top-to-bottom in the frame loop.",
+          "optional": false,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "any"
+            }
+          }
+        },
+        {
+          "name": "id",
+          "description": "GUID of the player/controller GameObject the playtest drives. Omit to auto-resolve the first PlayerController.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "component",
+          "description": "Controller component type to target (e.g. 'PlayerController'). Omit to auto-detect.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "ids",
+          "description": "GameObject GUIDs to RECORD (from get_scene_hierarchy WHILE PLAYING). Omit to record the playtest's player hierarchy (the default and usually what you want).",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "sampleRate",
+          "description": "Recording samples per second (default 30, clamped 1-120)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "clipName",
+          "description": "Saved .movie asset name without extension (default playtest_<UTC timestamp>; sanitized to [A-Za-z0-9_-])",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "folder",
+          "description": "Assets subfolder to save the clip into (default \"recordings\")",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
       "module": "cinematics",
       "name": "create_cutscene_director",
       "description": "Generate a hand-authored cutscene player component that needs NO .movie asset — the zero-asset alternative to the MovieMaker family (add_movie_player/play_movie, which play keyframed .movie clips authored in the editor's Movie Maker dock). You author the shots directly in the inspector as parallel lists: ShotPositions (Vector3), ShotAngles (pitch/yaw/roll — Angles, not raw quaternions), ShotHoldSeconds, ShotBlendSeconds, and an optional per-shot ShotLookAt GameObject (aim at a target instead of using ShotAngles). At runtime it takes over the main camera (Scene.Camera) in OnPreRender ONLY while playing — smoothstep-eased Vector3.Lerp + Rotation.Slerp between shots — captures the camera's prior transform and restores it exactly when finished (same un-apply discipline as create_camera_shake). Play from any game code via the static <Name>.Play() (first director) or <Name>.Play(\"name\") (matches CutsceneName); subscribe the static <Name>.OnCutsceneFinished, or gate game logic on the static <Name>.IsCutscenePlaying. LockInput freezes player input each frame via Input.ClearActions() while still reading the SkipAction press first so the cutscene stays skippable. Optional letterbox generates a razor_lint-safe black-bars overlay panel (host under a ScreenPanel) shown while IsCutscenePlaying. LOCAL-only (each client renders its own view) — trigger inside an [Rpc.Broadcast] for all clients. Attach to ANY GameObject; it drives the camera itself and does not need to sit on the camera. Returns { created, path, className, skipAction, lockInput, letterbox, nextSteps } — path is the generated .cs (letterbox lists the overlay files when enabled). Follow with trigger_hotload, then get_compile_errors, then attach via add_component_with_properties (component=className).",
@@ -1797,6 +2266,258 @@
       ]
     },
     {
+      "module": "dialoguefx",
+      "name": "create_camera_effects",
+      "description": "Generate static conveniences over the SDK's BUILT-IN camera effects — CameraComponent.AddShake(amplitude, frequency, duration), AddPunch(Vector3 direction, amplitude, frequency, duration, fovAmplitude), AddPunch(Angles, ...) and AddTilt(Angles, duration, easeTime), all fire-and-forget, self-expiring, whitelist-verified in sandboxed game code 2026-07-13: a sealed Component exposing {name}.Shake/ShakeAt/Punch/PunchAngles/Tilt statics that resolve the main camera (Scene.Camera, else IsMainCamera search, else first camera; warn + return null when the scene has none) and return the live Sandbox.CameraEffectSystem.BaseEffect (Stop()/IsDone; ShakeAt sets Epicenter+Radius for distance falloff), plus one-word preset triggers — HitPunch() / ExplosionShake() / ExplosionShakeAt(position, radius) / LandingTilt() — driven by [Property] tunables. Statics work with NO instance placed; place the component only to tune presets in the inspector. RELATIONSHIP: create_camera_shake is the CONTINUOUS trauma model (AddTrauma accumulates and decays); these built-ins are ONE-SHOT engine effects — they compose safely, but don't fire both for the same event or hits feel doubled. Returns {created, path, className, staticApi[], presetTriggers[], propertyNames[], note}. Next: trigger_hotload + get_compile_errors, call the statics from game code (e.g. {name}.Shake(4, 25, 0.8) on explosion) or attach via targetId and trigger presets. Limits & honesty: compile + camera resolution verified; the editor cannot judge FEEL — tune amplitudes in a human playtest; effects are LOCAL visuals (wrap in [Rpc.Broadcast] for everyone). Refused during play mode; refuses to overwrite an existing file.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class/file name. Defaults to 'CameraFx'. Sanitized to a valid C# identifier.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory under the project root for the .cs file. Defaults to 'Code'.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "hitPunchDirection",
+          "description": "HitPunch preset: punch direction. Defaults to Vector3.Backward (camera kicks back).",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "hitPunchAmplitude",
+          "description": "HitPunch preset: positional kick strength. Defaults to 8.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "hitPunchFrequency",
+          "description": "HitPunch preset: oscillation frequency. Defaults to 20.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "hitPunchDuration",
+          "description": "HitPunch preset: seconds. Defaults to 0.25.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "hitPunchFovAmplitude",
+          "description": "HitPunch preset: FOV kick amount (0 = none). Defaults to 3.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "explosionShakeAmplitude",
+          "description": "ExplosionShake preset: shake strength. Defaults to 5.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "explosionShakeFrequency",
+          "description": "ExplosionShake preset: oscillation frequency. Defaults to 25.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "explosionShakeDuration",
+          "description": "ExplosionShake preset: seconds. Defaults to 0.8.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "landingTiltAngles",
+          "description": "LandingTilt preset as {x: pitch, y: yaw, z: roll} degrees (or 'p,y,r'). Defaults to 5 pitch / 0 yaw / 2 roll.",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "landingTiltDuration",
+          "description": "LandingTilt preset: seconds the tilt lasts. Defaults to 0.35.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "landingTiltEase",
+          "description": "LandingTilt preset: ease-in/out time within the duration. Defaults to 0.15.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach the component to — only needed to tune presets in the inspector; the statics work with no instance (only attaches if the type is already in the TypeLibrary — hotload first).",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "dialoguefx",
+      "name": "generate_lipsync_dialogue",
+      "description": "Generate a lipsync dialogue performer — NPCs SPEAK their lines with MOVING MOUTHS: a sealed Component holding a [Property] line list (speaker GameObject name + text) that, per line, (a) mirrors the line into a generated create_dialogue_system HUD when one exists (loose TypeLibrary capability bind: List<string> Lines + Begin() + bool IsActive — neither system references the other), (b) speaks the text via Sandbox.Speech.Synthesizer positionally AT the speaker (per-speaker voice name/gender/age/rate via the Voices list), (c) drives the speaker's SkinnedModelRenderer mouth morphs from the live viseme stream — Handle.LipSync.Visemes (IReadOnlyList<float> in the engine's 15-viseme order, read live from Sandbox.LipSync.VisemeNames 2026-07-13) multiplied through the model's own baked viseme->morph table (Model.GetVisemeMorph — verified nonzero on Citizen, e.g. viseme_AA -> openjawL/R; NOT a hand-guessed morph map), with MorphScale + smoothing, and (d) advances when the audio handle stops (LineGapSeconds pause, LineTimeoutSeconds safety-skip, Skip() to cut a line short, StopDialogue() to abort). Static events: OnLineStarted(dialogue, lineIndex, speaker) + OnDialogueFinished(dialogue). Returns {created, path, className, lineCount, voiceCount, propertyNames[], note}. Next: trigger_hotload + get_compile_errors, attach (targetId re-call or add_component_with_properties), fill Lines/Voices in the inspector or bake them via params, call Begin() from game code (or autoStart:true; pair with create_interactable). Limits & honesty: the editor cannot playtest audio, so the LIVE viseme stream is RUNTIME-UNVERIFIED — the generated LogVisemes() helper + DebugLogVisemes property confirm it in seconds in play mode (the API surface and mapping data ARE live-verified); models without baked viseme data log a warning and stay audio-only (Citizen has it); voices are machine/OS-specific and TrySetVoice is best-effort; LOCAL-only — call Begin() inside an [Rpc.Broadcast] for everyone; a bound HUD's own advance input stays active (it only ends that HUD's display, not the audio). Refused during play mode; refuses to overwrite an existing file.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class/file name. Defaults to 'LipsyncDialogue'. Sanitized to a valid C# identifier.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory under the project root for the .cs file. Defaults to 'Code'.",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "lines",
+          "description": "Dialogue lines baked as inspector-editable defaults. Defaults to a two-line demo on the own GameObject.",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "object"
+            }
+          }
+        },
+        {
+          "name": "voices",
+          "description": "Per-speaker voice settings baked as defaults. Defaults to empty (every speaker uses the OS default voice).",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "object"
+            }
+          }
+        },
+        {
+          "name": "volume",
+          "description": "Playback volume for spoken lines. Defaults to 1.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "positional",
+          "description": "true (default): 3D audio parented to the speaker GameObject. false: flat 2D narrator voice.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "driveMouth",
+          "description": "true (default): drive the speaker's SkinnedModelRenderer mouth morphs from the viseme stream. false: audio-only.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "morphScale",
+          "description": "Multiplier on viseme-derived morph weights (same idea as Sandbox.LipSync.MorphScale). Defaults to 1.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "mouthSmoothSeconds",
+          "description": "Seconds of exponential smoothing on mouth morphs (0 = raw viseme weights). Defaults to 0.05.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "lineGapSeconds",
+          "description": "Pause between a line's audio ending and the next line starting. Defaults to 0.2.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "lineTimeoutSeconds",
+          "description": "Safety: a line whose audio never starts (synthesis pending/failed) is skipped after this many seconds. Defaults to 20.",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "bindHud",
+          "description": "true (default): loosely bind a create_dialogue_system HUD in the scene (TypeLibrary capability match) and mirror each line into it. false: no HUD mirroring.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "autoStart",
+          "description": "true: Begin() fires in OnStart. Defaults to false (call Begin() from game code).",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "debugLogVisemes",
+          "description": "true: log the live viseme stream ~4x/second while speaking — the fast way to runtime-verify the mouth drive. Defaults to false.",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach the component to (only attaches if the type is already in the TypeLibrary — hotload first, then re-call or use add_component_with_properties).",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
       "module": "director",
       "name": "create_event_director",
       "description": "Generate a generalized L4D-style AI/pacing director component (host-authoritative). On a configurable interval the host rolls a weighted pick over a [Property] List<GameObject> EventPrefabs (with a parallel List<float> Weights), skips any event already active (dedupe) and anything past a MaxActive concurrency cap, clones the chosen prefab, NetworkSpawns it, and attaches a generated {name}TimedEvent companion so each spawned event self-destructs after EventLifetime seconds. Great for ambient events, waves, and world events. Single-player safe (IsProxy guard; NetworkSpawn falls back to a local clone). Fill EventPrefabs/Weights in the inspector or via the bridge after a hotload; edit the RollInterval() stub to make pacing adaptive (player-count/inactivity/time-pressure factors) per the ai-director cookbook. Optionally attached to an existing GameObject by GUID (after a hotload). NOTE: emits ONE .cs file containing two classes ({name} + {name}TimedEvent); the type only resolves after trigger_hotload.",
@@ -2033,6 +2754,331 @@
           "optional": true,
           "type": {
             "kind": "integer"
+          }
+        }
+      ]
+    },
+    {
+      "module": "economysave",
+      "name": "add_steam_stat_currency",
+      "description": "Generate a currency component (sealed) persisted over Sandbox.Services.Stats — Steam-cloud persistence, per Steam account, per package ident, with NO local save file. The stat stores the ABSOLUTE balance: every Add(double)/TrySpend(double) pushes Stats.SetValue(statName, balance); Flush() (and OnDestroy) pushes the buffered writes. On start it reads the balance back asynchronously via Stats.GetLocalPlayerStats(ident) -> Refresh() -> Get(statName).Value and fires the static OnBalanceLoaded(double); wait for IsLoaded before showing the balance. CLOUD SEMANTICS (surprising): stat writes are buffered/rate-limited by the backend and apply ONLY to the LOCAL Steam user — calling this for another player silently does nothing, so attach it to the LOCAL player's GameObject (IsProxy guards keep remote copies inert); read-back is eventually consistent and can lag minutes behind writes — the in-session Balance property is the runtime truth. Dev sessions without a real published package ident may read back nothing (balance starts 0 with a log line). packageIdent defaults to the running package (Game.Ident). Returns { created, path, className, statName, packageIdent, flushEveryChange, placedOn, note, nextSteps }. Next: trigger_hotload, attach to the local player, bind OnBalanceChanged for the HUD. Refused during play mode. Use create_economy_wallet/create_currency_account for in-run networked money, create_signed_save for offline local persistence; pair with create_leaderboard_panel (the same stat can back a leaderboard).",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated component. Defaults to 'SteamStatCurrency'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "statName",
+          "description": "Sandbox.Services stat that stores the balance (the stat-name string is the contract between write and read-back). Defaults to 'currency'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "packageIdent",
+          "description": "Package ident to read stats from. Omit/empty = the running package (Game.Ident)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "flushEveryChange",
+          "description": "Call Stats.Flush() after every balance change instead of relying on the buffered flush + OnDestroy flush (the backend rate-limits flushes). Defaults to false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of the LOCAL player's GameObject to attach to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "economysave",
+      "name": "create_currency_account",
+      "description": "Generate a host-authoritative currency ACCOUNT component (sealed) — the audited sibling of create_economy_wallet (wallet = simple money, account = money + a ledger). Balance is [Sync(SyncFlags.FromHost)] so clients can't author their own money; host-guarded Deposit(amount, reason), Withdraw(amount, reason) -> bool, and TryTransfer(otherAccount, amount, reason) -> bool each record a Transaction { Time (Time.Now), signed Amount, Reason, BalanceAfter } into a fixed-size ring buffer (historySize, default 32; oldest entries overwritten SILENTLY). GetRecentTransactions(max) returns them NEWEST FIRST — the ledger is HOST-SIDE ONLY and does not replicate (Balance does); proxies get an empty list. Bind the instance OnBalanceChanged(long) for HUD labels. Single-player safe. Returns { created, path, className, startingBalance, historySize, placedOn, note, nextSteps }. Next: trigger_hotload, then attach via targetId re-run or add_component_to_new_object. Refuses if the file already exists; refused during play mode. Use create_economy_wallet when you don't need the audit trail; pair with create_idle_economy (it auto-wires this account's Money/TrySpend).",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated component. Defaults to 'CurrencyAccount'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "startingBalance",
+          "description": "Balance the account opens with (host seeds it in OnStart). Defaults to 0",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "historySize",
+          "description": "Transaction ring-buffer capacity (clamped 1..4096); fixed once the first transaction is recorded, oldest overwritten silently after that. Defaults to 32",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a per-player/bank GameObject to attach to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "economysave",
+      "name": "create_idle_economy",
+      "description": "Generate a geometric idle-economy component (sealed): generators on the classic BaseCost * Growth^Owned cost curve with Buy 1 / Buy N / Buy Max — CostOf(index, count), MaxAffordable(index), TryBuy(index, count) and BuyMax(index) all use the CLOSED-FORM geometric series (cost = c0*(g^n-1)/(g-1), buyMax = floor(log_g(funds*(g-1)/c0+1))) — no per-copy loops, Buy 1000 is the same math as Buy 1. Wallet wiring is TypeLibrary reflection with NO compile-time wallet dependency (the shipped create_idle_income pattern): each income tick invokes AddMoney(long|int) on the first sibling component that has one, purchases invoke TrySpend(long|int), Buy Max reads the sibling's Money (or Balance) property — works out of the box next to create_economy_wallet or create_currency_account; with NO wallet sibling, purchases are refused with a Log.Warning (never silent) while TotalEarned still accumulates. Host-authoritative: mutations IsProxy-guarded; owned counts are HOST-SIDE state (not replicated); TotalEarned is [Sync(FromHost)]. Static events OnPurchased(index, count, cost) and OnIncomeTick(amount, total). BuyMax steps down once past a whole-currency rounding edge rather than failing. Returns { created, path, className, generators, tickSeconds, placedOn, note, nextSteps }. Next: trigger_hotload, place it NEXT TO a wallet on the same GameObject, tune the parallel GeneratorNames/BaseCosts/Growths/IncomesPerSecond lists with set_property. Refused during play mode. Pair with create_offline_progress for away-time earnings; use create_idle_income for a bare income ticker with no purchasing.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated component. Defaults to 'IdleEconomy'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "tickSeconds",
+          "description": "Seconds between income grants (floored at 0.1). Defaults to 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "generators",
+          "description": "Baked-in generator defaults (inspector-tunable after generation). Omit for a starter trio: Cursor 15/1.15/0.5, Farm 200/1.15/4, Factory 3000/1.12/30",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "object"
+            }
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of the GameObject to attach to — put it on the SAME GameObject as the wallet so the reflection wiring finds it (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "economysave",
+      "name": "create_loot_table_resource",
+      "description": "Generate GameResource-based loot tables — the data-asset sibling of create_weighted_loot_table. One .cs file containing THREE types: an entry POCO { Name, Weight, optional NestedTable reference }, a [AssetType]-registered GameResource loot-table class (designers author '.loot' files in the editor asset browser — New > Loot Table — after the hotload; NOTE: [AssetType(Name=..., Extension=..., Category=...)] is used because GameResourceAttribute is [Obsolete] on this SDK), and a '<name>Resolver' Component that rolls an assigned table by cumulative weight. Nested tables: an entry with a NestedTable rolls INTO that table instead of dropping its Name, capped at maxDepth (default 4) with a self-reference guard so cycles terminate (at the cap the deepest entry's Name is returned). Resolver.Roll() returns the item name (null + warning when no Table is assigned or the table is empty; entries with weight <= 0 never win; all-zero weights fall back to the first entry) and fires the static OnLoot(GameObject, item) event; roll HOST-SIDE and replicate the result yourself. targetId attaches the RESOLVER (the resource is an asset type, not a component). SURPRISING: pick an extension that is NOT a suffix of a built-in one (e.g. avoid 'cfg') or ResourceLibrary picks up engine files as phantom instances. Returns { created, path, className, resolverClass, extension, maxDepth, placedOn, note, nextSteps }. Next: trigger_hotload -> author .loot assets in the editor -> assign the resolver's Table (set_property with the asset path). Refused during play mode. Use create_weighted_loot_table for a single inline component with no asset files; create_gacha_drop_table for pity + duplicate mechanics.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated GameResource (the resolver becomes '<name>Resolver'). Defaults to 'LootTableResource'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "extension",
+          "description": "Asset file extension (lowercase alphanumerics; avoid suffixes of built-in extensions like 'cfg'). Defaults to 'loot'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "title",
+          "description": "Display name of the asset type in the editor's New-asset menu. Defaults to 'Loot Table'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "maxDepth",
+          "description": "Default nested-table resolve depth cap baked into the resolver (clamped 0..16; also a [Property]). Defaults to 4",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach the RESOLVER component to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "economysave",
+      "name": "create_meta_progression",
+      "description": "Generate a between-runs roguelite meta-progression component (sealed, owner-only): persistent meta-currency + an unlock-flag dictionary saved to FileSystem.Data JSON (dirty-flag autosave + OnDestroy, the create_save_system shape). API: Grant(long), TrySpend(long) -> bool, Unlock(key) (idempotent — the static OnUnlocked(key) event fires only on the FIRST unlock, and unlocks write through to disk immediately), IsUnlocked(key) -> bool, and the run-end seam BankRun(int earned) which converts a finished run's earnings into meta-currency, bumps RunsBanked, and saves immediately — call it from your round machine's end-of-run transition (create_round_state_machine / create_round_phase_machine). Instance OnCurrencyChanged(long) drives meta-shop balance labels. Versioned payload: old-version files start fresh. IsProxy-guarded — in multiplayer each machine banks only its own local meta file (this is per-machine persistence, not a server economy). Returns { created, path, className, fileName, version, placedOn, note, nextSteps }. Next: trigger_hotload, attach to a persistent hub/menu-scene manager GameObject, gate content with IsUnlocked when building the player. Refused during play mode. Pair with create_currency_account (in-run money) and create_signed_save (if the meta file needs tamper evidence — this one is unsigned).",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated component. Defaults to 'MetaProgression'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "fileName",
+          "description": "FileSystem.Data path the meta state is written to. Defaults to 'meta.json'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "version",
+          "description": "Payload version; mismatched files start fresh. Defaults to 1",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "autosaveSeconds",
+          "description": "Dirty-flag autosave cadence in seconds; 0 disables the heartbeat (unlocks and BankRun still write through immediately). Defaults to 10",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a persistent manager GameObject to attach to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "economysave",
+      "name": "create_signed_save",
+      "description": "Generate a tamper-evident, versioned save-system component (sealed, owner-only). The SaveData payload POCO is serialized to JSON (Sandbox.Json), FNV-1a-64 hashed over payload + version + salt, and written as a signed envelope { Version, Payload, Signature } to FileSystem.Data. Load() re-verifies: a signature mismatch (hand-edited/corrupt file) triggers a FORCED RESET — the save file is DELETED, defaults are used, and the static OnTampered(reason) event fires (destructive and deliberate; tell the player). A version mismatch starts fresh without the tamper event (add migrations in Load). Loaded values pass a Sanitize() clamp hook so even a re-signed save can't smuggle absurd values. Dirty-flag autosave (autosaveSeconds, default 10; MarkDirty() to arm) + a final save in OnDestroy. HONEST LIMIT: the salt ships inside the game assembly, so this is tamper-EVIDENT (stops notepad edits), NOT cryptographically secure. If you omit salt, a unique random one is baked into the generated file — changing it later invalidates existing saves. Returns { created, path, className, fileName, version, autosaveSeconds, placedOn, note, nextSteps }. Next: trigger_hotload, attach, add your fields to SaveData + clamps to Sanitize(), bump version on shape changes. Refused during play mode. Use create_save_system for a plain unsigned save, create_save_slots for multi-slot UI flows, create_meta_progression for roguelite meta-state.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated component. Defaults to 'SignedSave'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "fileName",
+          "description": "FileSystem.Data path the signed envelope is written to. Defaults to 'save_signed.json'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "version",
+          "description": "Save-shape version baked into the file and the signature; mismatched files start fresh. Defaults to 1",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "salt",
+          "description": "Signing salt baked into the generated code. Omit to bake a unique random salt (recommended); changing it later invalidates existing saves",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "autosaveSeconds",
+          "description": "Dirty-flag autosave cadence in seconds; 0 disables the heartbeat (OnDestroy still saves). Defaults to 10",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a save-manager GameObject to attach to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
           }
         }
       ]
@@ -3335,6 +4381,85 @@
       ]
     },
     {
+      "module": "gameplayrecorder",
+      "name": "gameplay_recording_status",
+      "description": "Poll the gameplay recording job. While recording returns { recording:true, jobId, elapsedSeconds (clip-timeline seconds), framesWithData, maxSeconds, sampleRate, capture, trackedObjectCount } (trackedObjectCount is -1 for whole-scene capture). After an auto-stop (maxSeconds cap / play mode ended) returns { stopped:true, pendingSave:true, reason } — the clip is in memory awaiting stop_gameplay_recording. After a save/discard returns that last summary (assetPath etc.). Read-only; works during play. No params.",
+      "params": []
+    },
+    {
+      "module": "gameplayrecorder",
+      "name": "record_gameplay_clip",
+      "description": "Start recording live play-mode gameplay into a Sandbox.MovieMaker clip — REQUIRES play mode (start_play first; errors otherwise). Captures the given GameObjects (ids — recommended: small focused clips) or, when ids is omitted, the WHOLE scene (heavy: every object becomes tracks). Returns { started, jobId, sampleRate, maxSeconds, capture, discarded, note } immediately; recording runs ASYNC in the editor frame loop until stop_gameplay_recording or the maxSeconds safety cap (default 60s of clip time, max 600s). Only one recording at a time (a second call errors while active; a stopped-but-unsaved clip is discarded by a new start, reported in 'discarded'). Combine with playtest or drive_player to record a SCRIPTED run, then stop_gameplay_recording to save the .movie and play_movie to replay it.",
+      "params": [
+        {
+          "name": "ids",
+          "description": "GameObject GUIDs to capture (from get_scene_hierarchy WHILE PLAYING — play-mode ids can differ from editor ids). Omit to capture the whole scene (heavy)",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "sampleRate",
+          "description": "Samples per second (default 30, clamped 1-120)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "maxSeconds",
+          "description": "Safety cap — auto-stops the recording once the clip timeline reaches this many seconds (default 60, clamped 1-600). The clip stays in memory until stop_gameplay_recording saves it",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        }
+      ]
+    },
+    {
+      "module": "gameplayrecorder",
+      "name": "stop_gameplay_recording",
+      "description": "Stop the active gameplay recording and persist it as a project .movie asset the editor can load (written to Assets/<folder>/<name>.movie, registered + compiled — list_movies then shows it with hasCompiledClip). Also saves a job that already auto-stopped (maxSeconds cap, or play mode ended). Returns { saved, assetPath, durationSeconds, trackCount, sampleRate, compiled, stopReason, wired, note } — a trackCount of 0 means nothing was captured and the response warns about it. Pass wireToId to auto-wire a MoviePlayer on that GameObject pointed at the new clip (during play mode that wiring is RUNTIME-ONLY and discarded on stop_play; the .movie asset itself always persists). Errors if the target file already exists (the clip stays in memory — retry with another name). discard:true throws the recording away instead. Replay: add_movie_player + play_movie in play mode.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Asset name without extension (default recording_<UTC timestamp>; sanitized to [A-Za-z0-9_-])",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "folder",
+          "description": "Assets subfolder to save into (default \"recordings\")",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "wireToId",
+          "description": "GameObject GUID to auto-wire a MoviePlayer at the new clip (runtime-only if done during play mode)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "discard",
+          "description": "Throw the recording away instead of saving it",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
       "module": "inputs",
       "name": "ensure_input_action",
       "description": "Register a custom named INPUT ACTION in the project so a generated game's custom verbs work in play mode. Writes to <project>.sbproj → Metadata.InputSettings.Actions[]. Idempotent: if the action already exists it is left alone (pass update=true to rebind its key). If the project has no InputSettings yet, the full DEFAULT action set (Forward/Back/Left/Right/Jump/Use/attack1/...) is seeded first so player movement/use are preserved — the engine only auto-injects defaults when a game defines NONE. After adding, call it from game code with Input.Pressed(\"name\") / Input.Down(\"name\") / Input.Released(\"name\"). Note: input config is read at project load, so restart_editor (or reload the project) for a new action to take effect in play mode.",
@@ -4358,6 +5483,56 @@
           "optional": false,
           "type": {
             "kind": "any"
+          }
+        }
+      ]
+    },
+    {
+      "module": "movieauthoring",
+      "name": "author_movie_clip",
+      "description": "Author a MovieMaker .movie cutscene clip from a declarative shot list — EDIT MODE ONLY, no Movie Maker dock, no play mode, no real-time waiting (a 30s clip bakes in one call, typically <1s). Builds a hold+blend keyframe timeline from the shots (smoothstep ease by default), steps a camera through it, and hand-pumps MovieRecorder Advance/Capture per synthetic frame, then saves Assets/<folder>/<clipName>.movie (registered + compiled; errors if the file exists — the scene itself is NOT saved). Returns { authored, path, name, durationSeconds, frames, sampleRate, shots, tracks, bakeMs, compiled, loadable, camera, nextSteps }. Camera: omit cameraId for a temp camera (destroyed after the bake — play back with add_movie_player createTargets:true so the missing target is recreated), or pass cameraId of an existing camera GameObject (transform + FOV restored EXACTLY afterwards; the clip then animates THAT object on playback). fovDegrees is baked for real (the clip carries a FieldOfView track). Authored clips animate ONLY the camera the bake moves — other scene objects don't move in edit mode (that's what record_gameplay_clip is for). Total timeline capped at 120s, max 32 shots. Errors during play mode (stop_play first). Verify with list_movies; play via add_movie_player + play_movie in play mode.",
+      "params": [
+        {
+          "name": "shots",
+          "description": "The shot list in order (1-32 shots). Timeline = hold₀, then blendᵢ + holdᵢ per following shot",
+          "optional": false,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "object"
+            }
+          }
+        },
+        {
+          "name": "clipName",
+          "description": "Asset name without extension (default authored_<UTC timestamp>; sanitized to [A-Za-z0-9_-])",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "folder",
+          "description": "Assets subfolder to save into (default \"movies\")",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "sampleRate",
+          "description": "Clip samples per second (default 30, clamped 1-120)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "cameraId",
+          "description": "GUID of an existing camera GameObject (must have a CameraComponent) to bake through — restored EXACTLY afterwards, and playback then animates that object. Omit for a temp camera that is destroyed after the bake",
+          "optional": true,
+          "type": {
+            "kind": "string"
           }
         }
       ]
@@ -6579,6 +7754,110 @@
       ]
     },
     {
+      "module": "roundui",
+      "name": "add_panel_buildhash",
+      "description": "PATCH an existing .razor file (razor_lint's companion FIXER — razor_lint flags 'PanelComponent without BuildHash', this adds it). NOT a scaffold: it EDITS the file in place, inserting 'protected override int BuildHash() => System.HashCode.Combine( ... )' at the end of the first @code block, folding the fields and auto-properties declared there. HEURISTIC string/regex parsing — review the diff: computed (=>) properties, statics, consts, events and Action/Func members are skipped; reference-typed members fold by REFERENCE (a mutated List re-renders only if Count-style state is also folded); TimeSince/TimeUntil/RealTimeSince/RealTimeUntil members fold as whole seconds (1 Hz re-render, not every frame); braces inside @code string literals can confuse the block parser. If no members are found a '=> 0' stub with a TODO is inserted (silences the lint but does NOT re-render — replace it). Returns { patched, path, hashedMembers[], buildHash, note } on success, { alreadyPresent: true, path } when a BuildHash already exists (file left UNCHANGED — extend it by hand), or { error } for non-PanelComponent files, missing @code, or a path outside the project. Follow with trigger_hotload, then razor_lint to confirm the finding cleared.",
+      "params": [
+        {
+          "name": "path",
+          "description": "Project-relative path to the .razor file to patch, e.g. 'Code/UI/MyHud.razor' (from razor_lint's finding.file or list_project_files). Must '@inherits PanelComponent'; .razor.scss files are rejected",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "roundui",
+      "name": "create_round_timer_hud",
+      "description": "Generate a Razor screen-panel HUD (.razor + .razor.scss) showing the active round/phase time remaining as mm:ss with the phase/state name above it. NO code coupling to your round machine: at runtime it discovers one by TypeLibrary property reflection — same-GameObject components first, then the whole scene, re-scanning every 2s while unbound — matching either shipped machine shape: create_round_phase_machine output (a [Sync] TimeUntil 'PhaseTimer' + 'CurrentPhase' enum for the label) or create_round_state_machine output (a manager with 'StateIndex' + 'Current', whose active state carries a [Sync] TimeUntil 'TimeLeft' + 'Identifier'). First matching component wins; any hand-written machine exposing those member names also binds. Adaptive BuildHash folds the WHOLE second remaining so the panel re-renders at 1 Hz, not every frame. Optional low-time warning: at/below lowTimeSeconds the clock gets the 'low' CSS class (red by default). Shows '--:--' (and fades out via the 'unbound' class) until a machine exists. Returns { created, razorPath, scssPath, className, lowTimeSeconds, note, nextSteps }. Renders NOTHING without a ScreenPanel host: follow with trigger_hotload, then add_screen_panel, then add_component_with_properties (component=className) on the same object; verify with capture_view (renderUI=true) in play mode.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated panel. Defaults to 'RoundTimerHud'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .razor + .razor.scss. Defaults to 'Code/UI'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "lowTimeSeconds",
+          "description": "Remaining-seconds threshold at/below which the clock gets the 'low' warning class (clamped to >= 0; 0 disables). Editable per-instance via the LowTimeSeconds [Property]. Defaults to 10",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        }
+      ]
+    },
+    {
+      "module": "roundui",
+      "name": "scaffold_map_vote_flow",
+      "description": "Scaffold an end-of-round map vote. Three files: <Name>.cs (sealed host-authoritative controller) + <Name>Panel.razor + <Name>Panel.razor.scss (vote UI: one button per map, live tallies, countdown, own-pick highlight, winner banner). Flow: host calls StartVote() (usually from a post-round phase/state, or set the AutoStart [Property]) -> clients click -> votes route client-to-host via [Rpc.Host] SubmitVote with the caller re-resolved HOST-SIDE from Rpc.Caller (null-checked — Connection has no IsValid on this SDK) and the map index re-validated (re-votes overwrite, keyed by SteamId) -> tallies replicate via [Sync(FromHost)] NetList<int> -> when the [Sync] TimeUntil countdown expires the host picks the winner (most votes; ties break deterministically via one LCG scramble of a time seed — no System.Random) -> after resultLingerSeconds the HOST calls Scene.LoadFromFile(winner) (API verified live on this SDK; clients follow via the scene networking layer — verify the client hand-off in a real multi-client session). Static event OnVoteFinished(sceneFile) fires on every machine. Returns { created, componentPath, razorPath, scssPath, className, panelClassName, maps, voteDurationSeconds, resultLingerSeconds, autoStart, note, nextSteps }. REQUIREMENTS: the controller must sit on a NETWORK-SPAWNED object in multiplayer or [Sync] never replicates; if maps is omitted the MapScenes list is generated EMPTY and StartVote() refuses with a warning until you fill it in the inspector. Follow with trigger_hotload, attach via add_component_with_properties, host the panel under add_screen_panel.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the controller; the panel is generated as <Name>Panel. Defaults to 'MapVote'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs + .razor + .razor.scss. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "maps",
+          "description": "Scene files to vote between, e.g. [\"scenes/arena.scene\", \"scenes/docks.scene\"] (find them with list_scenes). Baked into the MapScenes [Property] list, editable later in the inspector. Defaults to an EMPTY list (StartVote() then refuses until it's filled)",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "voteDurationSeconds",
+          "description": "Seconds the vote stays open once StartVote() is called (clamped to >= 3). Defaults to 20",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "resultLingerSeconds",
+          "description": "Seconds the winner banner shows before the host loads the winning scene (clamped to >= 0). Defaults to 4",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "autoStart",
+          "description": "Start the vote automatically on spawn (host only). Usually false — call StartVote() from your round machine's post-round state instead. Defaults to false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
       "module": "saveslots",
       "name": "create_save_slots",
       "description": "Generate a multi-slot save MANAGER component (the slot-picker sibling of create_save_system). Use this when the game needs SEVERAL named save slots the player chooses between (New Game / Load Game menu, per-character or per-run saves) — not one silent autosave. Use create_save_system instead when a single implicit save file is enough. Emits one sealed Component that lists / creates / loads / saves / deletes N slots: a lightweight manifest file (saveslots.json) holds per-slot metadata for the picker (Used flag + Name + SavedAtUnix timestamp + PlaytimeSeconds) so listing never loads a heavy payload, and each slot's game state lives in its own saveslot_<i>.json. Versioned SlotData POCO with clamp-on-load Sanitize() and delete-on-version-mismatch; runs only on the owning machine (IsProxy guard). Static OnSlotLoaded / OnSlotSaved / OnSlotDeleted hooks for HUD. Storage stays within the verified FileSystem.Data.ReadJsonOrDefault / WriteJson / DeleteFile surface (index-file pattern, no directory enumeration). Set sceneReconciliation:true to also reconcile scene objects by GameObject.Id on load — records the save marks destroyed are destroyed, survivors repositioned, missing skipped (good for a placeable-world tycoon). Optionally attached to an existing GameObject by GUID (after a hotload).",
@@ -6835,6 +8114,372 @@
         {
           "name": "targetId",
           "description": "GUID of an existing GameObject to attach the station component to (only attaches if the type is already loaded — generate, trigger_hotload, then it places; otherwise add it after the hotload)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "statsachievements",
+      "name": "add_achievement_trigger",
+      "description": "SCENE-MUTATING: generate a data-driven achievement trigger-zone component AND create its GameObject now (named zone with a sized BoxCollider, IsTrigger=true, at the given position). When an object tagged triggerTag enters, the component calls <achievementSetClass>.Instance.Progress(achievementId, amount) — or Unlock() when unlock=true — with a once-only latch and optional destroy-after-fire. Returns { created, path, className, achievementSetClass, achievementId, gameObject, attached, note, nextSteps }. The generated component only attaches to the zone after trigger_hotload — until then `attached` is false and nextSteps carries the exact add_component_with_properties follow-up. The generated code references the set class BY NAME: run create_achievement_set first or the project will not compile (the result warns via `note`). Re-running with the same name fails unless reuseClass=true, which skips codegen and just places another zone (attaching + configuring immediately since the class is already compiled). Refused during play mode.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated trigger component. Defaults to 'AchievementTrigger'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "achievementSetClass",
+          "description": "Class name of the achievement set the zone reports to (from create_achievement_set). Defaults to 'AchievementSet'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "achievementId",
+          "description": "Id of the achievement to progress/unlock (sanitized to [a-z0-9_-])",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "amount",
+          "description": "Progress amount added per fire (ignored when unlock=true). Defaults to 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "unlock",
+          "description": "Call Unlock() instead of Progress(). Defaults to false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "triggerTag",
+          "description": "Tag the entering object must carry (put it on the player via set_tags). Defaults to 'player'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "onceOnly",
+          "description": "Only the first tagged entry fires. Defaults to true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "destroyAfterFire",
+          "description": "Destroy the zone GameObject after firing. Defaults to false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "createObject",
+          "description": "Create the zone GameObject now (with BoxCollider). Defaults to true; false = code-gen only",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "objectName",
+          "description": "Name for the zone GameObject. Defaults to '<name>Zone'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "position",
+          "description": "World position of the zone GameObject",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "scale",
+          "description": "BoxCollider size — uniform number, object {x,y,z}, or comma string \"x,y,z\". Defaults to 100,100,100",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "reuseClass",
+          "description": "If the .cs already exists, skip codegen and just place another zone with the existing class. Defaults to false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "statsachievements",
+      "name": "add_leaderboard_stat",
+      "description": "Generate a batched write-side stat reporter component for Sandbox.Services.Stats — the write partner of create_leaderboard_panel. Gameplay code calls the static <Name>.Report(\"kills\", 1) from anywhere; amounts accumulate locally and flush as Stats.Increment deltas on a timer (default every 12 s, also on disable/destroy). Baseline-delta bookkeeping means a partial flush retries the un-sent remainder instead of double-counting, and deltas larger than maxChunk are sent in chunks. Returns { created, path, className, placedOn, note, nextSteps }. Place ONE in the scene after trigger_hotload (add_component_to_new_object), or pass targetId to attach immediately when the type is already compiled. Stats are PER LOCAL PLAYER (each client reports its own) and only exist on leaderboards once the stat is registered for the project ident on sbox.game. Fails if the file already exists.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated component. Defaults to 'StatReporter'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "flushIntervalSeconds",
+          "description": "Seconds between batched flushes to the backend. Defaults to 12, clamped to >= 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "maxChunk",
+          "description": "Largest amount sent in a single Stats.Increment call; bigger deltas are chunked. Defaults to 1000, clamped to >= 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "statsachievements",
+      "name": "create_achievement_set",
+      "description": "Generate an achievement engine: a component with an AchievementDef list (id/title/description/target), per-achievement progress persisted via FileSystem.Data JSON (survives restarts), Progress(id, amount) / Unlock(id) API on a static Instance, a static OnAchievementUnlocked event, and an optional Stats.Increment mirror ('ach-<id>' += 1) on unlock. Also emits a Razor unlock-toast HUD (<Name>Toast.razor + .razor.scss, razor_lint clean) unless makeToast=false. Returns { created, path, className, toastRazorPath, toastScssPath, toastClassName, achievements, placedOn, note, nextSteps }. Ids are sanitized to [a-z0-9_-]; omitting achievements bakes 3 editable samples. After trigger_hotload: place ONE set in the scene, and host the toast under a ScreenPanel (add_screen_panel). Pair with add_achievement_trigger for world-trigger unlocks. LOCAL-only: achievements belong to each client's local player. Fails if the .cs or toast .razor already exists.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated engine component (toast panel becomes <name>Toast). Defaults to 'AchievementSet'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for all generated files. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "achievements",
+          "description": "Achievement definitions baked into the component. Omit for 3 editable samples (first_steps, collector, veteran)",
+          "optional": true,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "object"
+            }
+          }
+        },
+        {
+          "name": "fileName",
+          "description": "Save file name inside FileSystem.Data. Defaults to 'achievements.json'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "mirrorToStats",
+          "description": "Mirror each unlock into Sandbox.Services.Stats as 'ach-<id>' += 1. Defaults to true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "makeToast",
+          "description": "Also emit the <name>Toast.razor + .razor.scss unlock toast HUD. Defaults to true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "toastSeconds",
+          "description": "Seconds each unlock toast stays on screen. Defaults to 4, clamped to >= 0.5",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach the engine to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "statsachievements",
+      "name": "create_elo_rating_system",
+      "description": "Generate a self-contained, host-authoritative elo rating component: standard elo math (expected = 1/(1+10^((Rb-Ra)/400)), delta = K * (score - expected)) with a [Property] K-factor, ratings in a [Sync(SyncFlags.FromHost)] NetDictionary<long,float> keyed by SteamId, and host-side persistence via FileSystem.Data JSON. API on a static Instance: ReportMatch(winnerSteamId, loserSteamId) for 1v1 and ReportTeamMatch(winnerIds, loserIds) for teams (team-average elo, uniform delta per member) — both are IsProxy-guarded no-ops on clients; GetRating(steamId) works anywhere (unknown players = defaultRating); the static OnRatingChanged(steamId, newRating) fires on EVERY machine via an [Rpc.Broadcast]. Returns { created, path, className, kFactor, defaultRating, placedOn, note, nextSteps }. After trigger_hotload: place ONE in the scene and network its GameObject (network_spawn) or the [Sync] never replicates. Only the HOST's disk holds the ratings ledger. Fails if the file already exists.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated component. Defaults to 'EloRatingSystem'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "kFactor",
+          "description": "Elo K-factor — how far one result moves ratings (32 = fast, 16 = stable). Defaults to 32, clamped to >= 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "defaultRating",
+          "description": "Rating assigned to players with no recorded matches. Defaults to 1000",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "fileName",
+          "description": "Save file name inside FileSystem.Data (host-side ledger). Defaults to 'elo_ratings.json'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "statsachievements",
+      "name": "create_speedrun_leaderboard",
+      "description": "Generate a speedrun timer component plus a leaderboard display panel. The timer (<Name>.cs) is TimeSince-based with a static Instance: StartTimer() at run start, StopTimer() at the finish (pairs with a trigger zone), ResetTimer() to abort. StopTimer persists the local best via FileSystem.Data and submits Stats.SetValue(statName, seconds) ONLY when the run beats it — configure the stat with MIN aggregation on sbox.game so the global board keeps best times. The panel (<Name>Panel.razor + .razor.scss, razor_lint clean) fetches via Leaderboards.GetFromStat with min aggregation + ascending sort, has a clickable Friends-only filter button, and overlays a local-best row read from the same save file. Returns { created, path, className, panelRazorPath, panelScssPath, panelClassName, statName, placedOn, note, nextSteps }. After trigger_hotload: place ONE timer (add_component_to_new_object or targetId) and host the panel under a ScreenPanel/WorldPanel (add_screen_panel). maxRows clamps to 1..50; makePanel=false skips the panel files. Fails if the .cs or panel .razor already exists.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated timer component (panel becomes <name>Panel). Defaults to 'SpeedrunTimer'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for all generated files. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "statName",
+          "description": "Sandbox.Services stat the best time is written to (sanitized to [a-z0-9_-]). Defaults to 'best_time'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "fileName",
+          "description": "Save file name inside FileSystem.Data for the local best. Defaults to 'speedrun.json'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "title",
+          "description": "Panel title text. Defaults to 'Best Times'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "maxRows",
+          "description": "Leaderboard rows fetched/shown. Defaults to 10, clamped to 1..50",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "makePanel",
+          "description": "Also emit the <name>Panel.razor + .razor.scss display panel. Defaults to true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach the timer to (only attaches if the type is already loaded — hotload first)",
           "optional": true,
           "type": {
             "kind": "string"
@@ -9235,6 +10880,307 @@
           "name": "prefabPath",
           "description": "Prefab asset path (e.g. 'prefabs/player.prefab')",
           "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "worldrender",
+      "name": "add_daynight_sun",
+      "description": "Generate a sun/sky driver component for the clock made by create_day_night_clock — a COMPANION, not a replacement: the clock owns TimeOfDay, this renders it. Every frame it reads TimeOfDay/SunriseHour/SunsetHour off the clock (sibling first, else first in scene, retrying 1/s) and drives a DirectionalLight: sunrise→sunset maps to a 0-180° pitch arc (continuing below the horizon at night), LightColor runs a hardcoded gradient (warm dawn → white noon → orange dusk → dim blue night, HDR-scaled by Intensity since s&box lights have no Brightness field), and optionally lerps the SkyBox2D Tint between night blue and day white. The clock CLASS NAME is baked in as a typed reference — the call ERRORS if `clockClass` isn't found in the TypeLibrary or any project .cs (run create_day_night_clock first; a bad token would break the whole game-assembly compile). Returns {created, path, className, clockClass, sunYaw, intensity, driveSkybox, placedOn, note, nextSteps[]}. Next: trigger_hotload → attach to the DirectionalLight's GameObject → start_play, set_runtime_property TimeOfDay on the clock (6/12/20/0) + capture_view to verify the looks. File/scene-mutating — refused during play mode.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated component. Defaults to 'DayNightSun'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "clockClass",
+          "description": "Class name of the day-night clock to bind to (the `name` you gave create_day_night_clock). Defaults to 'DayNightClock'. Must already exist as a compiled type or a project .cs file",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "sunYaw",
+          "description": "Compass heading of the sun's arc in degrees. Defaults to 30",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "intensity",
+          "description": "Brightness multiplier on the colour gradient (HDR, >1 valid; intensity = colour magnitude). Defaults to 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "driveSkybox",
+          "description": "Also tint the scene's SkyBox2D between night blue and day white. Defaults to true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GUID of a GameObject to attach to (only attaches if the type is already loaded — hotload first)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "worldrender",
+      "name": "add_render_target_camera",
+      "description": "CCTV / security monitor / mirror / simple portal: creates a secondary camera (IsMainCamera=false, Priority param) positioned/rotated or aimed at a target object, a display surface (scaled box with a ModelRenderer), and GENERATES a sealed wiring component that at runtime creates the render-target Texture (Texture.CreateRenderTarget builder), assigns camera.RenderTarget and sets the texture onto an anonymous complex-shader material on the display (attribute 'Color' = albedo; the screen is scene-lit, not emissive/unlit). Returns {created, camera{id,...}, display{id,...}|null, className, path, generatedCode, attachedAndWired, resolution, nextSteps[]}. FIRST call generates the .cs → follow nextSteps: trigger_hotload, then add_component_with_properties on the display with properties {SourceCamera: <camera GUID>}; a REPEAT call reusing the same `name` after the hotload attaches AND wires everything automatically (attachedAndWired=true). The feed only renders in play mode — verify with start_play + capture_view. If `name`'s .cs file exists but isn't compiled yet, the call errors — hotload first. Scene/file-mutating — refused during play mode.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Class name for the generated wiring component. Defaults to 'RenderTargetDisplay'. Reuse the same name for extra cameras — after a hotload the class is reused and wired in one shot",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "directory",
+          "description": "Subdirectory for the generated .cs file. Defaults to 'Code'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "cameraName",
+          "description": "GameObject name for the camera. Defaults to 'RT Camera'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "position",
+          "description": "World position of the camera",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "rotation",
+          "description": "World rotation of the camera",
+          "optional": true,
+          "type": {
+            "kind": "rotation"
+          }
+        },
+        {
+          "name": "lookAtId",
+          "description": "GUID of a GameObject to aim the camera at (overrides rotation; from get_scene_hierarchy / find_objects)",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "priority",
+          "description": "CameraComponent.Priority (integer). Defaults to 1",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "fieldOfView",
+          "description": "Camera field of view in degrees (clamped 5-170). Engine default when omitted",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "resolution",
+          "description": "Render-target size as 'width,height' pixels (min 16). Defaults to '512,512'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "backgroundColor",
+          "description": "Camera background colour. Engine default when omitted",
+          "optional": true,
+          "type": {
+            "kind": "color"
+          }
+        },
+        {
+          "name": "createDisplay",
+          "description": "Create the display surface GameObject. Defaults to true. Pass false to wire your own surface later",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "displayPosition",
+          "description": "World position of the display surface",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "displayRotation",
+          "description": "World rotation of the display surface",
+          "optional": true,
+          "type": {
+            "kind": "rotation"
+          }
+        },
+        {
+          "name": "displaySize",
+          "description": "Display box extents as 'x,y,z' world units (thin x = a wall screen facing ±x). Defaults to '4,128,72'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "attribute",
+          "description": "Material attribute that receives the texture. Defaults to 'Color' (albedo on the complex shader). Sanitized to [A-Za-z0-9_]",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "worldrender",
+      "name": "add_water_body",
+      "description": "Create a swimmable/buoyant water region: a GameObject with a WaterVolume (s&box's buoyancy + drag physics volume, region defined by a trigger BoxCollider sized to `size`) plus, by default, a simple flat translucent-blue surface box at the water line so it's visible. HONEST LIMIT: the visual is a tinted dev-box stand-in, NOT a Gerstner/water shader — the dev material may render the tint opaque; swap in a real water material later. Only the WaterVolume properties you pass are set (engine defaults otherwise). Returns {created, gameObject{id,...}, size, appliedProperties[], surface{id,...}|null, note, nextSteps[]}. Next: start_play and drop a physics prop in to verify buoyancy; tune FluidDensity/LinearDrag/WaveAmplitude etc. with set_property on the WaterVolume. Scene-mutating — refused during play mode.",
+      "params": [
+        {
+          "name": "name",
+          "description": "GameObject name. Defaults to 'Water'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "position",
+          "description": "World position of the volume's CENTRE (the surface sits at z + size.z/2 + surfaceOffset)",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "size",
+          "description": "Full extents of the volume as 'x,y,z' world units. Defaults to '512,512,128'",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "density",
+          "description": "WaterVolume.FluidDensity — higher = more buoyant. Engine default when omitted",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "linearDrag",
+          "description": "WaterVolume.LinearDrag on submerged bodies. Engine default when omitted",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "angularDrag",
+          "description": "WaterVolume.AngularDrag on submerged bodies. Engine default when omitted",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "waveAmplitude",
+          "description": "WaterVolume.WaveAmplitude — physics wave height (does NOT animate the visual surface)",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "waveFrequency",
+          "description": "WaterVolume.WaveFrequency — physics wave frequency",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "fluidVelocity",
+          "description": "WaterVolume.FluidVelocity — current/flow direction and speed, world units/s",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "surfaceOffset",
+          "description": "WaterVolume.SurfaceOffset — shifts the water line relative to the top of the box",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "visualSurface",
+          "description": "Create the tinted surface box child. Defaults to true",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "surfaceColor",
+          "description": "Tint of the visual surface. Defaults to translucent blue (0.15,0.35,0.55,0.6)",
+          "optional": true,
+          "type": {
+            "kind": "color"
+          }
+        },
+        {
+          "name": "parentId",
+          "description": "GUID of a parent GameObject",
+          "optional": true,
           "type": {
             "kind": "string"
           }

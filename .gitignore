@@ -19,3 +19,4 @@ sbox-bridge-addon/obj/
 
 # graphify build working dir — the curated graph copy lives in docs/graph/
 graphify-out/
+wip/

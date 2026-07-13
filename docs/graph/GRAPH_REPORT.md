@@ -1,16 +1,16 @@
-# Graph Report - sbox-claude  (2026-07-08)
+# Graph Report - sbox-claude  (2026-07-13)
 
 ## Corpus Check
-- 175 files · ~890,194 words
+- 248 files · ~1,239,620 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 4045 nodes · 5289 edges · 305 communities (225 shown, 80 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 93 edges (avg confidence: 0.83)
+- 5014 nodes · 6992 edges · 369 communities (285 shown, 84 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 93 edges (avg confidence: 0.83)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `efa53ff7`
+- Built from commit: `37757bf3`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -316,18 +316,82 @@
 - [[_COMMUNITY_Community 302|Community 302]]
 - [[_COMMUNITY_Community 303|Community 303]]
 - [[_COMMUNITY_Community 304|Community 304]]
+- [[_COMMUNITY_Community 305|Community 305]]
+- [[_COMMUNITY_Community 306|Community 306]]
+- [[_COMMUNITY_Community 307|Community 307]]
+- [[_COMMUNITY_Community 308|Community 308]]
+- [[_COMMUNITY_Community 309|Community 309]]
+- [[_COMMUNITY_Community 310|Community 310]]
+- [[_COMMUNITY_Community 311|Community 311]]
+- [[_COMMUNITY_Community 312|Community 312]]
+- [[_COMMUNITY_Community 313|Community 313]]
+- [[_COMMUNITY_Community 314|Community 314]]
+- [[_COMMUNITY_Community 315|Community 315]]
+- [[_COMMUNITY_Community 316|Community 316]]
+- [[_COMMUNITY_Community 317|Community 317]]
+- [[_COMMUNITY_Community 318|Community 318]]
+- [[_COMMUNITY_Community 319|Community 319]]
+- [[_COMMUNITY_Community 320|Community 320]]
+- [[_COMMUNITY_Community 321|Community 321]]
+- [[_COMMUNITY_Community 322|Community 322]]
+- [[_COMMUNITY_Community 323|Community 323]]
+- [[_COMMUNITY_Community 324|Community 324]]
+- [[_COMMUNITY_Community 325|Community 325]]
+- [[_COMMUNITY_Community 326|Community 326]]
+- [[_COMMUNITY_Community 327|Community 327]]
+- [[_COMMUNITY_Community 328|Community 328]]
+- [[_COMMUNITY_Community 329|Community 329]]
+- [[_COMMUNITY_Community 330|Community 330]]
+- [[_COMMUNITY_Community 331|Community 331]]
+- [[_COMMUNITY_Community 332|Community 332]]
+- [[_COMMUNITY_Community 333|Community 333]]
+- [[_COMMUNITY_Community 334|Community 334]]
+- [[_COMMUNITY_Community 335|Community 335]]
+- [[_COMMUNITY_Community 336|Community 336]]
+- [[_COMMUNITY_Community 337|Community 337]]
+- [[_COMMUNITY_Community 338|Community 338]]
+- [[_COMMUNITY_Community 339|Community 339]]
+- [[_COMMUNITY_Community 340|Community 340]]
+- [[_COMMUNITY_Community 341|Community 341]]
+- [[_COMMUNITY_Community 342|Community 342]]
+- [[_COMMUNITY_Community 343|Community 343]]
+- [[_COMMUNITY_Community 344|Community 344]]
+- [[_COMMUNITY_Community 345|Community 345]]
+- [[_COMMUNITY_Community 346|Community 346]]
+- [[_COMMUNITY_Community 347|Community 347]]
+- [[_COMMUNITY_Community 348|Community 348]]
+- [[_COMMUNITY_Community 349|Community 349]]
+- [[_COMMUNITY_Community 350|Community 350]]
+- [[_COMMUNITY_Community 351|Community 351]]
+- [[_COMMUNITY_Community 352|Community 352]]
+- [[_COMMUNITY_Community 353|Community 353]]
+- [[_COMMUNITY_Community 354|Community 354]]
+- [[_COMMUNITY_Community 355|Community 355]]
+- [[_COMMUNITY_Community 356|Community 356]]
+- [[_COMMUNITY_Community 357|Community 357]]
+- [[_COMMUNITY_Community 358|Community 358]]
+- [[_COMMUNITY_Community 359|Community 359]]
+- [[_COMMUNITY_Community 360|Community 360]]
+- [[_COMMUNITY_Community 361|Community 361]]
+- [[_COMMUNITY_Community 362|Community 362]]
+- [[_COMMUNITY_Community 363|Community 363]]
+- [[_COMMUNITY_Community 364|Community 364]]
+- [[_COMMUNITY_Community 365|Community 365]]
+- [[_COMMUNITY_Community 366|Community 366]]
+- [[_COMMUNITY_Community 367|Community 367]]
+- [[_COMMUNITY_Community 368|Community 368]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `IBridgeHandler` - 222 edges
-2. `Communities (288 total, 76 thin omitted)` - 209 edges
+1. `Communities (365 total, 86 thin omitted)` - 276 edges
+2. `IBridgeHandler` - 271 edges
 3. `JsonElement` - 179 edges
 4. `Task` - 160 edges
-5. `BridgeClient` - 60 edges
-6. `ClaudeBridge` - 40 edges
-7. `PlaytestRunner` - 33 edges
-8. `Job` - 27 edges
-9. `Changelog` - 27 edges
-10. `Party / Microgame-Collection Recipe` - 24 edges
+5. `BridgeClient` - 73 edges
+6. `BridgeScaffoldGameplayTools` - 44 edges
+7. `Task` - 43 edges
+8. `McpTool` - 43 edges
+9. `ClaudeBridge` - 41 edges
+10. `PlaytestRunner` - 34 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `Synced Day/Night Cycle with Smoothstep Twilight` --semantically_similar_to--> `create_day_night_clock Tool`  [INFERRED] [semantically similar]
@@ -364,23 +428,27 @@
 - **Playable Scaffold = sbox-scaffold-game skill orchestrating set_component_reference + add_component_to_new_object + create_objective_system** — scaffolds_scaffold_game_skill, scaffolds_set_component_reference, scaffolds_add_component_to_new_object, scaffolds_create_objective_system [EXTRACTED 0.95]
 - **Adaptive Pacing (AI Director) as Cross-Genre Concept used in survival-horror, social-deduction, and gacha-crawler** — ai_director_composed_multipliers, survival_horror_escalating_spawner, social_deduction_cmd_use_target, gacha_ev_normalization [INFERRED 0.75]
 
-## Communities (305 total, 80 thin omitted)
+## Communities (369 total, 84 thin omitted)
 
 ### Community 0 - "Graph Report Meta"
 Cohesion: 0.01
-Nodes (209): Communities (288 total, 76 thin omitted), Community 0 - "Graph Report Meta", Community 100 - "Community 100", Community 101 - "Community 101", Community 102 - "Community 102", Community 103 - "Community 103", Community 104 - "Community 104", Community 105 - "Community 105" (+201 more)
+Nodes (276): Communities (365 total, 86 thin omitted), Community 0 - "Graph Report Meta", Community 100 - "Community 100", Community 101 - "Community 101", Community 102 - "Community 102", Community 103 - "Community 103", Community 104 - "Community 104", Community 105 - "Community 105" (+268 more)
 
 ### Community 1 - "Physics & VFX Handlers"
 Cohesion: 0.03
-Nodes (67): AddCaveWaypointHandler, AddForestPOIHandler, AddJointHandler, AddNetworkHelperHandler, AddTerrainClearingHandler, AddTerrainHillHandler, AddTerrainTrailHandler, AssignMaterialHandler (+59 more)
+Nodes (66): AddCaveWaypointHandler, AddForestPOIHandler, AddForestTrailHandler, AddJointHandler, AddNetworkHelperHandler, AddTerrainClearingHandler, AssignModelHandler, AssignSoundHandler (+58 more)
 
 ### Community 2 - "Camera & Lighting Handlers"
 Cohesion: 0.04
-Nodes (40): AddBeamHandler, AddColliderHandler, AddEnvmapProbeHandler, AddLightHandler, AddPhysicsHandler, AddRagdollHandler, AddScreenPanelHandler, AddTrailHandler (+32 more)
+Nodes (39): AddBeamHandler, AddColliderHandler, AddEnvmapProbeHandler, AddLightHandler, AddPhysicsHandler, AddRagdollHandler, AddScreenPanelHandler, AddTrailHandler (+31 more)
+
+### Community 3 - "Component & Scene Handlers"
+Cohesion: 0.12
+Nodes (4): BridgeScaffoldGameplayTools, JsonNode, McpTool, Task
 
 ### Community 4 - "Networking Codegen Handlers"
-Cohesion: 0.04
-Nodes (35): AddRpcMethodHandler, AddSyncPropertyHandler, BakeNavMeshHandler, BakeReflectionsHandler, CreateGameManagerHandler, CreateLobbyManagerHandler, CreateMaterialHandler, CreateNetworkedPlayerHandler (+27 more)
+Cohesion: 0.05
+Nodes (25): AddRpcMethodHandler, AddSyncPropertyHandler, CreateGameManagerHandler, CreateLobbyManagerHandler, CreateMaterialHandler, CreateNetworkedPlayerHandler, CreateNetworkEventsHandler, CreateNpcControllerHandler (+17 more)
 
 ### Community 5 - "Networking Concepts (Docs)"
 Cohesion: 0.04
@@ -399,8 +467,8 @@ Cohesion: 0.04
 Nodes (44): Access, Adding & Querying Components, Additional Virtual Methods, Architecture Overview, Async in Components, Broadcasting, Built-in Event Interfaces, Children & Hierarchy (+36 more)
 
 ### Community 9 - "World-Gen Handlers"
-Cohesion: 0.14
-Nodes (7): AddForestTrailHandler, RaycastTerrainHandler, SculptTerrainHandler, WorldGenHelpers, IList, MethodInfo, Component
+Cohesion: 0.11
+Nodes (12): AddTerrainHillHandler, AddTerrainTrailHandler, ClearForestPOIsHandler, InvokeButtonHandler, ListComponentButtonsHandler, RaycastTerrainHandler, SculptTerrainHandler, WorldGenHelpers (+4 more)
 
 ### Community 10 - "Built-in Components Reference"
 Cohesion: 0.05
@@ -411,8 +479,8 @@ Cohesion: 0.05
 Nodes (41): ai-director, anti-cheat, board-game, building-placement, card-battler, casino-gambling, coop-kitchen, Corpus Index — Cross-Reference of 51 Mined Games (+33 more)
 
 ### Community 12 - "Level Layout Handlers"
-Cohesion: 0.07
-Nodes (18): AlignObjectsHandler, ApplyAtmosphereHandler, DistributeObjectsHandler, GetPropertyHandler, GetSceneHierarchyHandler, GroupObjectsHandler, InspectNetworkedObjectHandler, MeasureDistanceHandler (+10 more)
+Cohesion: 0.08
+Nodes (14): AlignObjectsHandler, DistributeObjectsHandler, GetPropertyHandler, GetSceneHierarchyHandler, GroupObjectsHandler, InspectNetworkedObjectHandler, MeasureDistanceHandler, ReplaceModelHandler (+6 more)
 
 ### Community 13 - "Networking Production Patterns"
 Cohesion: 0.05
@@ -424,7 +492,7 @@ Nodes (21): DriveJob, DrivePlayerHandler, DrivePlayerStatusHandler, PlayInputDri
 
 ### Community 15 - "Bridge Core & Coercion"
 Cohesion: 0.07
-Nodes (20): Action, DateTime, double, AddComponentWithPropertiesHandler, ClaudeBridge, LoadSceneHandler, PlayState, SetPropertyHandler (+12 more)
+Nodes (20): Action, DateTime, AddComponentWithPropertiesHandler, ClaudeBridge, LoadSceneHandler, PlayState, SetPropertyHandler, Func (+12 more)
 
 ### Community 16 - "AI Director & Survival Patterns"
 Cohesion: 0.06
@@ -439,8 +507,8 @@ Cohesion: 0.06
 Nodes (33): A. Skill: `sbox-scaffold-game`, Approach: skill vs. tools, B. New low-level tool: `set_component_reference`  ← **highest-value gap-filler**, C. New low-level tool: `add_component_to_new_object`, D. New low-level tool: `ensure_input_action`, E. New system tool: `create_objective_system`  ← **the win/lose primitive**, F. New system tool: `create_health_system`, G. New system tool: `create_pickup` (+25 more)
 
 ### Community 19 - "MCP Server Modules"
-Cohesion: 0.07
-Nodes (21): args, bridge, server, registerCinematicsTools(), registerComponentTools(), registerDebugDrawTools(), registerDirectorTools(), registerInputTools() (+13 more)
+Cohesion: 0.06
+Nodes (25): args, bridge, LIFELINE_TOOLS, server, registerAssetTools(), registerAudioTools(), registerBatchTools(), registerCinematicsTools() (+17 more)
 
 ### Community 20 - "NPM Package Metadata"
 Cohesion: 0.06
@@ -455,8 +523,8 @@ Cohesion: 0.08
 Nodes (29): CardDef GameResource — Cost, Type, Effects List, Art, Card-Battler Genre Recipe (deckbuilder/TCG/auto-battler), Authoritative Turn Flow — [Sync(FromHost)] ActivePlayerId, host-only mutators, FileSystem.Mounted vs FileSystem.Data — Discover=merge, Write=Data only, GameResource + [AssetType] Data Asset Pattern, PostReload() Cache Invalidation for Hot-Reload Safety (despawn.murder), Prefab Registry Pattern — pre-clone, BreakFromPrefab, index by id, TypeLibrary Reflection Catalog (facepunch.ss2 — code-only, no .vcfg files) (+21 more)
 
 ### Community 23 - "Install & Onboarding"
-Cohesion: 0.05
-Nodes (43): The Brain: sbox-cookbook as AI Knowledge Base, 1. Install the addon — *everyone*, 2. Connect the Claude side — *pick one*, 3. (Optional) Open the bridge dock, 4. Verify, A note on the reviews, Architecture, Build s&box games by talking to Claude — or any AI. (+35 more)
+Cohesion: 0.06
+Nodes (30): The Brain: sbox-cookbook as AI Knowledge Base, 1. Install the addon — *everyone*, 2. Connect the Claude side — *pick one*, 3. (Optional) Open the bridge dock, 4. Verify, A note on the reviews, Architecture, Build s&box games by talking to Claude — or any AI. (+22 more)
 
 ### Community 24 - "CI Parity Audit"
 Cohesion: 0.06
@@ -580,7 +648,7 @@ Nodes (20): 1. Generic "possess any contraption" seat-drive — dexlab.sandbox-r
 
 ### Community 55 - "Community 55"
 Cohesion: 0.08
-Nodes (23): Job, PlaytestHandler, PlaytestRunner, PlaytestStatusHandler, StepSpec, Angles, bool, Component (+15 more)
+Nodes (24): Job, PlaytestAbortHandler, PlaytestHandler, PlaytestRunner, PlaytestStatusHandler, StepSpec, Angles, bool (+16 more)
 
 ### Community 56 - "Community 56"
 Cohesion: 0.10
@@ -627,8 +695,8 @@ Cohesion: 0.11
 Nodes (18): 1. Auth: Steam token â†’ session JWT (REST), 2. Resilient call: backoff + re-auth-on-401 + `ApiResult<T>`, 3. Optimistic store: mutate-local â†’ reconcile â†’ debounce-flush, 4. Fire-and-forget telemetry, aethercore.versus / facepunch.fair â€” dual-sink + session cache (when Stats is enough), Build order, Canonical modern approach, despawn.murder â€” REST + JWT + optimistic store (the reference stack) (+10 more)
 
 ### Community 67 - "Community 67"
-Cohesion: 0.09
-Nodes (12): registerAssetTools(), registerAudioTools(), registerNavigationTools(), Vec3, registerProjectTools(), registerSaveSlotsTools(), Check, registerSelfTestTools() (+4 more)
+Cohesion: 0.08
+Nodes (14): registerAuditTools(), registerGameFeelTools(), registerInteractionPackTools(), registerLootEconomyTools(), registerNavigationTools(), Vec3, registerPlaytestTools(), registerPublishingTools() (+6 more)
 
 ### Community 68 - "Community 68"
 Cohesion: 0.11
@@ -651,8 +719,8 @@ Cohesion: 0.06
 Nodes (34): Authority-forked read properties (emg.everything_must_go), Build order, Cash register â€” checkout queue, Charge â†’ act â†’ refund-on-fail rollback (thefancylads.restaurant_dev), Clothing blacklist sanitizer for Dresser.Randomize() (luckygaming.doner_kiosk), Corpus refresh (2026): more reference implementations, Customer AI â€” activity-queue FSM on a NavMeshAgent, Data-driven catalogs as plain static C# (emg.everything_must_go) (+26 more)
 
 ### Community 74 - "Community 74"
-Cohesion: 0.13
-Nodes (15): Status: v1.19.0 -- 200 handlers / 209 tools (run `get_bridge_status` for the live tool/handler count), What's new in v1.10.0, What's new in v1.11.0, What's new in v1.12.0, What's new in v1.13.0, What's new in v1.14.0, What's new in v1.15.0, What's new in v1.16.0 (+7 more)
+Cohesion: 0.05
+Nodes (36): `bridge_asset` — asset library & packages, `bridge_audio` — sounds, `bridge_batch` — bulk operations with dry-run, `bridge_character` — Citizens, `bridge_component` — components on objects, `bridge_debug` — health, console, profiler, debug draw, `bridge_discovery` — reflect over the API, `bridge_gameobject` — GameObjects, transforms, layout (+28 more)
 
 ### Community 75 - "Community 75"
 Cohesion: 0.11
@@ -679,8 +747,8 @@ Cohesion: 0.12
 Nodes (16): 10. `create_placement_mode`, 1. `create_interactable`, 2. `create_weighted_loot_table`, 3. `create_save_system`, 4. `create_leaderboard_panel`, 5. `copy_asset_with_dependencies`, 6. `razor_lint`, 7. `sandbox_lint` (+8 more)
 
 ### Community 81 - "Community 81"
-Cohesion: 0.04
-Nodes (44): Bridge Connection Tests, Characters (v1.4.0), Components, Diagnostics, camera, navmesh, spatial, reflections, particles (v1.5.0), Docs search (v1.5.0, MCP-server-side), GameObject Lifecycle, Hierarchy & Selection, Integration Tests (+36 more)
+Cohesion: 0.22
+Nodes (8): 1. Automated gates (run these first), 2. Manual smoke path (~10 minutes, editor open), 3. Play mode & the playtest harness (manual), 4. Security spot-checks, Test execution notes, Testing Guide (v2, native MCP), Verifying the lifeline, What the live gate checks
 
 ### Community 82 - "Community 82"
 Cohesion: 0.12
@@ -696,15 +764,15 @@ Nodes (15): Decide-Then-Animate Gacha Pattern, EV-Preserving Economy Normalizati
 
 ### Community 85 - "Community 85"
 Cohesion: 0.13
-Nodes (15): 1. Confirm the bridge is alive, 2. Brainstorm before code (for non-trivial features), 3. Research the s&box API before guessing, 4. Implement with bite-sized edits, 5. Hotload and verify compile, 6. Screenshot and read it yourself, Building s&box Features Through the Bridge, Common s&box gotchas (so you don't re-discover them) (+7 more)
+Nodes (15): 1. Confirm the bridge is alive, 2. Brainstorm before code (for non-trivial features), 3. Research the s&box API before guessing, 4. Implement with bite-sized edits, 5. Hotload and verify compile, 6. Screenshot and look at it, Building s&box Features Through the Bridge, Common s&box gotchas (so you don't re-discover them) (+7 more)
 
 ### Community 86 - "Community 86"
 Cohesion: 0.13
-Nodes (6): registerPhysicsTools(), Vector3Schema, registerUiFeedbackTools(), BridgeClient, classifyStatus(), stripBom()
+Nodes (6): registerCinematicRecordingTools(), registerGameplayRecorderTools(), registerInspectionTools(), BridgeClient, classifyStatus(), stripBom()
 
 ### Community 87 - "Community 87"
-Cohesion: 0.13
-Nodes (14): 1. The bridge cannot synthesize gameplay input — "compiles + zero exceptions" ≠ "playable", 2. "Default Surface not found" thrown on every `Scene.Trace`, 3. Newly-added local-library `PackageReference`s need a real restart, not `trigger_hotload`, 4. Asset pipeline — corpus/community model paths render as the giant ERROR mesh, 5. Copying a model that SHADOWS a core asset → endless recompile-stall loop, 6. Razor / UI transpiler quirks, 6a. A `PanelComponent` renders nothing without a sibling `ScreenPanel`, 6b. Emoji in `@code`, or `switch`-expressions in `@code`, can crash the transpiler (+6 more)
+Cohesion: 0.08
+Nodes (24): 10. `describe_type` is blind to STATIC members and constructors, 11. `Sandbox.Services` API shapes that reflection folklore gets wrong, 12. `GameResourceAttribute` is `[Obsolete]` — use `[AssetType]`, and mind the extension, 13. `MovieRecorder.Start()` AUTO-advances — pumping it yourself DOUBLE-COUNTS, 14. `JsonSerializerOptions { WriteIndented = true }` throws in editor context, 15. `Sandbox.LipSync` cannot consume a TTS `SoundHandle`, 16. The SDK moves under you — e.g. CameraComponent now ships `AddShake` / `AddPunch` / `AddTilt`, 17. Hotload can transiently corrupt `MovieRecorder` GLOBALLY (+16 more)
 
 ### Community 88 - "Community 88"
 Cohesion: 0.13
@@ -747,8 +815,8 @@ Cohesion: 0.16
 Nodes (14): SyncFlags.FromHost + Private Setter Pattern, INetworkListener Interface, ISceneStartup Interface, IsProxy Guard Pattern, Lobby & Connection API, NetworkHelper Component, Ownership Transfer API, Networking Reference (RPCs, Sync, Authority) (+6 more)
 
 ### Community 99 - "Community 99"
-Cohesion: 0.06
-Nodes (34): A. Claude Code plugin — easiest, B. npm + manual MCP registration, C. Fully manual / from source, Characters & models, Components, Console & C# execution, Discovery & library detection, Documentation search (+26 more)
+Cohesion: 0.15
+Nodes (12): Conventions, How it works, Install, Integrations, Known issues (short list), License, Quickstart — your first 5 minutes, s&box Claude Bridge (+4 more)
 
 ### Community 100 - "Community 100"
 Cohesion: 0.19
@@ -760,7 +828,7 @@ Nodes (13): Canonical buy recipe: proxy→host→validate→spend→cap→save, 
 
 ### Community 102 - "Community 102"
 Cohesion: 0.23
-Nodes (7): EnsureInputActionHandler, InputActionHelpers, JsonArray, JsonObject, Encoding, JsonElement, Task
+Nodes (7): EnsureInputActionHandler, InputActionHelpers, JsonArray, Encoding, JsonElement, JsonObject, Task
 
 ### Community 103 - "Community 103"
 Cohesion: 0.15
@@ -771,8 +839,8 @@ Cohesion: 0.15
 Nodes (13): 10. [Sync] social feed for "recent wins" (lavagame.multis_cases), 1. Reflection-driven gacha pool (facepunch.ss2), 2. Stat-modifier stack for equipment-derived stats (facepunch.ss2), 3. Single-axis multi-outcome leaderboard encoding (facepunch.ss2), 4. EV-preserving economy normalization (lavagame.multis_cases), 5. Wear/float as a secondary value axis (lavagame.multis_cases), 6. Save integrity without a crypto library (lavagame.multis_cases), 7. Cloud-authoritative load + _saveReady guard (lavagame.multis_cases) (+5 more)
 
 ### Community 105 - "Community 105"
-Cohesion: 0.22
-Nodes (8): Architecture Overview, MCP Server-Side Tools (no editor handler), Attribution — the `sbox-api` skill, What we changed when bundling it into the sbox-claude plugin, Live SDK Reflection (describe_type / search_types / get_method_signature), sbox-api Skill SKILL.md Router, Ten Rules You Must Not Break (s&box), Unity to s&box Translation Table
+Cohesion: 0.29
+Nodes (6): Attribution — the `sbox-api` skill, What we changed when bundling it into the sbox-claude plugin, Live SDK Reflection (describe_type / search_types / get_method_signature), sbox-api Skill SKILL.md Router, Ten Rules You Must Not Break (s&box), Unity to s&box Translation Table
 
 ### Community 106 - "Community 106"
 Cohesion: 0.14
@@ -799,8 +867,8 @@ Cohesion: 0.17
 Nodes (12): BuildHash, Child Panel, File Structure, Generic Panels, Key Rules, Panel References, PanelComponent (Root), Passing Properties (+4 more)
 
 ### Community 112 - "Community 112"
-Cohesion: 0.09
-Nodes (22): Build the MCP server, Configuration, Environment variables, Fixing a "connected but every call times out" hang, Install (recommended — uses the installer script), Installation Guide, Linux / WSL / macOS, Manual install (fallback, if the installer can't find your project) (+14 more)
+Cohesion: 0.10
+Nodes (20): From source (hacking on the bridge), Installation Guide (v2.0.0), Legacy fallback — file IPC (v2.0.x only), Next steps, Option A — the Claude Code plugin (recommended), Option B — manual registration, Prerequisites, Prerequisites (+12 more)
 
 ### Community 113 - "Community 113"
 Cohesion: 0.17
@@ -816,7 +884,7 @@ Nodes (10): author, name, url, description, homepage, keywords, license, name (+
 
 ### Community 116 - "Community 116"
 Cohesion: 0.17
-Nodes (11): Community Hubs (Navigation), Corpus Check, God Nodes (most connected - your core abstractions), Graph Freshness, Graph Report - sbox-claude  (2026-07-02), Hyperedges (group relationships), Import Cycles, Knowledge Gaps (+3 more)
+Nodes (11): Community Hubs (Navigation), Corpus Check, God Nodes (most connected - your core abstractions), Graph Freshness, Graph Report - sbox-claude  (2026-07-12), Hyperedges (group relationships), Import Cycles, Knowledge Gaps (+3 more)
 
 ### Community 117 - "Community 117"
 Cohesion: 0.20
@@ -839,8 +907,8 @@ Cohesion: 0.18
 Nodes (10): A Reference Component (Shape Only — Not the Content), Architecture in 30 Seconds, Gotchas Captured From Real Builds, Project Structure (s&box Game), READ BEFORE WRITING CODE, Routing Table — "I need to…", s&box Skill — Router, The Ten Rules You Must Not Break (+2 more)
 
 ### Community 122 - "Community 122"
-Cohesion: 0.13
-Nodes (8): CameraComponent, AddPostProcessHandler, ApplyPostFxLookHandler, CaptureViewHandler, GetRuntimePropertyHandler, ListAnimationsHandler, ScreenshotFromHandler, SetRuntimePropertyHandler
+Cohesion: 0.20
+Nodes (5): CameraComponent, AddPostProcessHandler, ApplyAtmosphereHandler, ApplyPostFxLookHandler, ScreenshotFromHandler
 
 ### Community 123 - "Community 123"
 Cohesion: 0.11
@@ -863,8 +931,8 @@ Cohesion: 0.20
 Nodes (10): Built-in Controls, Button, Checkbox, DropDown, Image, Label, Other Controls, SliderControl (+2 more)
 
 ### Community 129 - "Community 129"
-Cohesion: 0.11
-Nodes (17): [1.0.0] — 2026-04-10, [1.11.0] — 2026-06-09, [1.14.0] -- 2026-06-18, [1.15.0] -- 2026-06-18, [1.17.0] -- 2026-06-25, [1.17.1] -- 2026-06-25, [1.19.0] -- 2026-07-07, Added (+9 more)
+Cohesion: 0.10
+Nodes (20): [1.0.0] — 2026-04-10, [1.11.0] — 2026-06-09, [1.14.0] -- 2026-06-18, [1.15.0] -- 2026-06-18, [1.17.0] -- 2026-06-25, [1.17.1] -- 2026-06-25, [1.5.2] — 2026-06-03, [1.6.0] — 2026-06-03 (+12 more)
 
 ### Community 130 - "Community 130"
 Cohesion: 0.09
@@ -931,8 +999,8 @@ Cohesion: 0.25
 Nodes (8): BuildHash Conditional Re-render, CSS :intro/:outro Panel Transitions, NavigationHost (SPA-style panel routing), Panel Tree Architecture (ScreenPanel → PanelComponent → Panel), PanelComponent vs Panel Distinction, UI & Razor Panels Reference, Two-Way Binding (:bind), VirtualList/VirtualGrid for Large Datasets
 
 ### Community 146 - "Community 146"
-Cohesion: 0.15
-Nodes (12): C# (Bridge Addon), Coding Conventions, Contributing to Sbox-Claude, Development Setup, File Path Security, Generated-code templates, IBridgeHandler Interface, Known Limitations (+4 more)
+Cohesion: 0.17
+Nodes (11): Adding a new tool, Architecture overview (v2), CI gates, Contributing to the s&box Claude Bridge, Development setup, Generated-code templates (scaffolds), Handler conventions (still current in v2), License & pull requests (+3 more)
 
 ### Community 147 - "Community 147"
 Cohesion: 0.29
@@ -1119,8 +1187,8 @@ Cohesion: 0.50
 Nodes (4): [1.13.0] -- 2026-06-12, Added -- Wave 3 tools (compile-verified live), Fixed -- review hardening (Opus-assisted deep sweep), Notes
 
 ### Community 193 - "Community 193"
-Cohesion: 0.25
-Nodes (8): [1.16.0] -- 2026-06-20, [1.18.0] -- 2026-07-02, Added -- community-demand scaffolds (the Tier-1 backlog, complete), Added -- new engine feature support, Docs, Docs, Fixed, Investigated — no change needed
+Cohesion: 0.22
+Nodes (9): [1.16.0] -- 2026-06-20, [1.18.0] -- 2026-07-02, Added -- community-demand scaffolds (the Tier-1 backlog, complete), Added -- new engine feature support, Docs, Docs, Fixed, Fixed (+1 more)
 
 ### Community 194 - "Community 194"
 Cohesion: 0.32
@@ -1135,8 +1203,8 @@ Cohesion: 0.67
 Nodes (3): Editor Bootstrap Crash Fix (TypeLibrary in static ctor), Static EditorEvent.Frame Handler Fix, v1.3.0 Release
 
 ### Community 197 - "Community 197"
-Cohesion: 0.50
-Nodes (4): [1.5.0] — 2026-06-03, Added, Notes & Known Issues, Security & Fixed
+Cohesion: 0.22
+Nodes (9): [1.3.2] — 2026-06-02, [1.5.0] — 2026-06-03, Added, Added, Changed, Changed, Fixed, Notes & Known Issues (+1 more)
 
 ### Community 198 - "Community 198"
 Cohesion: 0.67
@@ -1149,6 +1217,10 @@ Nodes (3): Editor Viewport Render-to-Image API Missing, CameraComponent (sealed,
 ### Community 200 - "Community 200"
 Cohesion: 0.50
 Nodes (4): [1.8.0] — 2026-06-06, Added / improved, Fixed, Known issues
+
+### Community 201 - "Community 201"
+Cohesion: 0.67
+Nodes (3): npx, sbox, sbox-lifeline
 
 ### Community 202 - "Community 202"
 Cohesion: 0.67
@@ -1175,32 +1247,40 @@ Cohesion: 0.32
 Nodes (4): AddInteractionStationHandler, CultureInfo, JsonElement, Task
 
 ### Community 209 - "Community 209"
-Cohesion: 0.67
-Nodes (3): [1.3.1] — 2026-05-16, Added, Why a patch and not a minor
+Cohesion: 0.13
+Nodes (12): DefSpec, AddAchievementTriggerHandler, AddLeaderboardStatHandler, CreateAchievementSetHandler, CreateEloRatingSystemHandler, CreateSpeedrunLeaderboardHandler, StatsAchievementsHelpers, Component (+4 more)
 
 ### Community 210 - "Community 210"
 Cohesion: 0.67
 Nodes (3): [1.4.0] — 2026-06-02, Added, Notes
 
 ### Community 211 - "Community 211"
-Cohesion: 0.67
-Nodes (3): [1.6.0] — 2026-06-03, Added, Notes
+Cohesion: 0.07
+Nodes (29): bridge_asset, bridge_audio, bridge_batch, bridge_character, bridge_component, bridge_debug, bridge_discovery, bridge_gameobject (+21 more)
+
+### Community 219 - "Community 219"
+Cohesion: 0.11
+Nodes (18): GameplayRecorderRunner, GameplayRecordingStatusHandler, Job, RecordGameplayClipHandler, StopGameplayRecordingHandler, IDisposable, MovieRecorder, bool (+10 more)
+
+### Community 251 - "Community 251"
+Cohesion: 0.17
+Nodes (4): BridgeGameObjectTools, McpTool, ReadOnly, Task
 
 ### Community 252 - "Community 252"
 Cohesion: 0.38
 Nodes (3): CreateSaveSlotsHandler, JsonElement, Task
 
 ### Community 253 - "Community 253"
-Cohesion: 0.33
-Nodes (6): 1. Add the C# handler (for tools that touch the editor), 2. Register it in `RegisterHandlers()` (same file), 3. Add the MCP tool (TypeScript), 4. If you created a new tool file, register it in `index.ts`, 5. Build and test, Adding a New Tool
+Cohesion: 0.07
+Nodes (24): BUILTIN_COLLISIONS, checkOnly, CSHARP_KEYWORDS, csStr(), __dirname, doc, docLines(), excluded (+16 more)
 
 ### Community 271 - "Community 271"
 Cohesion: 0.40
 Nodes (3): AddLipSyncHandler, JsonElement, Task
 
 ### Community 272 - "Community 272"
-Cohesion: 0.67
-Nodes (3): [1.5.1] — 2026-06-03, Added, Notes
+Cohesion: 0.15
+Nodes (12): AddSteamStatCurrencyHandler, CreateCurrencyAccountHandler, CreateIdleEconomyHandler, CreateLootTableResourceHandler, CreateMetaProgressionHandler, CreateSignedSaveHandler, EconomySaveHelpers, GeneratorDef (+4 more)
 
 ### Community 273 - "Community 273"
 Cohesion: 0.21
@@ -1214,6 +1294,10 @@ Nodes (7): AddInteractionPromptHandler, CreateCarrySystemHandler, CreateHoldToCo
 Cohesion: 0.24
 Nodes (7): AddFlickerLightHandler, CreateCameraShakeHandler, CreateFloatingCombatTextHandler, GameFeelHelpers, CultureInfo, JsonElement, Task
 
+### Community 276 - "Community 276"
+Cohesion: 0.21
+Nodes (8): AddTtsVoiceHandler, AiSystemsHelpers, CreateEventBusHandler, CreateNeedsSystemHandler, CreateNpcScheduleBrainHandler, CreateUtilityAiHandler, JsonElement, Task
+
 ### Community 288 - "Community 288"
 Cohesion: 0.25
 Nodes (7): CreateCurrencyPickupHandler, CreateGachaDropTableHandler, CreateOfflineProgressHandler, LootEconomyHelpers, CultureInfo, JsonElement, Task
@@ -1223,52 +1307,272 @@ Cohesion: 0.22
 Nodes (9): AddMoviePlayerHandler, ListMoviesHandler, MoviePlayerLocator, PlayMovieHandler, StopMovieHandler, MoviePlayer, JsonElement, Scene (+1 more)
 
 ### Community 290 - "Community 290"
-Cohesion: 0.17
-Nodes (11): Non-tool work (part of the same staged wave), Per-family implementation pattern (agents: follow exactly), Process, Track A — Cinematics & Dialogue (the headline), Track B — Networking primitives pack (Tier-2), Track C — UI / feedback pack (Tier-2), Track D — Loot / economy variants (Tier-2), Track E — Interaction pack (Tier-2) (+3 more)
+Cohesion: 0.12
+Nodes (15): Gate results, Non-tool work (part of the same staged wave), Outcome (2026-07-08), Per-family implementation pattern (agents: follow exactly), Process, Release status, Still queued, Track A — Cinematics & Dialogue (the headline) (+7 more)
 
 ### Community 291 - "Community 291"
-Cohesion: 0.18
-Nodes (11): Addon Location, API Schema, Bridge Behavior Notes, Class Discovery, Compilation, Critical Lessons Learned, Main Thread Requirement, Math & Events (s&box sandbox specifics) (+3 more)
+Cohesion: 0.23
+Nodes (5): BridgeWorldTools, JsonNode, McpTool, ReadOnly, Task
 
 ### Community 292 - "Community 292"
-Cohesion: 0.20
-Nodes (10): Components, Editor Selection, GameObject, Models & Materials, Physics, Play Mode, Project, Scene Access (+2 more)
+Cohesion: 0.10
+Nodes (19): 1. Discovery — find the tool, then call it, 2. The loop, 3. Read-only vs mutating semantics, 4. Dry-run discipline on batch tools, 5. Error semantics and chaining, 6. When to use the lifeline, 7. Worked examples, A. "Set a horror-night mood in this scene." (+11 more)
 
 ### Community 293 - "Community 293"
-Cohesion: 0.29
-Nodes (6): Architecture, Bridge map (knowledge graph), Development, Known Issues / TODO, Project Structure, s&box + Claude Code MCP Integration
+Cohesion: 0.14
+Nodes (13): Addon location & compilation, Architecture (v2), Bridge map (knowledge graph), Critical lessons learned, Dev workflow (the loop that works), Engine walls (work around, don't retry), Known issues / TODO, Legacy IPC (fallback only, deleted v2.1.0) (+5 more)
 
 ### Community 294 - "Community 294"
-Cohesion: 0.29
-Nodes (7): How to Install (Current Working Method), Prerequisites, Step 1: Create the Library in s&box, Step 2: Copy the Bridge Code, Step 3: Build the MCP Server, Step 4: Register with Claude Code, Step 5: Restart s&box
+Cohesion: 0.24
+Nodes (5): BridgeProjectTools, JsonNode, McpTool, ReadOnly, Task
 
 ### Community 295 - "Community 295"
-Cohesion: 0.50
-Nodes (4): [1.3.2] — 2026-06-02, Added, Changed, Fixed
+Cohesion: 0.25
+Nodes (8): [2.0.0] -- 2026-07-09 "Native", Added (so far), Added — wave-1 tools (Batch 51: audit & batch operations), Added — wave-2 tools (Batch 52: real prefabs, batch buildout, playtest control), Added — wave-3 tools (Batch 53: scene checkpoints, scene orientation, idle/team scaffolds), Added — wave-4 tools (Batch 54: vehicles — NEW bridge_vehicle toolset), Dropped from the native surface (native built-ins are 1:1 equivalents), Known limitations
 
 ### Community 296 - "Community 296"
+Cohesion: 0.07
+Nodes (15): AssignMaterialHandler, BakeReflectionsHandler, ConfigureNetworkHandler, ConsoleRunHandler, CreatePlayerControllerHandler, GetProjectConfigHandler, ListScenesHandler, RecompileAssetHandler (+7 more)
+
+### Community 297 - "Community 297"
+Cohesion: 0.14
+Nodes (14): CinematicRecordingHelpers, CreateKillcamHandler, Job, RecordPlaytestHandler, RecordPlaytestRunner, CultureInfo, Frame, GameObject (+6 more)
+
+### Community 298 - "Community 298"
+Cohesion: 0.25
+Nodes (4): BridgeVisualsTools, JsonNode, McpTool, Task
+
+### Community 299 - "Community 299"
+Cohesion: 0.19
+Nodes (9): CheckpointSceneHandler, CreateIdleIncomeHandler, CreateTeamAssignerHandler, DescribeSceneHandler, ListCheckpointsHandler, RestoreCheckpointHandler, SceneCheckpoints, JsonElement (+1 more)
+
+### Community 300 - "Community 300"
+Cohesion: 0.25
+Nodes (4): BridgeNetworkingTools, McpTool, ReadOnly, Task
+
+### Community 302 - "Community 302"
+Cohesion: 0.18
+Nodes (8): AddPanelBuildhashHandler, CreateRoundTimerHudHandler, ScaffoldMapVoteFlowHandler, Regex, HashSet, JsonElement, List, Task
+
+### Community 303 - "Community 303"
+Cohesion: 0.20
+Nodes (11): AuthorMovieClipHandler, Shot, bool, double, float, int, JsonElement, List (+3 more)
+
+### Community 304 - "Community 304"
+Cohesion: 0.22
+Nodes (8): AddDayNightSunHandler, AddRenderTargetCameraHandler, AddWaterBodyHandler, WorldRenderHelpers, Color, CultureInfo, JsonElement, Task
+
+### Community 305 - "Community 305"
+Cohesion: 0.27
+Nodes (4): BridgeCharacterTools, McpTool, ReadOnly, Task
+
+### Community 306 - "Community 306"
+Cohesion: 0.30
+Nodes (5): BridgeComponentTools, JsonNode, McpTool, ReadOnly, Task
+
+### Community 307 - "Community 307"
+Cohesion: 0.28
+Nodes (4): BridgeDebugTools, McpTool, ReadOnly, Task
+
+### Community 308 - "Community 308"
+Cohesion: 0.12
+Nodes (15): Description sweep + hardening (2026-07-09, iteration 2), Facts pinned from the shipped XML docs, Phase 0 — live verification (~half a day, needs editor open), Phase 0 results (all green), Phase 1 — manifest + codegen (~2–3 days), Phase 1 progress (2026-07-08 late session), Phase 2 — packaging + skills (~1–2 days), Phase 3 — build on top (ongoing, the payoff) (+7 more)
+
+### Community 309 - "Community 309"
+Cohesion: 0.22
+Nodes (7): CreatePhysicsGrabToolHandler, CreateSeatSystemHandler, CreateVehicleControllerHandler, TuneVehicleHandler, Dictionary, JsonElement, Task
+
+### Community 310 - "Community 310"
+Cohesion: 0.16
+Nodes (13): __dirname, dummyBridge, fakeServer, files, indexSrc, manifest, registered, repoRoot (+5 more)
+
+### Community 311 - "Community 311"
+Cohesion: 0.15
+Nodes (12): 1. Transport, 2. Discovery, 3. Honesty, 4. Safety, Honest limitations (these stay honest), How AI-assisted s&box development works on it, The lifeline (forever), The v2.0.0 "Native" Relaunch (+4 more)
+
+### Community 312 - "Community 312"
+Cohesion: 0.29
+Nodes (4): BridgeScaffoldPolishTools, JsonNode, McpTool, Task
+
+### Community 313 - "Community 313"
+Cohesion: 0.36
+Nodes (3): BridgeValidationTools, ReadOnly, Task
+
+### Community 314 - "Community 314"
+Cohesion: 0.15
+Nodes (12): BUILTIN_TOOLS, BUILTIN_TOOLSETS, byCat, __dirname, emitterSrc, errors, EXPECTED_DROPPED, manifest (+4 more)
+
+### Community 315 - "Community 315"
+Cohesion: 0.15
+Nodes (12): 1. Intro cinematic on round start (director → unlock input), 2. NPC conversation (interactable → dialogue → reward), 3. Keyframed MovieMaker cutscene from a trigger zone, Cutscenes, Cinematics & Dialogue (bridge scaffolds), Dialogue (`create_dialogue_system`), Gotchas, Grounded in, Multiplayer semantics (+4 more)
+
+### Community 316 - "Community 316"
+Cohesion: 0.17
+Nodes (11): Can an AI agent modify my project? What stops it breaking things?, Do I need to be technical?, Do my old tools and workflows still work?, FAQ, How do I add a tool?, How do I know what tools exist?, The port isn't answering / tools are missing — where do I look?, What happens to the old npx server? (+3 more)
+
+### Community 317 - "Community 317"
+Cohesion: 0.29
+Nodes (7): BatchAddComponentHandler, BatchDeleteHandler, BatchOps, BatchReparentHandler, JsonElement, List, Task
+
+### Community 318 - "Community 318"
+Cohesion: 0.28
+Nodes (5): BridgeMovieMakerTools, JsonNode, McpTool, ReadOnly, Task
+
+### Community 319 - "Community 319"
+Cohesion: 0.36
+Nodes (4): BridgeNpcTools, JsonNode, McpTool, Task
+
+### Community 320 - "Community 320"
+Cohesion: 0.32
+Nodes (5): BridgePlaytestTools, JsonNode, McpTool, ReadOnly, Task
+
+### Community 321 - "Community 321"
+Cohesion: 0.36
+Nodes (5): BridgeScreenshotTools, JsonObject, McpTool, ReadOnly, Task
+
+### Community 322 - "Community 322"
+Cohesion: 0.35
+Nodes (4): BridgeAssetTools, McpTool, ReadOnly, Task
+
+### Community 323 - "Community 323"
+Cohesion: 0.31
+Nodes (5): BridgePlayModeTools, JsonNode, McpTool, ReadOnly, Task
+
+### Community 324 - "Community 324"
+Cohesion: 0.20
+Nodes (9): Adding a new tool (v2, native MCP), Documentation standards, Good vs bad — the `find_objects` example, Naming conventions, Param docs, Regenerating the wrapper layer, The `<summary>` must cover five things, The template (+1 more)
+
+### Community 325 - "Community 325"
+Cohesion: 0.20
+Nodes (9): 1. Port 7269 not answering, 2. Editor log: `[MCP] Couldn't start MCP server on port 7269`, 3. Bridge tools missing from `search_tools`, 4. Editing addon `.cs` files externally doesn't recompile, 5. Editor crashed or hung — every native tool is dead, 6. Scene-mutating tool refused during play mode, 7. Tools time out, but the editor is open, Quick reference (+1 more)
+
+### Community 326 - "Community 326"
+Cohesion: 0.36
+Nodes (4): BridgeAudioTools, McpTool, ReadOnly, Task
+
+### Community 327 - "Community 327"
+Cohesion: 0.36
+Nodes (4): BridgePhysicsTools, McpTool, ReadOnly, Task
+
+### Community 328 - "Community 328"
+Cohesion: 0.36
+Nodes (4): BridgePrefabTools, McpTool, ReadOnly, Task
+
+### Community 329 - "Community 329"
+Cohesion: 0.20
+Nodes (10): [1.20.0] -- 2026-07-08, Added -- Cinematics & Dialogue (hand-authored, engine-proof -- zero assets), Added -- Interaction + carry (Tracks E/F), Added -- Loot / economy (Track D), Added -- MovieMaker / cutscene playback (the headline; Batch 45), Added -- Networking primitives (Track B), Added -- UI / feedback (Track C), Notes -- the verify-gate earned its keep again (+2 more)
+
+### Community 330 - "Community 330"
+Cohesion: 0.33
+Nodes (5): BatchSetPropertyHandler, DescribeProjectHandler, FindBrokenReferencesHandler, JsonElement, Task
+
+### Community 331 - "Community 331"
+Cohesion: 0.22
+Nodes (8): 3-tweet thread, (a) Long form — website / GitHub release (~440 words), (b) Discord announcement (~150 words, emoji-light), (c) Twitter / X, (d) s&box community forum post (developer-to-developer), s&box Claude Bridge v2.0.0 "Native" — the editor is now an AI-agent workspace, Single post (<280 chars), v2.0.0 "Native" — launch announcement (channel-ready variants)
+
+### Community 332 - "Community 332"
+Cohesion: 0.22
+Nodes (8): Feature-card blurbs, GitHub README intro line, Long paragraph, One-sentence description, Reusable copy blocks — s&box Claude Bridge v2.0.0 "Native", Roadmap blurb, Short paragraph, Website hero
+
+### Community 333 - "Community 333"
+Cohesion: 0.39
+Nodes (4): BridgeBatchTools, JsonNode, McpTool, Task
+
+### Community 334 - "Community 334"
+Cohesion: 0.44
+Nodes (3): BridgeDiscoveryTools, ReadOnly, Task
+
+### Community 335 - "Community 335"
+Cohesion: 0.42
+Nodes (4): BridgeMaterialTools, JsonNode, McpTool, Task
+
+### Community 336 - "Community 336"
+Cohesion: 0.25
+Nodes (7): Conventions (align with the native server), Migrating to v2.0.0 (native MCP), New tools in the v2 surface (waves 1-4), Setup (v2.0.0), Timeline, Tool changes, What you get
+
+### Community 337 - "Community 337"
+Cohesion: 0.20
+Nodes (10): Added — AI & Systems (Batch 59), Added — Economy & Save (Batch 55; bridge_scaffold_gameplay), Added — Gameplay Recording (Batch 60; bridge_moviemaker) — the engine-watch payoff, Added — Round-flow & UI (Batch 57), Added — Stats & Achievements (Batch 56; bridge_scaffold_gameplay), Added — The cinematic wave (Batches 61–63) — dialogue that speaks, cameras that kick, cutscenes without the dock, Added — World & Render (Batch 58), Deliberately skipped from the Tier-2 backlog (reasons verified live) (+2 more)
+
+### Community 338 - "Community 338"
+Cohesion: 0.36
+Nodes (4): BridgeSceneTools, McpTool, ReadOnly, Task
+
+### Community 339 - "Community 339"
+Cohesion: 0.46
+Nodes (3): BridgeUiTools, McpTool, Task
+
+### Community 340 - "Community 340"
+Cohesion: 0.46
+Nodes (3): BridgeVehicleTools, McpTool, Task
+
+### Community 341 - "Community 341"
+Cohesion: 0.36
+Nodes (4): BridgeWorkflowTools, McpTool, ReadOnly, Task
+
+### Community 342 - "Community 342"
+Cohesion: 0.29
+Nodes (6): `docs/` — internal, historical & generated, `docs/` — public & agent, Documentation Audit — v2.0.0 "Native" relaunch, Needs-review summary, Out of lane (noted, not audited/edited), Root docs
+
+### Community 343 - "Community 343"
+Cohesion: 0.33
+Nodes (4): BridgeNavigationTools, McpTool, ReadOnly, Task
+
+### Community 344 - "Community 344"
+Cohesion: 0.29
+Nodes (6): ColorObject, ColorSchema, registerWorldRenderTools(), RotationSchema, Vector3Object, Vector3Schema
+
+### Community 345 - "Community 345"
+Cohesion: 0.40
+Nodes (3): McpGate, JsonObject, Task
+
+### Community 346 - "Community 346"
+Cohesion: 0.40
+Nodes (3): callTool(), results, rpc()
+
+### Community 347 - "Community 347"
+Cohesion: 0.40
+Nodes (3): GetBridgeStatusHandler, JsonElement, Task
+
+### Community 348 - "Community 348"
+Cohesion: 0.36
+Nodes (5): CreateCameraEffectsHandler, GenerateLipsyncDialogueHandler, JsonElement, string, Task
+
+### Community 354 - "Community 354"
+Cohesion: 0.50
+Nodes (3): registerStatsAchievementsTools(), Vector3Object, Vector3Schema
+
+### Community 355 - "Community 355"
 Cohesion: 0.67
-Nodes (3): [1.5.2] — 2026-06-03, Added, Notes
+Nodes (3): [1.19.0] -- 2026-07-07, Added -- game-feel scaffolds (Tier-2 of the mined backlog begins), Roadmap
+
+### Community 356 - "Community 356"
+Cohesion: 0.67
+Nodes (3): [1.3.1] — 2026-05-16, Added, Why a patch and not a minor
+
+### Community 357 - "Community 357"
+Cohesion: 0.67
+Nodes (3): [1.5.1] — 2026-06-03, Added, Notes
 
 ## Knowledge Gaps
-- **2422 isolated node(s):** `$schema`, `name`, `description`, `name`, `url` (+2417 more)
+- **2687 isolated node(s):** `$schema`, `name`, `description`, `name`, `url` (+2682 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **80 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **84 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `IBridgeHandler` connect `Physics & VFX Handlers` to `Camera & Lighting Handlers`, `Component & Scene Handlers`, `Networking Codegen Handlers`, `Community 134`, `Community 135`, `Gameplay Scaffold Handlers`, `World-Gen Handlers`, `Level Layout Handlers`, `Play-Input Driver`, `Community 271`, `Bridge Core & Coercion`, `Community 273`, `Community 274`, `Community 275`, `Community 143`, `Community 149`, `NPC Brain Handlers`, `Community 288`, `Community 289`, `Community 169`, `Community 179`, `Community 180`, `Community 55`, `Community 194`, `Community 204`, `Community 208`, `Community 102`, `Community 106`, `Community 122`, `Community 252`?**
-  _High betweenness centrality (0.041) - this node is a cross-community bridge._
-- **Why does `JsonElement` connect `Networking Codegen Handlers` to `Physics & VFX Handlers`, `Camera & Lighting Handlers`, `Component & Scene Handlers`, `World-Gen Handlers`, `Level Layout Handlers`, `Bridge Core & Coercion`, `Community 143`, `Community 180`, `Community 122`?**
-  _High betweenness centrality (0.003) - this node is a cross-community bridge._
-- **Why does `CopyAssetWithDependenciesHandler` connect `Community 149` to `Physics & VFX Handlers`?**
+- **Why does `IBridgeHandler` connect `Physics & VFX Handlers` to `Camera & Lighting Handlers`, `Networking Codegen Handlers`, `Community 134`, `Community 135`, `Gameplay Scaffold Handlers`, `World-Gen Handlers`, `Level Layout Handlers`, `Play-Input Driver`, `Community 271`, `Community 272`, `Community 273`, `Community 274`, `Community 275`, `Community 276`, `Community 149`, `Bridge Core & Coercion`, `Community 143`, `NPC Brain Handlers`, `Community 288`, `Community 289`, `Community 296`, `Community 297`, `Community 169`, `Community 299`, `Community 302`, `Community 303`, `Community 304`, `Community 179`, `Community 180`, `Community 309`, `Community 55`, `Community 317`, `Community 194`, `Community 330`, `Community 204`, `Community 208`, `Community 209`, `Community 219`, `Community 347`, `Community 348`, `Community 102`, `Community 106`, `Community 122`, `Community 252`?**
+  _High betweenness centrality (0.038) - this node is a cross-community bridge._
+- **Why does `ClaudeBridge` connect `Bridge Core & Coercion` to `Physics & VFX Handlers`, `Camera & Lighting Handlers`, `Level Layout Handlers`, `Networking Codegen Handlers`?**
+  _High betweenness centrality (0.004) - this node is a cross-community bridge._
+- **Why does `BatchSetPropertyHandler` connect `Community 330` to `Physics & VFX Handlers`?**
   _High betweenness centrality (0.003) - this node is a cross-community bridge._
 - **What connects `$schema`, `name`, `description` to the rest of the system?**
-  _2504 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _2769 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Graph Report Meta` be split into smaller, more focused modules?**
-  _Cohesion score 0.009569377990430622 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.007246376811594203 - nodes in this community are weakly interconnected._
 - **Should `Physics & VFX Handlers` be split into smaller, more focused modules?**
-  _Cohesion score 0.03263305322128852 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.032387045181927226 - nodes in this community are weakly interconnected._
 - **Should `Camera & Lighting Handlers` be split into smaller, more focused modules?**
-  _Cohesion score 0.035854341736694675 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03673229503379371 - nodes in this community are weakly interconnected._

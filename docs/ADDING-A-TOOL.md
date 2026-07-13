@@ -40,12 +40,18 @@ public static class BridgeExampleTools
 
 Checklist per tool:
 
+- [ ] **`search_docs` the topic FIRST**: reflection gives you the *shape*; the official
+      docs give you the *idiom* (sbox.game/dev/doc = the Facepunch/sbox-docs repo). A tool
+      built from reflection alone can encode the wrong workflow around the right API.
 - [ ] **Toolset**: existing `bridge_*` group if it fits; new group only for a new domain.
 - [ ] **Name**: snake_case, stable forever, no collision with native built-ins
       (run `node scripts/audit-mcp-quality.mjs` — collisions are SILENT tool loss).
 - [ ] **XML summary**: what it does, what it returns, what to pass where next,
       destructive/surprising behavior, truncation, empty-input default.
 - [ ] **XML `<param>` docs on every parameter** (they become the input schema descriptions).
+- [ ] **Read `hasDefault` on `get_method_signature` output** before documenting an engine
+      API's parameter as required — a listed param with a default is legally omittable
+      (three shipped gotchas overstated requirements this way; BRIDGE_GOTCHAS #10).
 - [ ] **`[McpTool.ReadOnly]` vs `[McpTool]`**: ReadOnly promises "never changes project,
       scene or editor state" — clients skip permission prompts. Moving the editor camera,
       changing selection, playing audio = NOT read-only.

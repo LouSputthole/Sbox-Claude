@@ -14,6 +14,27 @@ using Editor.Mcp;
 public static class BridgeUiTools
 {
 	/// <summary>
+	/// PATCH an existing .razor file (razor_lint's companion FIXER — razor_lint flags 'PanelComponent
+	/// without BuildHash', this adds it). NOT a scaffold: it EDITS the file in place, inserting
+	/// 'protected override int BuildHash() =&gt; System.HashCode.Combine( ... )' at the end of the
+	/// first @code block, folding the fields and auto-properties declared there. HEURISTIC string/regex
+	/// parsing — review the diff: computed (=&gt;) properties, statics, consts, events and Action/Func
+	/// members are skipped; reference-typed members fold by REFERENCE (a mutated List re-renders only
+	/// if Count-style state is also folded); TimeSince/TimeUntil/RealTimeSince/RealTimeUntil members
+	/// fold as whole seconds (1 Hz re-render, not every frame); braces inside @code string literals can
+	/// confuse the block parser. If no members are found a '=&gt; 0' stub with a TODO is inserted
+	/// (silences the lint but does NOT re-render — replace it). Returns { patched, path,
+	/// hashedMembers[], buildHash, note } on success, { alreadyPresent: true, path } when a BuildHash
+	/// already exists (file left UNCHANGED — extend it by hand), or { error } for non-PanelComponent
+	/// files, missing @code, or a path outside the project. Follow with trigger_hotload, then
+	/// razor_lint to confirm the finding cleared.
+	/// </summary>
+	/// <param name="path">Project-relative path to the .razor file to patch, e.g. 'Code/UI/MyHud.razor' (from razor_lint's finding.file or list_project_files). Must '@inherits PanelComponent'; .razor.scss files are rejected.</param>
+	[McpTool( "add_panel_buildhash" )]
+	public static Task<object> AddPanelBuildhash( string path )
+		=> McpGate.Run( "add_panel_buildhash", McpGate.Args( ( "path", path ) ) );
+
+	/// <summary>
 	/// Create a new GameObject with a ScreenPanel component for full-screen UI overlay (HUD, menus,
 	/// etc.). Returns { created, gameObject:{ id, name, components, ... } }. NOTE: panelComponent is
 	/// looked up in the TypeLibrary and SILENTLY skipped if the type isn't loaded (freshly generated

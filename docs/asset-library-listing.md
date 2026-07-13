@@ -1,7 +1,7 @@
 # Claude Bridge for s&box
 ### Build s&box games by talking to Claude — or any AI.
 
-**232 native tools · 28 toolsets**, served by **s&box's built-in editor MCP server** — an AI working *inside* your s&box editor: writing scripts, creating GameObjects, wiring components, and building whole systems: physics, networking, UI, lighting, characters, terrain, vehicles, and more. You describe what you want; Claude builds it, screenshots it — **and sees the image right in the tool result** — and fixes it.
+**262 native tools · 28 toolsets**, served by **s&box's built-in editor MCP server** — an AI working *inside* your s&box editor: writing scripts, creating GameObjects, wiring components, and building whole systems: physics, networking, UI, lighting, characters, terrain, vehicles, and more. You describe what you want; Claude builds it, screenshots it — **and sees the image right in the tool result** — and fixes it.
 
 But the tools aren't the real story. **The bridge ships a brain.** The companion plugin bundles `sbox-cookbook` — a deep, code-grounded knowledge base of how to actually build games in s&box, mined from **real, shipped, open-source s&box games** and the modern engine source. So the AI reaches for *proven, shipped patterns* — real inventories, economies, save systems, shops, gacha, progression, multiplayer netcode, whole genre playbooks — instead of guessing.
 
@@ -74,7 +74,7 @@ Claude can *play* a compiled `.vpcf` particle, but s&box compiles those in its p
 
 ---
 
-## What it can do (232 native tools · 28 toolsets)
+## What it can do (262 native tools · 28 toolsets)
 
 **Scene & GameObjects** — create, clone, transform, parent, delete; full hierarchy access + editor selection; find objects by name, component, or tag; one-call scene orientation (`describe_scene`) and project orientation (`describe_project`).
 
@@ -159,11 +159,11 @@ You can also invoke any skill explicitly, e.g. `/sbox-claude:sbox-build-feature`
 
 ### v2.0.0 "Native" — the bridge moves into the editor
 
-**The big one.** s&box now ships a **native editor MCP server** (on by default — Editor → Preferences → MCP Server, local port 7269), and the bridge's full tool surface runs on it: **232 native tools across 28 described toolsets**, auto-discovered by the engine as `[McpTool]` methods. Streamable HTTP replaces file polling. **No Node.js on the main path.** Tool names are unchanged from v1.x.
+**The big one.** s&box now ships a **native editor MCP server** (on by default — Editor → Preferences → MCP Server, local port 7269), and the bridge's full tool surface runs on it: **262 native tools across 28 described toolsets**, auto-discovered by the engine as `[McpTool]` methods. Streamable HTTP replaces file polling. **No Node.js on the main path.** Tool names are unchanged from v1.x.
 
 - **Inline screenshots** — `take_screenshot` / `capture_view` / `screenshot_from` / `screenshot_orbit` return the PNG *inside the tool result*. Claude sees the image directly; no temp-file path to read back. The orbit returns every angle in one response.
 - **Live tool discovery** — agents find tools with `search_tools`, browse the 28 toolsets with `list_toolsets` / `describe_toolset`, and run them via `call_tool` / `call_tools` (batch several in one round trip). Hotload = live re-registration.
-- **Permission-free reads** — read-only tools carry the `[McpTool.ReadOnly]` hint, so clients can run them without permission prompts (53 of the 232).
+- **Permission-free reads** — read-only tools carry the `[McpTool.ReadOnly]` hint, so clients can run them without permission prompts (53 of the 262).
 - **Real error semantics** — failures are actual thrown tool errors, not `{ error }` payloads buried inside a success.
 - **Scene checkpoints — the agent-side undo** — `checkpoint_scene` / `restore_checkpoint` / `list_checkpoints` snapshot and roll back the whole scene (live-verified resurrecting a 317-root scene). The honest note: the engine's public undo/snapshot APIs are inert for addons on current builds, so there's **no per-edit auto-undo** — checkpoints are the answer, and they work.
 - **Real prefabs** — `create_prefab` writes full engine serialization; `instantiate_prefab` truly rebuilds the tree with GUID remap; `get_prefab_info` returns a structured summary.
@@ -188,14 +188,14 @@ Full release-by-release history: **[sboxskins.gg/claudebridge/changelog](https:/
 ## Under the hood
 
 - **Native editor MCP server** — Facepunch's server ships inside the editor: **streamable HTTP, loopback-only (`127.0.0.1:7269`), on by default**. Everything stays 100% on your machine — no external network, nothing leaves localhost.
-- **The bridge is a C# editor addon** whose 232 tools are `[McpTool]` static methods the engine's ToolRegistry auto-discovers, grouped into 28 described `bridge_*` toolsets. Every call dispatches onto the **main editor thread** (required for scene APIs).
+- **The bridge is a C# editor addon** whose 262 tools are `[McpTool]` static methods the engine's ToolRegistry auto-discovers, grouped into 28 described `bridge_*` toolsets. Every call dispatches onto the **main editor thread** (required for scene APIs).
 - **Hotload = live re-registration** — a new tool appears in `search_tools` seconds after a clean compile.
 - **Self-verifying** — Claude sees its screenshots inline, reads its own logs/compile errors, and lints networking + inspects what replicates, so it closes the build-and-check loop instead of hoping.
 - **Play-mode-safe & path-safe** — scene edits are refused during play mode with a clear error; file ops are confined to your project.
 - **Library-aware** — detects the addons already in your project and builds on them.
 - **The lifeline (optional)** — a slim Node.js stdio server for editor-down diagnostics; the native server dies with the editor, the lifeline doesn't.
 - **Legacy fallback** — the v1.x file-IPC transport and full stdio server remain compiled-in through v2.0.x for engine builds without the native server; they retire in v2.1.0.
-- Full picture: **245 total tools / 237 handlers** — 232 native + 7 lifeline + the 6 names served by native built-ins.
+- Full picture: **275 total tools / 267 handlers** — 262 native + 7 lifeline + the 6 names served by native built-ins.
 
 ---
 
@@ -248,7 +248,7 @@ Loopback-only and entirely local — the server binds `127.0.0.1`, so nothing is
 
 ## Full tool list
 
-**232 native tools across 28 `bridge_*` toolsets.** Agents browse these live with `list_toolsets` / `describe_toolset` and find individual tools with `search_tools`.
+**262 native tools across 28 `bridge_*` toolsets.** Agents browse these live with `list_toolsets` / `describe_toolset` and find individual tools with `search_tools`. (The per-toolset list below is the v2.0.0 snapshot — 30 tools added in v2.1.0; the generated `docs/TOOLSETS.md` is always the authoritative inventory.)
 
 **`bridge_asset` (6)** — `copy_asset_with_dependencies`, `get_asset_info`, `install_asset`, `list_asset_library`, `recompile_asset`, `search_assets`
 
@@ -344,7 +344,7 @@ s&box current build (the native MCP server ships in the editor since July 2026) 
 
 ---
 
-**One addon, one command, zero ceremony. 232 native tools · 28 toolsets + a brain trained on real shipped games. Describe your game — Claude builds it.**
+**One addon, one command, zero ceremony. 262 native tools · 28 toolsets + a brain trained on real shipped games. Describe your game — Claude builds it.**
 
 *Built by [sboxskins.gg](https://sboxskins.gg), the s&box community marketplace.*
 

@@ -89,6 +89,15 @@ existing calls are unchanged; these are additions worth knowing about:
   (drivable raycast car with a built-in driver seat), `create_seat_system`, `tune_vehicle`
   (arcade/drift/offroad/race presets), and `create_physics_grab_tool`.
 
+Since then, the staged `[Unreleased]` waves (2026-07-12/13) add **30 more tools** — economy &
+saves (audited ledgers, signed saves, meta-progression), stats & achievements, round-flow &
+UI, world & render (water volumes, render-target cameras, day-night sun), AI & systems
+(utility AI, schedule brains, needs, event buses, TTS), **gameplay recording** to
+`.movie` clips, and the **cinematic wave** (lipsync dialogue, built-in camera effects,
+shot-list cutscene authoring, recorded playtests, killcams) — bringing the surface to
+**262 native tools / 275 total / 267 handlers**.
+The full record is the CHANGELOG's `[Unreleased]` section.
+
 Browse them all in the generated [TOOLSETS.md](TOOLSETS.md); the plain-English tour is
 [ECOSYSTEM.md](ECOSYSTEM.md).
 

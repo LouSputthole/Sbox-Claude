@@ -6,7 +6,7 @@ companion: what each toolset is *for*, when you'd reach for it, and how the grou
 together. If a capability here contradicts TOOLSETS.md, TOOLSETS.md wins (it's generated;
 this is written).
 
-The surface: **232 native tools across 28 `bridge_*` toolsets** (53 read-only), plus the
+The surface: **262 native tools across 28 `bridge_*` toolsets** (53 read-only), plus the
 **7 lifeline tools** for editor-down diagnostics. Agents browse with `list_toolsets` /
 `describe_toolset` and find individual tools with `search_tools`; see the
 [Agent Guide](AGENT-GUIDE.md) for the working loop.
@@ -104,16 +104,21 @@ undoable** — always dry-run first. `batch_reparent` guards against cycles.
 ## Building the game (codegen scaffolds)
 
 ### `bridge_scaffold_gameplay` — gameplay systems
-*29 tools (0 read-only).* The largest toolset: **compile-verified C# scaffolds** for the
+*43 tools (0 read-only).* The largest toolset: **compile-verified C# scaffolds** for the
 systems every game hand-rolls — player/NPC controllers, game managers, health, pickups and
-interactables, inventory, save systems (single + multi-slot), economy wallets and idle
-income, loot and gacha tables, round/phase/state machines, day-night clocks, objective
-systems, stat modifiers, placement mode, teams, carry, hold-to-confirm, currency pickups,
-trigger zones, and more. Each writes a `.cs` file; follow with `trigger_hotload` + `compile_status`.
+interactables, inventory, save systems (single + multi-slot, signed tamper-evident,
+roguelite meta-progression), economy (wallets, audited currency accounts, idle income and
+geometric idle economies, Steam-stat currency), loot and gacha tables (including data-asset
+`.loot` GameResources), achievements and leaderboard stats, Elo ratings, speedrun boards,
+round/phase/state machines and map-vote flows, day-night clocks, objective systems, stat
+modifiers, needs systems, typed event buses, placement mode, teams, carry, hold-to-confirm,
+currency pickups, trigger zones, and more. Each writes a `.cs` file; follow with
+`trigger_hotload` + `compile_status`.
 
 - `create_health_system` + `create_objective_system` for a win/lose core in two calls.
-- `create_economy_wallet` + `create_idle_income` + `create_offline_progress` for a full idle kit.
-- `create_round_state_machine` when each phase needs its own behaviour (vs the lighter `create_round_phase_machine`).
+- `create_economy_wallet` + `create_idle_income` + `create_offline_progress` for a full idle kit — add `create_idle_economy` for geometric bulk-buy upgrades and `create_currency_account` for an audited ledger.
+- `create_round_state_machine` when each phase needs its own behaviour (vs the lighter `create_round_phase_machine`); `scaffold_map_vote_flow` for end-of-round map voting.
+- `create_achievement_set` + `add_achievement_trigger` for achievements with a toast HUD; `add_leaderboard_stat` is the write-side partner to `create_leaderboard_panel`.
 
 *Prompt:* "Give this game an inventory, a health system, and a save system."
 
@@ -124,15 +129,24 @@ hotload — generate, hotload, then attach.
 `bridge_ui`, `bridge_component` (attach the results).
 
 ### `bridge_scaffold_polish` — game feel & presentation
-*8 tools (0 read-only).* The juice layer: `create_camera_shake` (trauma model),
-`add_flicker_light` (Candle/Fluorescent/Faulty/Pulse/Lightning), `create_floating_combat_text`
-(billboarded damage popups), `create_combo_meter`, `create_proxy_nametag`,
-`create_worldpanel_ui`, `create_cutscene_director` (zero-asset camera-shot player), and
-`create_dialogue_system` (typewriter Razor HUD).
+*11 tools (0 read-only).* The juice layer: `create_camera_shake` (trauma model),
+`create_camera_effects` (statics over the SDK's built-in `AddShake` / `AddPunch` / `AddTilt`
+one-shots, with distance-falloff `ShakeAt` and HitPunch/ExplosionShake/LandingTilt presets —
+composes with the trauma model), `add_flicker_light` (Candle/Fluorescent/Faulty/Pulse/Lightning),
+`create_floating_combat_text` (billboarded damage popups), `create_combo_meter`,
+`create_proxy_nametag`, `create_worldpanel_ui`, `create_cutscene_director` (zero-asset
+camera-shot player), `create_dialogue_system` (typewriter Razor HUD),
+`generate_lipsync_dialogue` (NPCs *speak* their lines with moving mouths — positional TTS
+plus data-driven viseme→morph animation from the model's own baked data), and
+`create_round_timer_hud` (a Razor timer HUD that binds by reflection to either shipped
+round machine, 1 Hz adaptive BuildHash).
 
 - `add_flicker_light "Faulty"` on a hallway light — the biggest atmosphere win per call.
 - `create_floating_combat_text` wired into a damage path so every hit prints its number.
 - `create_cutscene_director` for an intro sequence with no `.movie` asset needed.
+- `create_round_timer_hud` after either round machine so the countdown is visible.
+- `generate_lipsync_dialogue` to make an NPC actually deliver its dialogue, mouth included;
+  `create_camera_effects` for one-shot hit punches and explosion shakes with no scaffold state.
 
 *Prompt:* "Add screen shake on explosions and floating damage numbers on hits."
 
@@ -143,12 +157,15 @@ hotload — generate, hotload, then attach.
 `bridge_moviemaker` (the keyframed-clip alternative to the cutscene director), `bridge_visuals`.
 
 ### `bridge_ui` — Razor UI panels
-*3 tools (0 read-only).* `add_screen_panel` (full-screen HUD host), `add_world_panel`
-(in-world 3D UI host), and `create_razor_ui` (a basic PanelComponent file). A `PanelComponent`
+*4 tools (0 read-only).* `add_screen_panel` (full-screen HUD host), `add_world_panel`
+(in-world 3D UI host), `create_razor_ui` (a basic PanelComponent file), and
+`add_panel_buildhash` (a FILE-EDIT tool that patches an existing `.razor` to add a
+`BuildHash` override — `razor_lint`'s companion fixer). A `PanelComponent`
 renders nothing without a host `ScreenPanel`/`WorldPanel`.
 
 - Host a generated HUD (leaderboard, combo meter, dialogue) under a `ScreenPanel`.
 - `add_world_panel` for health bars / signs / nameplates in world space.
+- `razor_lint` flags a panel that never re-renders → `add_panel_buildhash` fixes it in place.
 
 *Prompt:* "Add a screen panel to host the leaderboard I just generated."
 
@@ -178,13 +195,18 @@ clickable world UI the scene also needs a `Sandbox.WorldInput` (see `create_worl
 *Related:* `bridge_validation` (`networking_lint`, `inspect_networked_object`), `bridge_scaffold_gameplay`, `bridge_prefab`.
 
 ### `bridge_npc` — NPC brains & perception
-*5 tools (0 read-only).* `create_npc_brain` (Idle/Patrol/Wander/Chase/Search/Flee/Ambush state
-machine with occlusion-aware perception), `create_npc_spawner`, `place_patrol_route` +
-`assign_patrol_route`, and `simulate_npc_perception` — an edit-mode verifier that runs the
-same line-of-sight math the brain uses, so you can confirm "the tree blocks LOS" without play mode.
+*7 tools (0 read-only).* `create_npc_brain` (Idle/Patrol/Wander/Chase/Search/Flee/Ambush state
+machine with occlusion-aware perception), `create_utility_ai` (an abstract self-scoring
+`Action` base + a brain with hysteresis — emergent behaviour where the FSM is scripted; the
+two pair), `create_npc_schedule_brain` (a daily schedule with midnight wrap that binds by
+capability to any float-`TimeOfDay` clock, honest internal fallback clock, optional
+NavMeshAgent), `create_npc_spawner`, `place_patrol_route` + `assign_patrol_route`, and
+`simulate_npc_perception` — an edit-mode verifier that runs the same line-of-sight math the
+brain uses, so you can confirm "the tree blocks LOS" without play mode.
 
 - Give an enemy a chase brain, lay a patrol route, and verify its sightline in edit mode.
 - Spawn escalating waves from spawn points with `create_npc_spawner`.
+- `create_npc_schedule_brain` for villagers with a daily routine; `create_utility_ai` when behaviour should *emerge* from scored needs instead of fixed states.
 
 *Prompt:* "Add a guard that patrols these waypoints and chases the player when it sees them."
 
@@ -217,13 +239,17 @@ human playtest.
 ## Look & world
 
 ### `bridge_visuals` — lighting, fog, post-FX, particles
-*13 tools (0 read-only).* `add_light`, `set_fog`, `set_skybox`, `add_post_process`,
+*15 tools (0 read-only).* `add_light`, `set_fog`, `set_skybox`, `add_post_process`,
 `add_envmap_probe` + `bake_reflections`, the one-call `apply_atmosphere` and `apply_post_fx_look`
-mood presets, and particles (`spawn_vpcf` for the reliable path).
+mood presets, particles (`spawn_vpcf` for the reliable path), `add_render_target_camera`
+(a secondary camera rendered to a texture and wired onto a Material — the CCTV / mirror /
+portal-screen path), and `add_daynight_sun` (a DirectionalLight arc + color gradient +
+optional SkyBox2D tint driven by `create_day_night_clock`'s `TimeOfDay`).
 
 - `apply_atmosphere "horror"` for ambient + directional + fog + post-fx in one call.
 - `add_light` a spot for a flashlight; `set_fog "gradient"` for mood haze.
 - `spawn_vpcf` for a guaranteed-visible impact/sparks burst.
+- `add_render_target_camera` for a security-camera monitor; `add_daynight_sun` to make the clock *visible* in the sky.
 
 *Prompt:* "Light this room like a dim, foggy basement."
 
@@ -235,14 +261,18 @@ through the bridge** — use `spawn_vpcf`. An `add_envmap_probe` captures nothin
 *Related:* `bridge_scaffold_polish` (`add_flicker_light`), `bridge_screenshot` (verify the look), `bridge_world`.
 
 ### `bridge_world` — terrain, forests, caves, placement
-*15 tools (1 read-only).* Terrain sculpting and features (`add_terrain_hill`,
+*16 tools (1 read-only).* Terrain sculpting and features (`add_terrain_hill`,
 `add_terrain_clearing`, `add_terrain_trail`, `sculpt_terrain`, `build_terrain_mesh`,
 `raycast_terrain`), forests (`add_forest_poi`, `add_forest_trail`, `paint_forest_density`,
-`set_forest_seed`), caves (`add_cave_waypoint`), and `place_along_path` for fences/lampposts/rocks.
+`set_forest_seed`), caves (`add_cave_waypoint`), `place_along_path` for
+fences/lampposts/rocks, and `add_water_body` (a `WaterVolume` physics volume with a trigger
+footprint and an optional tinted surface — honest limit: swimmable water *physics*, not a
+water shader).
 
 - Raise hills and carve a trail, then `raycast_terrain` to place props on the surface.
 - Paint a dense forest region, add clearings and trails between POIs, regenerate once.
 - `place_along_path` a run of fence posts along a road.
+- `add_water_body` to make a carved basin actually swimmable.
 
 *Prompt:* "Build some rolling hills and a forest with a clearing in the middle."
 
@@ -457,35 +487,54 @@ just a hotload.
 *Related:* `bridge_material`, `bridge_gameobject`.
 
 ### `bridge_audio` — sounds
-*4 tools (1 read-only).* `list_sounds`, `create_sound_event` (author a `.sound` wired to a
-`.vsnd`), `assign_sound` (attach a `SoundPointComponent`), and `play_sound_preview` (test in the
-editor without play mode).
+*5 tools (1 read-only).* `list_sounds`, `create_sound_event` (author a `.sound` wired to a
+`.vsnd`), `assign_sound` (attach a `SoundPointComponent`), `play_sound_preview` (test in the
+editor without play mode), and `add_tts_voice` (a `Sandbox.Speech.Synthesizer` voice
+component — call `Say()` from game code; `enableVisemeData` exposes the live viseme stream).
 
 - `create_sound_event` then `assign_sound` to attach it to an object.
 - `play_sound_preview` to audition a sound quickly.
+- `add_tts_voice` for dynamic NPC barks/announcers with no recorded audio.
 
 *Prompt:* "Attach a looping ambient hum to the generator."
 
 *Safety:* `list_sounds` is read-only; the rest mutate. Looping lives on the
 `SoundPointComponent`, not the `.sound` event. `play_sound_preview` is fire-and-forget (no stop
-control).
+control). TTS is audio-only **by design** — `LipSync` consumes a `BaseSoundComponent`, not the
+`SoundHandle` TTS returns; drive mouths yourself from the exposed viseme data if you need them.
 
 *Related:* `bridge_character` (`add_lipsync` binds a sound), `bridge_scaffold_polish`.
 
-### `bridge_moviemaker` — cutscene playback
-*4 tools (1 read-only).* `list_movies`, `add_movie_player` (wire a `MoviePlayer` + optional
-`.movie` resource), `play_movie`, and `stop_movie`. The bridge **wires and plays** movies — it
-doesn't author keyframes (those are authored in the editor's Movie Maker dock).
+### `bridge_moviemaker` — cutscene authoring, playback & gameplay recording
+*10 tools (1 read-only).* Playback: `list_movies`, `add_movie_player` (wire a `MoviePlayer` +
+optional `.movie` resource), `play_movie`, and `stop_movie`. Authoring: `author_movie_clip`
+(bake a `.movie` cutscene from a declarative shot list — edit mode only, no dock, no
+real-time waiting; a temp or borrowed camera is restored exactly afterwards). Recording:
+`record_gameplay_clip` (record live gameplay in play mode — whole scene by default, or
+targeted objects via `ids`), `stop_gameplay_recording` (writes a compiled `.movie` asset,
+immediately loadable by `list_movies` / `play_movie`, with optional MoviePlayer wiring),
+`gameplay_recording_status` (poll), `record_playtest` (a scripted playtest AND a recording
+of the same run in one call — a failing playtest arrives with replayable footage), and
+`create_killcam` (a rolling-buffer killcam scaffold: the last N seconds of a target's
+gameplay, replayed through a chase cam on `TriggerReplay()`). The bridge **authors (from
+shot lists), records, wires, and plays** movies — hand-keyframing stays in the editor's
+Movie Maker dock.
 
-- `list_movies` first — an empty list means the clip has to be authored in the dock.
+- `list_movies` first — an empty list means bake one (`author_movie_clip`), record one, or author one in the dock.
 - `add_movie_player` with `playOnStart` for an intro cinematic; `play_movie` from a trigger.
+- `record_gameplay_clip` → play the moment → `stop_gameplay_recording` → replay it with `play_movie` — a replay pipeline in three calls; `create_killcam` packages the same idea as a game feature.
+- `record_playtest` for regression footage: verdict + clip from one call.
 
-*Prompt:* "Play the intro cutscene when the level starts."
+*Prompt:* "Record the next ten seconds of gameplay and replay it as a cutscene."
 
-*Safety:* `list_movies` is read-only; `add_movie_player` mutates (refused in play mode);
-`play_movie` / `stop_movie` work during play. Clips genuinely advance only in play mode.
+*Safety:* `list_movies` is read-only; `add_movie_player` / `author_movie_clip` /
+`create_killcam` mutate (refused in play mode); `play_movie` / `stop_movie` /
+`record_playtest` work during play. Clips genuinely advance only in play mode, and
+recording requires it. The recorder auto-advances with game time — the bridge monitors only
+(see [BRIDGE_GOTCHAS.md](BRIDGE_GOTCHAS.md) #13).
 
-*Related:* `bridge_scaffold_polish` (`create_cutscene_director` is the zero-asset alternative).
+*Related:* `bridge_scaffold_polish` (`create_cutscene_director` is the zero-asset
+alternative), `bridge_playtest` (`record_playtest` composes its step schema).
 
 ### `bridge_screenshot` — inline PNG capture
 *4 tools (1 read-only).* Hand-written. Every capture returns the **PNG inline as an image
