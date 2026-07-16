@@ -375,7 +375,7 @@
         "kind": "bash_entrypoint"
       },
       "_origin": "ast",
-      "id": "c_users_cargi_desktop_sbox_claude_install_sh__entry",
+      "id": "repo_install_sh__entry",
       "community": 221,
       "norm_label": "install.sh script"
     },
@@ -15867,7 +15867,7 @@
       "source_file": "sbox-bridge-addon/Code/claudebridge.csproj",
       "source_location": null,
       "_origin": "ast",
-      "id": "c_users_cargi_desktop_sbox_claude_sbox_bridge_addon_code_claudebridge_csproj",
+      "id": "repo_sbox_bridge_addon_code_claudebridge_csproj",
       "community": 126,
       "norm_label": "claudebridge.csproj"
     },
@@ -23252,14 +23252,14 @@
       "norm_label": "tool_backlog.md"
     },
     {
-      "label": "Bridge Tool Backlog \u2014 mined from 51 open-source s&box games (2026-06-09)",
+      "label": "Bridge Tool Backlog \u2014 mined from 51 public-source s&box games (2026-06-09)",
       "file_type": "document",
       "source_file": "docs/TOOL_BACKLOG.md",
       "source_location": "L1",
       "_origin": "ast",
       "id": "docs_tool_backlog_bridge_tool_backlog_mined_from_51_open_source_s_box_games_2026_06_09",
       "community": 178,
-      "norm_label": "bridge tool backlog \u2014 mined from 51 open-source s&box games (2026-06-09)"
+      "norm_label": "bridge tool backlog \u2014 mined from 51 public-source s&box games (2026-06-09)"
     },
     {
       "label": "Tier 1 \u2014 multi-game, high-confidence scaffolds (do these first)",
@@ -47131,7 +47131,7 @@
       "id": "build_feature_bridge_map"
     },
     {
-      "label": "51-Game Open-Source s&box Corpus",
+      "label": "51-Game Public-Source s&box Corpus",
       "file_type": "rationale",
       "source_file": "plugins/sbox-claude/skills/sbox-cookbook/SKILL.md",
       "source_location": "line 8",
@@ -47140,7 +47140,7 @@
       "author": null,
       "contributor": null,
       "community": 93,
-      "norm_label": "51-game open-source s&box corpus",
+      "norm_label": "51-game public-source s&box corpus",
       "id": "cookbook_51_game_corpus"
     },
     {
@@ -50583,7 +50583,7 @@
       "captured_at": null,
       "author": null,
       "contributor": null,
-      "rationale": "The hardest part of building an s&box game with AI isn't writing C# \u2014 it's knowing the right pattern. sbox-cookbook provides code-grounded recipes mined from real shipped open-source s&box games so the AI reaches for proven patterns instead of guessing.",
+      "rationale": "The hardest part of building an s&box game with AI isn't writing C# \u2014 it's knowing the right pattern. sbox-cookbook provides code-grounded recipes mined from real shipped public-source s&box games so the AI reaches for proven patterns instead of guessing.",
       "community": 23,
       "norm_label": "the brain: sbox-cookbook as ai knowledge base",
       "id": "docs_asset_library_brain_concept"
@@ -52488,7 +52488,7 @@
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "install_sh_install",
-      "target": "c_users_cargi_desktop_sbox_claude_install_sh__entry"
+      "target": "repo_install_sh__entry"
     },
     {
       "relation": "contains",
@@ -89332,7 +89332,7 @@
       "weight": 1.0,
       "confidence_score": 1.0,
       "source": "editor_claudebridge_editor",
-      "target": "c_users_cargi_desktop_sbox_claude_sbox_bridge_addon_code_claudebridge_csproj"
+      "target": "repo_sbox_bridge_addon_code_claudebridge_csproj"
     },
     {
       "relation": "references",

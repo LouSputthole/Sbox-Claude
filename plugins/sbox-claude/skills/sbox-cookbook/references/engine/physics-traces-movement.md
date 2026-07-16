@@ -1,5 +1,32 @@
 # Physics, Traces & Custom Movement
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Pattern: fluent Scene.Trace world query](#pattern-fluent-scenetrace-world-query)
+- [Pattern: applying forces to a real Rigidbody](#pattern-applying-forces-to-a-real-rigidbody)
+- [Pattern: CharacterController with manual gravity (leapfrog)](#pattern-charactercontroller-with-manual-gravity-leapfrog)
+- [Pattern: going kinematic to own your velocity](#pattern-going-kinematic-to-own-your-velocity)
+- [Pattern: suspension + collide-and-slide for a kinematic ground-follower](#pattern-suspension--collide-and-slide-for-a-kinematic-ground-follower)
+- [Pattern: network-correct grab / carry / drop](#pattern-network-correct-grab--carry--drop)
+- [Pattern: multi-point spring-damper buoyancy (floating boats/props)](#pattern-multi-point-spring-damper-buoyancy-floating-boatsprops)
+- [Pattern: conveyor — scroll a material from Collider.SurfaceVelocity](#pattern-conveyor--scroll-a-material-from-collidersurfacevelocity)
+- [Gotcha table](#gotcha-table)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Pattern: manual CCD via IScenePhysicsEvents.PrePhysicsStep (slamdunk.minigolf)](#pattern-manual-ccd-via-iscenephysicseventsprephysicsstep-slamdunkminigolf)
+  - [Pattern: runtime welded collision mesh from a subtree (slamdunk.minigolf)](#pattern-runtime-welded-collision-mesh-from-a-subtree-slamdunkminigolf)
+  - [Pattern: ModelBuilder.AddTraceMesh — shoot-through procedural geometry (ataco.sdoomresurrection)](#pattern-modelbuilderaddtracemesh--shoot-through-procedural-geometry-atacosdoomresurrection)
+  - [Pattern: ApplyImpulse for a shot controller + ICollisionListener for impact audio (alcoholics.niceputtidiot)](#pattern-applyimpulse-for-a-shot-controller--icollisionlistener-for-impact-audio-alcoholicsniceputtidiot)
+  - [Pattern: non-linear charge-power curve + stuck-ball watchdog (slamdunk.minigolf)](#pattern-non-linear-charge-power-curve--stuck-ball-watchdog-slamdunkminigolf)
+  - [Pattern: mass-compensated jetpack thrust with ground-ray gate (master.diggingsimulator)](#pattern-mass-compensated-jetpack-thrust-with-ground-ray-gate-masterdiggingsimulator)
+  - [Pattern: two-range trace for aim feedback (master.diggingsimulator)](#pattern-two-range-trace-for-aim-feedback-masterdiggingsimulator)
+  - [Pattern: boat self-righting torque + seat mount (pldr.duckpond)](#pattern-boat-self-righting-torque--seat-mount-pldrduckpond)
+  - [Pattern: MoveMode to add swimming to the stock PlayerController (pldr.duckpond)](#pattern-movemode-to-add-swimming-to-the-stock-playercontroller-pldrduckpond)
+  - [Updated gotcha table entries (2026 additions)](#updated-gotcha-table-entries-2026-additions)
+  - [Read these games for physics/trace/movement patterns](#read-these-games-for-physicstracemovement-patterns)
+<!-- reference-toc:end -->
+
 Querying the world with `Scene.Trace`, applying forces to Rigidbodies, and going kinematic to own your velocity when Source 2's solver fights you.
 
 ## Mental model
@@ -18,30 +45,27 @@ Three ways to move things, pick deliberately:
 
 Build every query fluently, chain filters, then `.Run()`. The result struct carries everything you need.
 
-```csharp
-var tr = Scene.Trace
-    .Ray( start, end )                       // or .Sphere(r, a, b) / .Ray(a,b).Size(bbox) for a box sweep
-    .IgnoreGameObject( GameObject )           // don't hit your own collider
-    .WithoutTags( "player", "debris" )        // exclude
-    .WithAnyTags( "solid", "npc", "glass" )   // include only these
-    .UseHitboxes()                            // precise hitbox hits, not just bounds
-    .Run();
+```text
+function query_world(start, end, self):
+  trace := begin a ray from start to end
+  exclude self from the query
+  exclude objects tagged player or debris
+  require at least one of solid, npc, or glass
+  request hitbox-level intersections
+  result := run trace
 
-if ( tr.Hit )
-{
-    // tr.GameObject, tr.Body, tr.Surface, tr.HitPosition, tr.Normal, tr.Distance, tr.Fraction
-}
+  if result reports a hit:
+    consume its object, physics body, surface, position, normal, distance, and fraction
 ```
 
 Interaction ray from the camera — the canonical "use" trace, self-ignored (sbox-scenestaging: PlayerUse.cs:30):
 
-```csharp
-var tr = Scene.Trace.Ray( camera.WorldPosition, camera.WorldPosition + camera.WorldRotation.Forward * 100 )
-    .IgnoreGameObject( GameObject )
-    .Run();
-
-if ( tr.Hit && tr.GameObject.Components.Get<BaseInteractor>() is BaseInteractor interactable )
-    interactable.OnUsed();
+```text
+function try_use(camera, player):
+  endpoint := camera position + camera forward direction * interaction range
+  result := trace a ray from camera position to endpoint while ignoring player
+  if result hit an object that exposes an interaction component:
+    invoke that component's use action
 ```
 
 Ground check: trace a short ray `Vector3.Down`. Note a trace hits a **child** collider/hitbox, not the entity root — resolve the owner with `GetInAncestorsOrSelf<T>()`, not a self-only `Components.Get<T>()`.
@@ -52,19 +76,16 @@ Ground check: trace a short ray `Vector3.Down`. Note a trace hits a **child** co
 
 Apply forces in `OnFixedUpdate`. `ApplyForce` pushes through the center of mass; `ApplyForceAt(tr.HitPosition, force)` pushes at a point and imparts torque/spin. Multiply by `Body.Mass` only when you want a **mass-independent** ("ignore mass") response so light and heavy props react identically. The sensor trace **must self-ignore** (offset start past the prop's bounds + `IgnoreGameObjectHierarchy`) or it pushes itself (wirebox: WireForcerComponent.cs:68):
 
-```csharp
-protected override void OnFixedUpdate()
-{
-    var offset = WorldRotation.Up * GetComponent<Rigidbody>().PhysicsBody.GetBounds().Size.z;
-    var tr = Scene.Trace.Ray( WorldPosition + offset, WorldPosition + offset + WorldRotation.Up * Length )
-        .UseHitboxes().WithAnyTags( "solid", "npc", "glass" ).WithoutTags( "debris", "player" )
-        .IgnoreGameObjectHierarchy( GameObject ).Size( 2 ).Run();
-    if ( !tr.Hit || !tr.Body.IsValid() ) return;
+```text
+on each fixed physics step:
+  place the sensor origin beyond this object's bounds along its up axis
+  sweep a narrow trace outward that:
+    uses hitboxes, accepts solid/npc/glass, rejects debris/player, and ignores this hierarchy
+  stop unless the trace hit a valid physics body
 
-    var force = WorldRotation.Up * Force;
-    if ( IgnoreMass ) force *= tr.Body.Mass;     // cancel mass → equal accel for light + heavy
-    tr.Body.ApplyForce( force );                 // ApplyForceAt(tr.HitPosition, force) → spin
-}
+  force := configured magnitude along this object's up axis
+  if equal acceleration across masses is desired, multiply force by target mass
+  apply force through the center, or apply it at the hit position when torque is desired
 ```
 
 ---
@@ -73,39 +94,29 @@ protected override void OnFixedUpdate()
 
 CharacterController gives you no gravity. Apply it as **two half-steps** around `Move()` (leapfrog/Verlet) — a single full step lags the jump/fall arc. Move in `OnFixedUpdate`, never `OnUpdate` (sbox-grubs: GrubPlayerController.cs:46).
 
-```csharp
-protected override void OnFixedUpdate()
-{
-    if ( IsProxy ) return;
+```text
+on each authoritative fixed physics step:
+  if grounded:
+    remove vertical velocity
+    accelerate toward the requested movement velocity
+    apply strong ground friction
+  otherwise:
+    subtract one half-step of gravity from velocity
+    apply light air friction
 
-    if ( IsGrounded )
-    {
-        CharacterController.SetVelocity( CharacterController.Velocity.WithZ( 0f ) );
-        CharacterController.Accelerate( GetWishVelocity() );
-        CharacterController.ApplyFriction( 4f, 100f );
-    }
-    else
-    {
-        CharacterController.SetVelocity( Velocity - Gravity * Time.Delta * 0.5f );  // half BEFORE
-        CharacterController.ApplyFriction( 0.1f );
-    }
+  ask CharacterController to move
 
-    CharacterController.Move();
-
-    if ( !IsGrounded )
-        CharacterController.SetVelocity( Velocity - Gravity * Time.Delta * 0.5f );  // other half AFTER
-}
+  if still airborne:
+    subtract the second half-step of gravity
 ```
 
 Jump: set the velocity, then **`ReleaseFromGround()`**, then trigger the animator — or the controller re-sticks to the floor the same tick and eats the jump (sbox-grubs: GrubPlayerController.cs:122-124):
 
-```csharp
-if ( Input.Pressed( "jump" ) )
-{
-    CharacterController.SetVelocity( new Vector3( Facing * 175f, 0f, 220f ) );
-    CharacterController.ReleaseFromGround();   // unstick BEFORE Move() runs
-    Animator.TriggerJump();
-}
+```text
+when jump is pressed:
+  set the controller's horizontal and upward launch velocity
+  release the controller from the ground before its next move
+  trigger the jump presentation
 ```
 
 ---
@@ -114,25 +125,17 @@ if ( Input.Pressed( "jump" ) )
 
 When the solver caps your drive force, take movement off Source 2's hands once and integrate by hand. Keep the Body for its collider geometry + collision queries only (sbox-vehicle-kit: VehicleBase.Wheels.cs:192-201).
 
-```csharp
-void SetupKinematicIfNeeded()
-{
-    if ( _kinematicReady || Body == null ) return;
-    try { Body.MotionEnabled = false; } catch { /* property name drifts across SDKs */ }
-    _vel = Vector3.Zero;
-    _kinematicReady = true;
-}
+```text
+once, when a physics body becomes available:
+  disable solver-driven motion using the SDK member verified for the current build
+  initialize the component-owned velocity and mark setup complete
 
-protected override void OnFixedUpdate()
-{
-    SetupKinematicIfNeeded();
-    var dt = Time.Delta;
-    if ( dt <= 0f ) return;                  // dt==0 while time-scaled/paused
-
-    _vel += AccumulatedForces / VehicleMass; // Body.Mass reads 0 now → keep your own mass field
-    WorldPosition += _vel * dt;              // move by hand
-    Body.Velocity = _vel;                    // mirror back so debug overlays/readers stay consistent
-}
+on each fixed physics step:
+  ensure kinematic setup has happened
+  stop when the time step is zero or negative
+  add accumulated acceleration using a component-owned mass value
+  advance world position from the owned velocity
+  mirror that velocity to the body for observers and debugging
 ```
 
 ---
@@ -141,31 +144,25 @@ protected override void OnFixedUpdate()
 
 Per wheel/foot, raycast down and apply a Hooke's-law spring + damper into a single Z velocity change (sbox-vehicle-kit: VehicleBase.Wheels.cs:549-571):
 
-```csharp
-var hit = Scene.Trace.Ray( origin, origin + wsDown * (restLength + radius) )
-    .IgnoreGameObject( GameObject ).Run();
-if ( hit.Hit )
-{
-    var compression = 1f - MathX.Clamp( (hit.Distance - radius) / restLength, 0f, 1f );
-    var spring = compression * Stiffness;
-    var damper = (compression - prevCompression) / dt * Damping;
-    totalSuspensionForce += spring + damper;   // caller sums → one body Z velocity change
-}
+```text
+for each suspension sample:
+  trace downward through rest length plus wheel radius while ignoring the vehicle
+  if ground is found:
+    normalize compression from hit distance and clamp it to the valid range
+    spring contribution := compression * stiffness
+    damping contribution := compression change per second * damping
+    add both contributions to the body's accumulated suspension force
 ```
 
 **Walls are the trap:** when floor and walls are one `MapCollider`, a low box sweep keeps hitting the shared floor face and never sees the wall. Instead fire horizontal **feeler rays at mid-body height** (they physically cannot touch the floor), reject floor/ramp hits with `|Normal.z| > 0.7`, clamp the move, and slide the remainder by cancelling only the into-wall velocity component (sbox-vehicle-kit: VehicleBase.Wheels.cs:494-523):
 
-```csharp
-var tr = Scene.Trace.Ray( start, start + dir * rayLen )
-    .IgnoreGameObjectHierarchy( GameObject ).Run();
-if ( tr.Hit && MathF.Abs( tr.Normal.z ) <= 0.7f )    // a wall, not the floor
-{
-    var wallN = tr.Normal.WithZ( 0f ).Normal;
-    var slide = remaining - wallN * Vector3.Dot( remaining, wallN );  // tangential remainder
-    pos += slide;
-    var into = Vector3.Dot( _vel, wallN );
-    if ( into < 0f ) _vel -= wallN * into;            // kill only the into-wall component
-}
+```text
+cast a horizontal feeler from mid-body height while ignoring the mover hierarchy
+if it hits a surface whose vertical normal magnitude is at most the floor threshold:
+  flatten and normalize the surface normal
+  project the remaining displacement onto the wall tangent and apply that slide
+  measure velocity into the wall
+  if velocity points into the wall, remove only that normal component
 ```
 
 ---
@@ -174,42 +171,26 @@ if ( tr.Hit && MathF.Abs( tr.Normal.z ) <= 0.7f )    // a wall, not the floor
 
 To carry a physics object across the network: trace for it, `TakeOwnership`, parent it, tag it, and **disable its Rigidbody** so it follows kinematically. Drive its transform in `OnPreRender` (render-rate, smooth). On drop, re-enable the Rigidbody, set throw velocity, unparent, `DropOwnership`. The non-obvious safety: a proxy still flagged carrying must auto-Drop or two clients fight over ownership (sbox-scenestaging: NetworkTest.cs:71).
 
-```csharp
-[Sync] GameObject Carrying { get; set; }
+```text
+synced state: carried object
 
-void TryPickup()
-{
-    var tr = Scene.Trace.WithoutTags( "player" ).Sphere( 16, eyePos, eyePos + fwd * 100 ).Run();
-    if ( !tr.Hit || tr.Body.GameObject is not GameObject go || !go.Tags.Has( "pickup" ) ) return;
+on pickup request:
+  sphere-trace from the eyes through carry range, excluding players
+  require a hit body whose object carries the pickup tag
+  take network ownership of that object
+  store it as carried, parent it to the carrier while preserving world transform, and add a carrying tag
+  disable its valid Rigidbody so parent motion, not physics, drives it
 
-    go.Network.TakeOwnership();
-    Carrying = go;
-    Carrying.SetParent( GameObject, true );
-    Carrying.Tags.Add( "carrying" );
-    if ( Carrying.Components.Get<Rigidbody>( true ) is { IsValid: true } rb ) rb.Enabled = false;
-}
+before rendering:
+  when the carried object is valid and locally authoritative, place it at the hold transform
 
-protected override void OnPreRender()   // smooth render-rate follow, NOT physics
-{
-    if ( Carrying.IsValid() && !Carrying.IsProxy )
-        Carrying.WorldPosition = HoldRelative.WorldPosition + HoldRelative.Parent.WorldRotation * new Vector3( 0, 0, 40 );
-}
+during carry maintenance:
+  if the carried object has become a proxy, immediately run the drop path
 
-void UpdatePickup()
-{
-    if ( Carrying.IsValid() && Carrying.IsProxy ) { Drop(); return; }  // proxy still carrying → auto-drop
-    // ...
-}
-
-void Drop()
-{
-    if ( Carrying.Components.Get<Rigidbody>( true ) is { IsValid: true } rb )
-    { rb.Enabled = true; rb.Velocity = throwDir; }
-    Carrying.SetParent( null, true );
-    Carrying.Tags.Remove( "carrying" );
-    Carrying.Network.DropOwnership();
-    Carrying = null;
-}
+on drop:
+  re-enable any valid Rigidbody and assign the throw velocity
+  unparent while preserving world transform, remove the carrying tag, and release ownership
+  clear the synced carried reference
 ```
 
 Read `tr.Surface.SoundCollection` for material-specific footsteps/impact audio off any trace.
@@ -220,28 +201,18 @@ Read `tr.Surface.SoundCollection` for material-specific footsteps/impact audio o
 
 Float a Rigidbody on a water surface with a **grid of sample points over the hull**, each contributing a Hooke's-law spring (force ∝ depth below the wave surface) plus a damper (opposes that point's vertical velocity, kills oscillation). Sampling at several offset points — not one centre point — is what gives roll/pitch and a stable, non-bouncy float. Run it in `OnFixedUpdate`, gated `if (IsProxy) return;` (host/owner-authoritative physics).
 
-```csharp
-void ApplyBuoyancy()
-{
-    var ext = m_Collider.LocalBounds.Extents;
-    float sx = ext.x * HullSpread, sy = ext.y * HullSpread;
-    // 9 points: centre + 4 edges + 4 corners
-    Vector3[] pts = { center, center+new Vector3(sx,0,0), center+new Vector3(-sx,0,0), /* …8… */ };
-
-    float mass = m_Collider.Rigidbody.Mass;
-    var angularVel = m_Collider.Rigidbody.AngularVelocity;
-    foreach ( var local in pts )
-    {
-        var world = WorldTransform.PointToWorld( local );
-        float depth = ( WaterManager.GetWaterHeightAt( world ) + SurfaceOffset ) - world.z;
-        if ( depth <= 0f ) continue;                                  // point is above the surface
-
-        float spring = depth * SpringStiffness * mass * AirVolume / pts.Length;   // scaled by remaining air
-        var pointVel = m_Collider.Rigidbody.Velocity + Vector3.Cross( angularVel, world - WorldPosition );
-        float damper = -pointVel.z * Damping * mass / pts.Length;     // per-point vertical damper
-        m_Collider.Rigidbody.ApplyForceAt( world, Vector3.Up * (spring + damper) );
-    }
-}
+```text
+on each authoritative fixed physics step:
+  derive a nine-point hull sample from the center, edges, and corners of local bounds
+  read body mass and angular velocity
+  for each local sample:
+    transform it to world space and query water height there
+    depth := water surface plus offset minus sample height
+    skip samples above the surface
+    spring := depth * stiffness * mass * remaining air / sample count
+    point velocity := linear velocity + angular velocity crossed with the sample offset
+    damper := negative vertical point velocity * damping * mass / sample count
+    apply the combined upward force at that world-space sample
 ```
 
 Verified against pldr.duck_pond `Code/Water/Buoyancy/Buoyancy.cs`: the 9-point hull sample (`:149-172`), per-point `spring = depth * Stiffness * mass * AirVolume / pointCount` + velocity damper applied with `ApplyForceAt` (`:195-201`), quadratic **water resistance** `-0.5·ρ·v²·Cd·A·dir·submersion` (`:111-130`), submersion-scaled **angular drag** (`:134-145`), and **wave-transport** that nudges the hull along the wave's horizontal displacement (`:207-216`). The `[Sync] AirVolume` (`:25`) drains while submerged so a holed boat slowly **sinks** (`:99-107`). Global surface queries `WaterManager.GetWaterHeightAt` / `GetWaveDisplacementAt` are the seam any water system should expose (`Code/Water/WaterManager.cs`). The same 9-point design appears in treehaven.sdiver and stepdev.xtrem_road.
@@ -252,21 +223,17 @@ Verified against pldr.duck_pond `Code/Water/Buoyancy/Buoyancy.cs`: the 9-point h
 
 A moving-belt look without animating geometry: set a `BoxCollider.SurfaceVelocity` (physics actually carries props along it), then drive the belt material's scroll attribute from that same velocity so the texture visibly matches the push.
 
-```csharp
-public sealed class Conveyor : Component
-{
-    [RequireComponent] private BoxCollider Collider { get; set; }
-    [Property] private ModelRenderer Renderer { get; set; }
+```text
+component requirements:
+  a box collider supplies surface velocity
+  a model renderer supplies the belt material attributes
 
-    protected override void OnFixedUpdate()
-    {
-        if ( Renderer.IsValid() && Renderer.SceneObject.IsValid() )
-            Renderer.SceneObject.Attributes.Set( "TimeScale", Collider.SurfaceVelocity.x / 65f );
-    }
-}
+on each fixed physics step:
+  if the renderer and its scene object are valid:
+    set the material's TimeScale attribute from the collider's belt-axis surface velocity
 ```
 
-Verbatim from stellawisps.lumberyard `Code/Tycoon/Conveyor.cs:14`. One source of truth (`SurfaceVelocity`) drives both the physics carry and the visual scroll, so they can never disagree. The belt material reads its `TimeScale` attribute to pan its UVs. Pair with trigger-zone "suckers" (a `BoxCollider` trigger that pulls items toward a sell/buy point) for a full belt economy (lumberyard `ItemSucker.cs`/`SellSucker.cs`).
+The implementation cited at stellawisps.lumberyard `Code/Tycoon/Conveyor.cs:14` demonstrates the shared-input design. One source of truth (`SurfaceVelocity`) drives both the physics carry and the visual scroll, so they can never disagree. The belt material reads its `TimeScale` attribute to pan its UVs. Pair with trigger-zone "suckers" (a `BoxCollider` trigger that pulls items toward a sell/buy point) for a full belt economy (lumberyard `ItemSucker.cs`/`SellSucker.cs`).
 
 ---
 
@@ -302,18 +269,14 @@ See also: **sbox-api** (look up exact signatures via reflection) and **sbox-buil
 
 For small fast bodies (golf balls, projectiles, marbles) the built-in Rigidbody CCD is not enough. Implement `IScenePhysicsEvents.PrePhysicsStep` — it runs *after* `OnFixedUpdate` but *before* the solver, so you can detect a tunnel and redirect the body before the engine ever sees the penetration. Owner-only; proxies let the host's result replicate.
 
-```csharp
-// slamdunk.minigolf: Player/Ball.cs → PrePhysicsStep
-public void PrePhysicsStep()
-{
-    if ( IsProxy || Rigidbody.Velocity.Length < 100f ) return;
-    var start = WorldPosition;
-    var tr = Scene.Trace.Sphere( 2f, start, start + Rigidbody.Velocity * Time.Delta )
-        .WithTag( "entity" ).IgnoreGameObject( GameObject ).Run();
-    if ( !tr.Hit ) return;
-    WorldPosition = tr.HitPosition + tr.Normal * 2f;
-    Rigidbody.Velocity = Vector3.Reflect( Rigidbody.Velocity, tr.Normal ) * 0.8f; // energy loss
-}
+```text
+before each physics-solver step:
+  stop on proxies or when speed is below the CCD threshold
+  sphere-sweep from current position through this step's velocity displacement
+  require the entity tag and ignore the moving object itself
+  if the sweep hits:
+    place the body just outside the surface by one sweep radius
+    reflect velocity around the hit normal and multiply by an energy-retention factor
 ```
 
 Anti-pattern: running CCD inside `OnFixedUpdate` instead. The solver runs *after* `OnFixedUpdate`, so the body is already penetrating when you redirect it — you get a one-frame overlap pop. `PrePhysicsStep` intercepts before that.
@@ -324,25 +287,16 @@ Anti-pattern: running CCD inside `OnFixedUpdate` instead. The solver runs *after
 
 A fast body tunnels/snags on seams between many separate convex colliders. Build one `ModelCollider` for the whole level from a `ModelBuilder` that ingests every `ModelRenderer`'s verts, welds duplicates with `worldPos.SnapToGrid(0.1f)`, then optionally stitches T-junctions (vertex on another triangle's edge — `|dist(p1,p2)-(dist(p1,p3)+dist(p2,p3))| < 0.01`). Make the result `Static = true` and `NetworkMode.Never` (each client builds its own; collision is deterministic). Pair with `Network.ClearInterpolation()` after any teleport so the ball doesn't lerp across the map.
 
-```csharp
-// slamdunk.minigolf: CollisionManager.cs (condensed)
-var mb = new ModelBuilder();
-var weldMap = new Dictionary<Vector3, int>();
-var tris = new List<int>();
-var verts = new List<Vector3>();
-foreach ( var mr in hole.GetComponentsInChildren<ModelRenderer>() )
-{
-    foreach ( var v in mr.Model.GetVertices() )
-    {
-        var w = mr.WorldTransform.PointToWorld( v ).SnapToGrid( 0.1f );
-        if ( !weldMap.TryGetValue( w, out int i ) ) { i = verts.Count; verts.Add(w); weldMap[w]=i; }
-        tris.Add( i );
-    }
-}
-mb.AddCollisionMesh( verts.ToArray(), tris.ToArray() );
-var go = Scene.CreateObject(); go.Static = true;
-go.NetworkMode = NetworkMode.Never;
-go.AddComponent<ModelCollider>().Model = mb.Create();
+```text
+create an empty model builder, quantized-position-to-index map, vertex list, and index list
+for every descendant model renderer:
+  for every source vertex:
+    transform it to world space and snap it to the weld grid
+    allocate one output index only when that quantized position is new
+    append the resolved index to the triangle stream
+add the welded vertices and indices as one collision mesh
+create a static, never-networked scene object
+assign the built model to its ModelCollider
 ```
 
 ---
@@ -351,15 +305,13 @@ go.AddComponent<ModelCollider>().Model = mb.Create();
 
 When procedural geometry must also be *traceable* (bullets, LOS, ground-checks) add a trace mesh alongside the render and collision meshes in the same `ModelBuilder`. One model, one GameObject, all three channels.
 
-```csharp
-// ataco.sdoomresurrection: DoomMap.cs (condensed)
-var mb = new ModelBuilder();
-mb.AddMesh( renderMesh );                              // visible
-mb.AddCollisionMesh( triVerts, triIndices );           // physics bodies walk on it
-mb.AddTraceMesh( tracePoints, traceIndices );          // Scene.Trace rays hit it
-var mr = go.AddComponent<ModelRenderer>();
-mr.Model = mb.Create();
-go.AddComponent<ModelCollider>();                      // static; no Rigidbody
+```text
+create one model builder
+add the visible render mesh
+add triangle data for physical collision
+add point/index data for Scene.Trace intersections
+build the model and assign it to a renderer on the target object
+add a static ModelCollider without a Rigidbody
 ```
 
 ---
@@ -368,21 +320,18 @@ go.AddComponent<ModelCollider>();                      // static; no Rigidbody
 
 Use `ApplyImpulse` (instantaneous momentum change, mass-aware) rather than `ApplyForce` (continuous) for a single-shot putt/kick/slingshot. Gate all input on `Rigidbody.Velocity.Length > threshold` so you can't re-hit a moving ball. Wire `ICollisionListener.OnCollisionStart` for impact sounds without a polling trace.
 
-```csharp
-// alcoholics.nice_putt_idiot: GolfBall.cs (condensed)
-bool IsMoving => Rigidbody.Velocity.Length > MaxVelocityForPutt;
+```text
+moving := body speed exceeds the allowed re-hit threshold
 
-void Putt( Vector2 direction, float dragDistance, float maxDrag )
-{
-    if ( IsMoving ) return;
-    var power = MinPower + MathX.Clamp( dragDistance / maxDrag, 0f, 1f ) * (MaxPower - MinPower);
-    Rigidbody.ApplyImpulse( new Vector3( 0f, direction.x * power, direction.y * power ) );
-    Client?.IncrementStrokes();
-}
+on putt request(direction, drag distance):
+  stop if moving
+  normalize drag distance and clamp it to zero through one
+  interpolate shot power between designer minimum and maximum
+  apply one impulse along the mapped play-plane direction
+  increment the responsible player's stroke count
 
-// ICollisionListener — no trace polling needed for audio
-public void OnCollisionStart( Collision c )
-    => Sound.Play( PuttSound, c.Contact.Point );
+on collision start:
+  play the impact sound at the first contact point
 ```
 
 ---
@@ -391,23 +340,18 @@ public void OnCollisionStart( Collision c )
 
 Shape shot power non-linearly so the low end is still useful. Track `TimeSince AlmostStill`; a ball creeping at 0.1–5 u/s for more than ~3 s is force-stopped with `Rigidbody.ClearForces()` + zero linear/angular velocity, preventing a slow roller from stalling a round. On respawn/teleport call `GameObject.Network.ClearInterpolation()` so the remote proxy doesn't visually lerp across the map.
 
-```csharp
-// slamdunk.minigolf: Ball.cs (condensed)
-// Non-linear power: designer-intuitive, low-end responsive
-float shaped = 2.78f * MathX.Pow( 2f * rawPower + 0.4f, 2f );
-Rigidbody.ApplyForceAt( WorldPosition, dir * shaped * 9500f );
+```text
+on shot release:
+  transform raw charge with the configured nonlinear power curve
+  apply the resulting force at the ball position along the aim direction
 
-// Stuck watchdog in OnUpdate
-if ( Rigidbody.Velocity.Length is > 0.1f and < 5f )
-    _almostStillTime += Time.Delta;
-else _almostStillTime = 0f;
-if ( _almostStillTime > 3f )
-{
-    Rigidbody.Velocity = Vector3.Zero;
-    Rigidbody.AngularVelocity = Vector3.Zero;
-    Rigidbody.ClearForces();
-    _almostStillTime = 0f;
-}
+on each update:
+  accumulate almost-still time only while speed lies between the creep thresholds
+  otherwise reset that timer
+  once the timer exceeds the watchdog duration:
+    zero linear and angular velocity
+    clear accumulated forces
+    reset the watchdog
 ```
 
 Note: `MathX.Pow` — NOT `MathF.Pow` (which does not exist in the s&box sandbox).
@@ -418,20 +362,14 @@ Note: `MathX.Pow` — NOT `MathF.Pow` (which does not exist in the s&box sandbox
 
 A jetpack that feels consistent regardless of the player's physics mass multiplies thrust by `_rb.Mass` so the acceleration is mass-independent. Gate the thrust on a short downward ray finding no ground — this prevents draining fuel while standing still, and correctly re-engages as soon as the player leaves the floor.
 
-```csharp
-// master.digging_simulator: JetpackController.cs (condensed)
-protected override void OnFixedUpdate()
-{
-    if ( !Input.Down( "jump" ) ) return;
-    if ( _rb == null ) _rb = Components.GetInAncestorsOrSelf<Rigidbody>();
-    // Only thrust when airborne
-    var groundRay = Scene.Trace.Ray( WorldPosition, WorldPosition + Vector3.Down * 8f )
-        .IgnoreGameObjectHierarchy( GameObject ).Run();
-    if ( groundRay.Hit ) return;
-    var force = Vector3.Up * ThrustAccel * _rb.Mass * Time.Delta; // mass-compensated
-    _rb.ApplyForce( force );
-    ConsumeBattery( Time.Delta );
-}
+```text
+on each fixed physics step:
+  stop unless the jump control is held
+  resolve the nearest ancestor Rigidbody when it is not cached
+  trace a short distance downward while ignoring the player hierarchy
+  stop when ground is detected
+  compute upward thrust from desired acceleration, body mass, and fixed-step duration
+  apply that force and consume battery for the same duration
 ```
 
 ---
@@ -440,18 +378,16 @@ protected override void OnFixedUpdate()
 
 Fire a long trace for a visual ghost cursor (green = in range, red = too far) and a short trace for the actual action. They share one call site but have different `WithoutTags` masks: the long trace can hit ore (show it), the short one excludes ore (dig behind it). This makes targeting readable without any UI distance calculation.
 
-```csharp
-// master.digging_simulator: DrillTool.cs (condensed)
-var visualTr = Scene.Trace.Ray( ray ).WithTag( "terrain" ).Run(); // long range, any tag
-var digTr    = Scene.Trace.Ray( ray ).WithoutTags( "ore", "player", "tool" ).Run(); // short range
+```text
+visual hit := run the long terrain trace used for cursor feedback
+action hit := run the action trace while excluding ore, player, and tool tags
 
-if ( visualTr.Hit )
-{
-    _cursor.WorldPosition = visualTr.HitPosition;
-    _cursor.Tint = (visualTr.Distance <= DigDistance) ? Color.Green : Color.Red;
-}
-if ( Input.Pressed( "attack1" ) && digTr.Hit && digTr.Distance <= DigDistance )
-    zone.Dig( digTr.HitPosition, DigRadius );
+if the visual trace hit:
+  move the cursor to its hit position
+  tint it valid when within action range, otherwise tint it out-of-range
+
+if primary action was pressed and the action trace hit within range:
+  dig the target zone at that position using the configured radius
 ```
 
 ---
@@ -460,28 +396,17 @@ if ( Input.Pressed( "attack1" ) && digTr.Hit && digTr.Distance <= DigDistance )
 
 Apply a constant self-righting torque `Vector3.Cross(WorldRotation.Up, Vector3.Up) * Stability` so a physics boat can't capsize under waves or player movement. When a player mounts, disable their `Body` and collider, reparent to the seat, and decouple the camera (use the player's own eye angles in world space, not the boat's rotation) so pitch/roll don't cause seasickness. On dismount, teleport to an `ExitPoint` before re-enabling physics so they don't spawn inside the hull.
 
-```csharp
-// pldr.duck_pond: BoatController.cs (condensed)
-protected override void OnFixedUpdate()
-{
-    if ( !Buoyancy.IsTouchingWater ) return;
-    // self-right
-    var uprightTorque = Vector3.Cross( WorldRotation.Up, Vector3.Up ) * Stability;
-    Rigidbody.ApplyTorque( uprightTorque );
-    // drive
-    float speed = Rigidbody.Velocity.Length;
-    float speedLimit = MathX.Min( 1f, TerminalSpeed / (speed + 0.001f) );
-    Rigidbody.ApplyForceAt( BowPoint.WorldPosition,
-        WorldRotation.Forward * ThrottleInput * ThrustForce * speedLimit );
-}
+```text
+on each fixed physics step while touching water:
+  compute restoring torque from boat-up crossed with world-up, scaled by stability
+  apply that torque
+  derive a thrust limiter from terminal speed and current body speed
+  apply forward throttle force at the bow so steering can create torque
 
-void Mount( PlayerController player )
-{
-    player.Body.Enabled = false;
-    player.ColliderObject.Enabled = false;
-    player.SetParent( Seat, false );
-    player.LocalTransform = Transform.Zero;
-}
+on mount(player):
+  disable the player's body and collider
+  parent the player to the seat without retaining the previous local offset
+  reset the player's local transform
 ```
 
 ---
@@ -490,27 +415,21 @@ void Mount( PlayerController player )
 
 Rather than hand-rolling a swimming controller, plug into s&box's `MoveMode` scoring system. Override `Score()` to win when the player is submerged past a threshold, and `UpdateRigidBody()` to zero gravity and add damping for the water feel. The swim mode activates against the real animated wave surface, not a flat trigger.
 
-```csharp
-// pldr.duck_pond: FixedSwim.cs
-public sealed class MoveModeSwimFixed : MoveMode
-{
-    [Property] public int Priority { get; set; } = 10;
-    [Property, Range(0,1)] public float SwimLevel { get; set; } = 0.7f;
+```text
+swim move mode configuration:
+  expose a selection priority and a normalized submersion threshold
 
-    public override void UpdateRigidBody( Rigidbody b )
-    {
-        b.Gravity = false;
-        b.LinearDamping = 3.3f;
-        b.AngularDamping = 1f;
-    }
-    public override int Score( PlayerController c ) => WaterLevel > SwimLevel ? Priority : -100;
-    public override void OnModeBegin() => Controller.IsSwimming = true;
-    public override void OnModeEnd( MoveMode next )
-    {
-        Controller.IsSwimming = false;
-        if ( Input.Down( "Jump" ) ) Controller.Jump( Vector3.Up * 300f ); // hop out
-    }
-}
+when updating the player's Rigidbody:
+  disable gravity
+  apply strong linear damping and moderate angular damping
+
+when scoring this mode:
+  return its priority above the submersion threshold; otherwise return a losing score
+
+on mode begin, mark the controller as swimming
+on mode end:
+  clear the swimming flag
+  if jump remains held, apply an upward exit jump
 ```
 
 Add this component alongside a `PlayerController`. `WaterLevel` must be computed each `OnFixedUpdate` from the actual wave surface (sample wave height at head position, then `Vector3.InverseLerp(surface, foot, head, true)`).

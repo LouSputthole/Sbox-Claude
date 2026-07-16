@@ -35,3 +35,11 @@ jobs:
 
       - name: MCP surface quality gate (collisions = hard fail)
         run: node scripts/audit-mcp-quality.mjs
+
+      - name: Cookbook provenance gate
+        run: |
+          node scripts/audit-cookbook-provenance.mjs --self-test
+          node scripts/audit-cookbook-provenance.mjs
+
+      - name: Codex plugin in sync with Claude plugin
+        run: node scripts/gen-codex-plugin.mjs --check

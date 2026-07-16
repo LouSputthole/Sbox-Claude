@@ -1,5 +1,33 @@
 # Sandbox / Construction Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [The one idiom that makes it composable: scene-wide interface events](#the-one-idiom-that-makes-it-composable-scene-wide-interface-events)
+- [ISpawner: one interface for everything placeable](#ispawner-one-interface-for-everything-placeable)
+- [Per-player undo stack](#per-player-undo-stack)
+- [Ownership / prop protection](#ownership--prop-protection)
+- [Host-authoritative shared pool (ammo / resources)](#host-authoritative-shared-pool-ammo--resources)
+- [Baseline-snapshot cleanup](#baseline-snapshot-cleanup)
+- [ConVar GameSettings as the whole config surface](#convar-gamesettings-as-the-whole-config-surface)
+- [Optional round layer: phase state machine + chat-vote](#optional-round-layer-phase-state-machine--chat-vote)
+- [Build order](#build-order)
+- [How the real game does it (cite map)](#how-the-real-game-does-it-cite-map)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [1. Scene-diff save (net-new vs "serialize my structs")](#1-scene-diff-save-net-new-vs-serialize-my-structs)
+  - [2. DPP — full per-player prop governance (beyond simple Ownable)](#2-dpp--full-per-player-prop-governance-beyond-simple-ownable)
+  - [3. Client-predicted physgun with authority hand-off (klavs.basebuilder)](#3-client-predicted-physgun-with-authority-hand-off-klavsbasebuilder)
+  - [4. GameFeaturePolicy — one component to swap game modes (klavs.basebuilder)](#4-gamefeaturepolicy--one-component-to-swap-game-modes-klavsbasebuilder)
+  - [5. Absolute-timestamp phase timer (klavs.basebuilder)](#5-absolute-timestamp-phase-timer-klavsbasebuilder)
+  - [6. Build undo as transform-restore (not destroy)](#6-build-undo-as-transform-restore-not-destroy)
+  - [7. Contraption graph walk as a shared primitive (dexlab.sandbox-reforged)](#7-contraption-graph-walk-as-a-shared-primitive-dexlabsandbox-reforged)
+  - [8. Retroactive prop-destructibility (apl.sandboxwars)](#8-retroactive-prop-destructibility-aplsandboxwars)
+  - [9. Spawn-protection volume doubling as no-build zone (klavs.basebuilder)](#9-spawn-protection-volume-doubling-as-no-build-zone-klavsbasebuilder)
+  - [Read these games for deeper sandbox patterns](#read-these-games-for-deeper-sandbox-patterns)
+<!-- reference-toc:end -->
+
 How to build a sandbox-construction game (Garry's-Mod-style: spawn anything, build with tools, optional round/PvP layer) in modern s&box (GameObject/Component/Scene), distilled from the mined game `apl.sandboxwars` (Sandbox Wars) — a polished, fully hand-coded GMod-style sandbox on the modern API. (The genre's sibling `facepunch.ss1` is a 2D bullet-heaven and is covered by the survivors-like recipe; its stat-modifier engine cross-links below.)
 
 ## What defines the genre
@@ -258,7 +286,7 @@ For a **2D / sprite** sandbox variant (bullet-heaven), the survivors-like recipe
 
 ## Corpus refresh (2026): more reference implementations
 
-Four additional sandbox/construction games mined from the s&box open-source corpus add net-new techniques on top of the base recipe above. Sources: `apl.sandboxwars` (already the base), `dexlab.sandbox-reforged`, `klavs.basebuilder`. (`facepunch.ss1` is a 2D bullet-heaven with no sandbox-construction material; `facepunch.ss2`/`despawn.murder`/`facepunch.fair`/`barrelproto.ragroll` are unrelated genres — nothing net-new for this topic.)
+Four additional sandbox/construction games mined from the s&box public-source corpus add net-new techniques on top of the base recipe above. Sources: `apl.sandboxwars` (already the base), `dexlab.sandbox-reforged`, `klavs.basebuilder`. (`facepunch.ss1` is a 2D bullet-heaven with no sandbox-construction material; `facepunch.ss2`/`despawn.murder`/`facepunch.fair`/`barrelproto.ragroll` are unrelated genres — nothing net-new for this topic.)
 
 ---
 

@@ -1,5 +1,25 @@
 # Social-Hub Genre Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [The interaction loop (shared verb)](#the-interaction-loop-shared-verb)
+- [Economy, shop, inventory (the social meta)](#economy-shop-inventory-the-social-meta)
+- [Death, progression, AI](#death-progression-ai)
+- [Standout patterns worth copying](#standout-patterns-worth-copying)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [1. GameObjectSystem as the network bootstrap — no scene object required (facepunch.jumper)](#1-gameobjectsystem-as-the-network-bootstrap--no-scene-object-required-facepunchjumper)
+  - [2. Diff-based per-connection lobby preview reconciler (gabreusenra.wjse)](#2-diff-based-per-connection-lobby-preview-reconciler-gabreusenrawjse)
+  - [3. One-player-per-station with a 30-second reservation grace (sino.ssino)](#3-one-player-per-station-with-a-30-second-reservation-grace-sinossino)
+  - [4. Ping-corrected shared game clock for timed rounds (barrelproto.ragroll)](#4-ping-corrected-shared-game-clock-for-timed-rounds-barrelprotoragroll)
+  - [5. NetworkOrphaned.ClearOwner for drop-in mode objects (barrelproto.ragroll)](#5-networkorphanedclearowner-for-drop-in-mode-objects-barrelprotoragroll)
+  - [Read these games](#read-these-games)
+<!-- reference-toc:end -->
+
 How to build a persistent shared lobby that rotates self-contained minigames/experiences in modern s&box (GameObject/Component/Scene), distilled from the shipped title `playbtg.elevator` (Elevator S&box).
 
 ## What defines the genre

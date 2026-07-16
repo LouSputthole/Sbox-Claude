@@ -1,5 +1,33 @@
 # Platformer / Obstacle-Course Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [How the real games do it](#how-the-real-games-do-it)
+  - [Charge-jump (the climber's whole game) — jumper/Code/Player/JumperControllerInput.cs:313](#charge-jump-the-climbers-whole-game--jumpercodeplayerjumpercontrollerinputcs313)
+  - [Wall-bounce reflection — jumper/Code/Player/JumperControllerInput.cs:199](#wall-bounce-reflection--jumpercodeplayerjumpercontrollerinputcs199)
+  - [Finish-line / hazard trigger zones — jumper/Code/GamePlay/JumperFinishLine.cs:14](#finish-line--hazard-trigger-zones--jumpercodegameplayjumperfinishlinecs14)
+  - [Self-resetting hazards for deterministic retries — terryscrashcourse](#self-resetting-hazards-for-deterministic-retries--terryscrashcourse)
+  - [Countdown race timer + Services PB — terryscrashcourse/Code/CrashCourse/RaceTimerSystem.cs:236](#countdown-race-timer--services-pb--terryscrashcoursecodecrashcourseracetimersystemcs236)
+  - [Manager + spawn — jumper/Code/GamePlay/GameManager.cs:1](#manager--spawn--jumpercodegameplaygamemanagercs1)
+- [Reusable standout patterns](#reusable-standout-patterns)
+- [Pitfalls](#pitfalls)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Physics-rigidbody as the player, not a character controller — niceputtidiot/Code/Pawns/GolfBall.cs](#physics-rigidbody-as-the-player-not-a-character-controller--niceputtidiotcodepawnsgolfballcs)
+  - [Drag-to-aim via screen-space HUD, no InputAction — niceputtidiot/Code/UI/Hud.razor](#drag-to-aim-via-screen-space-hud-no-inputaction--niceputtidiotcodeuihudrazor)
+  - [Vignette transition gate (hide hard cuts behind a fade) — niceputtidiot/Code/Pawns/GolfBall.cs](#vignette-transition-gate-hide-hard-cuts-behind-a-fade--niceputtidiotcodepawnsgolfballcs)
+  - [Hold-to-confirm with input consumption — niceputtidiot/Code/UI/RestartPrompt/RestartPrompt.razor](#hold-to-confirm-with-input-consumption--niceputtidiotcodeuirestartpromptrestartpromptrazor)
+  - [Services leaderboard with metadata columns — niceputtidiot/Code/GoalPoint.cs + UI/Leaderboard/Leaderboard.razor](#services-leaderboard-with-metadata-columns--niceputtidiotcodegoalpointcs--uileaderboardleaderboardrazor)
+  - [Binary save with "ball at rest" gate — niceputtidiot/Code/SaveManager.cs](#binary-save-with-ball-at-rest-gate--niceputtidiotcodesavemanagercs)
+  - [No-checkpoint design as an intentional genre choice — niceputtidiot/Code/Pawns/Base/Client.cs](#no-checkpoint-design-as-an-intentional-genre-choice--niceputtidiotcodepawnsbaseclientcs)
+  - [Proxy nametag via WorldPanel + avatar: URL — niceputtidiot/Code/Pawns/GolfBall.cs](#proxy-nametag-via-worldpanel--avatar-url--niceputtidiotcodepawnsgolfballcs)
+  - [Updated "read these games" pointer](#updated-read-these-games-pointer)
+<!-- reference-toc:end -->
+
 How to build a precision-climber or obstacle-course game in modern s&box (GameObject/Component/Scene), distilled from two mined games: `facepunch.jumper` (Jump King-style vertical climber) and `yellowletter.terrys_crash_course` (2.5D time-trial obstacle course).
 
 ## What defines the genre
@@ -15,14 +43,14 @@ A platformer-obstacle game is **a skill-gated traversal loop against a fixed cou
 
 Pick from these. The first three are the genre spine; the rest are course flavor and meta.
 
-1. **Movement verb** — the one mechanic the whole game tests. Climber = charge-jump; course-runner = a kinematic run/jump controller. Build on the stock `PlayerController` + a custom `Sandbox.Movement.MoveMode` subclass rather than rewriting the controller (jumper/Code/Player/JumperWalkCustom.cs:7). See **references/systems/player-controller.md**.
+1. **Movement verb** — the one mechanic the whole game tests. Climber = charge-jump; course-runner = a kinematic run/jump controller. Build on the stock `PlayerController` + a custom `Sandbox.Movement.MoveMode` subclass rather than rewriting the controller (jumper/Code/Player/JumperWalkCustom.cs:7). See **references/engine/player-controller.md**.
 2. **Failure physics** — wall-bounce reflection (climber) or knockback/respawn (course). Bypasses controller collision response by writing `Body.Velocity` directly (jumper/Code/Player/JumperControllerInput.cs:199).
-3. **Goal + scoring** — a finish-line trigger or height-above-start. `Component.ITriggerListener` zones for the finish (jumper/Code/GamePlay/JumperFinishLine.cs:14); a `[Sync]`'d Height ticked each fixed update (jumper/Code/Player/JumperPlayerStuff.cs). See **references/systems/trigger-zones.md**.
+3. **Goal + scoring** — a finish-line trigger or height-above-start. `Component.ITriggerListener` zones for the finish (jumper/Code/GamePlay/JumperFinishLine.cs:14); a `[Sync]`'d Height ticked each fixed update (jumper/Code/Player/JumperPlayerStuff.cs). See **references/systems/level-design.md**.
 4. **Self-resetting hazard library** — every obstacle captures its start pose in `OnStart` and exposes `ResetToStart()`; a manager sweeps them between runs for deterministic retries (terrys_crash_course/Code/.../LevelStateManager.cs:251).
 5. **Run/race state machine** — countdown -> race -> finish, with a movement lock (terrys_crash_course/Code/CrashCourse/RaceTimerSystem.cs:144). A string-keyed `MenuStateController` drives UI/music/input lock off one `State` property (MenuStateController.cs:16).
-6. **Persistence + meta** — climber writes JSON to `FileSystem.Data`; course-runner uses `Sandbox.Services` (Stats=PB, Leaderboards, Achievements=medals). See **references/systems/persistence.md** and **references/systems/services-backend.md**.
-7. **Manager + spawn** — a `GameObjectSystem<T>` for host/network glue and player spawn (jumper/Code/GamePlay/GameManager.cs:1). See **references/systems/game-manager.md**.
-8. **Follow camera** — third-person follow with obstruction pull-in (jumper/Code/Camera/JumperCamera.cs:26). See **references/systems/camera.md**.
+6. **Persistence + meta** — climber writes JSON to `FileSystem.Data`; course-runner uses `Sandbox.Services` (Stats=PB, Leaderboards, Achievements=medals). See **references/systems/save-persistence.md** and **references/systems/services-backend.md**.
+7. **Manager + spawn** — a `GameObjectSystem<T>` for host/network glue and player spawn (jumper/Code/GamePlay/GameManager.cs:1). See **references/engine/architecture.md**.
+8. **Follow camera** — third-person follow with obstruction pull-in (jumper/Code/Camera/JumperCamera.cs:26). See **references/engine/player-controller.md**.
 
 ## Build order
 

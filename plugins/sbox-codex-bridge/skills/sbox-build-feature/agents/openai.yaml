@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build an S&box Feature"
+  short_description: "Build and visually verify s&box game features"
+  default_prompt: "Use $sbox-build-feature to implement and verify this s&box change."

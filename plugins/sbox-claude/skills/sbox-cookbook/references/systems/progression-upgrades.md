@@ -1,5 +1,34 @@
 # Progression & Upgrades
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What this IS / when you need it](#what-this-is--when-you-need-it)
+- [Canonical modern-s&box approach](#canonical-modern-sbox-approach)
+  - [1. Hold economy state as host-authoritative [Sync]](#1-hold-economy-state-as-host-authoritative-sync)
+  - [2. The canonical buy recipe (proxy → host → validate → spend → cap → save)](#2-the-canonical-buy-recipe-proxy--host--validate--spend--cap--save)
+  - [3. The cost curve](#3-the-cost-curve)
+  - [4. Pull-based payoff (don't push)](#4-pull-based-payoff-dont-push)
+  - [5. Define content as data, not code](#5-define-content-as-data-not-code)
+  - [6. Persist it (and clamp on load)](#6-persist-it-and-clamp-on-load)
+- [Variations seen across games](#variations-seen-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Per-source modifier stack keyed by the source object (cleaner than ss1)](#per-source-modifier-stack-keyed-by-the-source-object-cleaner-than-ss1)
+  - [Switch-expression effect lookups (no stored numbers, no migration)](#switch-expression-effect-lookups-no-stored-numbers-no-migration)
+  - [Bit-packed upgrade levels + data-asset stage ladders](#bit-packed-upgrade-levels--data-asset-stage-ladders)
+  - [Prestige variations: bracket currency + full-wipe-then-reapply](#prestige-variations-bracket-currency--full-wipe-then-reapply)
+  - ["Tuning sheet as code" — the whole XP economy in one file](#tuning-sheet-as-code--the-whole-xp-economy-in-one-file)
+  - [Backend-authoritative XP with optimistic local level-ups](#backend-authoritative-xp-with-optimistic-local-level-ups)
+  - [Leaderboard service as the source of truth for XP](#leaderboard-service-as-the-source-of-truth-for-xp)
+  - [Stat-threshold goals that auto-complete and unlock content](#stat-threshold-goals-that-auto-complete-and-unlock-content)
+  - [Achievements as decoupled event-listeners](#achievements-as-decoupled-event-listeners)
+  - [Zero-state soft progression walls](#zero-state-soft-progression-walls)
+  - [Gotcha — static rate-limiters must use RealTime.GlobalNow](#gotcha--static-rate-limiters-must-use-realtimeglobalnow)
+  - [Read these games (updated pointer)](#read-these-games-updated-pointer)
+<!-- reference-toc:end -->
+
 How to build leveled upgrade trees, currencies, and stat payoffs in modern s&box — host-authoritative, data-driven, and save-safe. Mined from 18 shipped games.
 
 ## What this IS / when you need it
@@ -31,24 +60,27 @@ public sealed class ShopProgression : Component
 
 ### 2. The canonical buy recipe (proxy → host → validate → spend → cap → save)
 
-Every upgrade follows the same shape. This is the most-copied block across the corpus (repo/enifun.shop_manager: `Code/Shop/ShopManager.cs:208`):
+Every upgrade follows the same authority and persistence sequence (repo/enifun.shop_manager: `Code/Shop/ShopManager.cs:208`):
 
-```csharp
-public bool TryBuyAdvertising()
-{
-    if ( IsProxy ) { RequestBuyAdvertisingOnHost(); return true; }   // client → host
-    if ( AdvertisingTier >= MaxAdvertisingTier ) return false;       // cap
+```text
+FUNCTION requestAdvertisingUpgrade()
+  IF running on a client proxy:
+    send an upgrade request to the host
+    RETURN request accepted
 
-    var cost = GetAdvertisingCost();
-    if ( !ShopFunds.Current.SpendMoney( cost, "Advertising" ) )      // re-validate funds host-side
-        return false;
+  IF advertising tier is already at its maximum:
+    RETURN false
 
-    AdvertisingTier++;                                              // mutate the [Sync] level
-    SaveManager.MarkDirty();                                        // persist
-    return true;
-}
+  authoritativeCost = derive the current advertising cost
+  IF the host-side wallet cannot spend authoritativeCost:
+    RETURN false
 
-[Rpc.Host] private void RequestBuyAdvertisingOnHost() => TryBuyAdvertising();
+  increment the synchronized advertising tier
+  mark persistence state dirty
+  RETURN true
+
+HOST REQUEST HANDLER
+  validate the caller and invoke requestAdvertisingUpgrade on the host
 ```
 
 Re-check the cap and the funds **on the host**, never trust the client number. With per-owner permissions, gate on the caller (repo/thefancylads.restaurant_dev: `Code/Common/Progression/Upgrades.cs:61` — `if ( restaurant.HasPermissions( Rpc.Caller ) )`).

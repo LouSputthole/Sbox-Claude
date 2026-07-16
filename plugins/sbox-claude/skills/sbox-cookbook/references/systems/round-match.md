@@ -1,5 +1,29 @@
 # Round / Match Flow (host-authoritative state machine)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it IS / when you need it](#what-it-is--when-you-need-it)
+- [Canonical modern-s&box approach](#canonical-modern-sbox-approach)
+- [Notable VARIATIONS across the games](#notable-variations-across-the-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [State-as-component instead of enum-switch (the big alternative)](#state-as-component-instead-of-enum-switch-the-big-alternative)
+  - [Paired local+RPC apply so the host's own client + proxies converge instantly](#paired-localrpc-apply-so-the-hosts-own-client--proxies-converge-instantly)
+  - [Vote-tally details the spine glossed over](#vote-tally-details-the-spine-glossed-over)
+  - [Self-terminating rounds without a fixed timer ("most players done")](#self-terminating-rounds-without-a-fixed-timer-most-players-done)
+  - [Late-joiner fairness (beyond just "spectate")](#late-joiner-fairness-beyond-just-spectate)
+  - [Round FSM gates player input via a computed property](#round-fsm-gates-player-input-via-a-computed-property)
+  - [Swappable game-mode object that survives host migration](#swappable-game-mode-object-that-survives-host-migration)
+  - [Round state as [Sync] bools + tags, not a List of players](#round-state-as-sync-bools--tags-not-a-list-of-players)
+  - [Phase-enter side effects can be heavy-handed (and that's fine)](#phase-enter-side-effects-can-be-heavy-handed-and-thats-fine)
+  - ["Round-match" with no PvP: the day/season cycle](#round-match-with-no-pvp-the-dayseason-cycle)
+  - [Fairness over many rounds: pity / bad-luck protection](#fairness-over-many-rounds-pity--bad-luck-protection)
+  - [Read these games (for round/match work)](#read-these-games-for-roundmatch-work)
+<!-- reference-toc:end -->
+
 The spine of nearly every multiplayer s&box game: a networked manager that drives a match through ordered phases (Lobby → Prep → Round → Resolution → GameOver), counts down a timer, and runs entry/exit side effects per phase. This is the single most-reused system across the mined games.
 
 ## What it IS / when you need it
@@ -165,7 +189,7 @@ The `[Sync]` enum is the reconcile path (a late joiner reads it and is correct);
 
 ### Vote-tally details the spine glossed over
 
-The spine notes "a map/mode vote exists." `vault108.suspectra`'s `ResolveVoting()` is a complete, copyable algorithm for *any* kick/eject/decision vote:
+The spine notes "a map/mode vote exists." `vault108.suspectra`'s `ResolveVoting()` demonstrates a complete decision procedure for kick, eject, or other player votes:
 - Each player carries `[Sync] Guid VotedForPlayerId`; **voting for the manager's own `GameObject.Id` is the canonical "Skip" sentinel.**
 - **Timed-out / empty votes count as skips:** `alive.Count(x => x.VotedForPlayerId == GameObject.Id || x.VotedForPlayerId == Guid.Empty)`.
 - Group real votes, take the max, count top candidates; **tie OR skip-majority → no ejection**, signalled with string sentinel tokens (`...SkippedToken` / `...TiedToken`) so the UI renders the right "no one was ejected" copy.

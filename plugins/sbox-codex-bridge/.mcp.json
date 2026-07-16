@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "sbox": {
+      "type": "http",
+      "url": "http://127.0.0.1:7269/mcp",
+      "enabled": true
+    },
+    "sbox-lifeline": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "sbox-mcp-server@2.1.0",
+        "--lifeline"
+      ],
+      "enabled": false
+    }
+  }
+}

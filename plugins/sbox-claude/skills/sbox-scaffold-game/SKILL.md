@@ -1,308 +1,350 @@
 ---
 name: sbox-scaffold-game
-description: Use when the user asks for a whole playable game in one go through the s&box Claude Bridge — "make me a first-person game", "scaffold a game", "give me something I can press Play on". Orchestrates the existing bridge tools plus the gameplay scaffolds (objective/health/pickup/interactable/loot-table/save-system + wallet/phase-machine/day-night-clock + round-state-machine/interaction-station/event-director/save-slots + set_component_reference + add_component_to_new_object) into a first-person starter you can enter play mode in and move around, see a level, and win or lose. Handles the generate→hotload→place sequencing and the screenshot verify loop.
+description: Use when the user asks for a whole playable game in one go through the s&box Claude Bridge — "make me a first-person game", "scaffold a game", "give me something I can press Play on". Orchestrates the existing bridge tools plus gameplay scaffolds into a first-person starter you can enter, move through, and win or lose. Handles generate/edit/hotload/place sequencing and visual plus automated runtime verification.
 ---
 
 # Scaffold a Playable s&box Game
 
-This skill turns ONE ask ("make me a first-person game") into a scene the user can
-press **Play** on and actually *move around, see a level, and win or lose* — not a
-folder of `.cs` files they still have to wire up by hand.
-
-Phase 1 ships **one genre: `first_person`**. It exercises every new gameplay tool
-and the trickiest constraint (generate→hotload→place sequencing). Other genres are
-future waves — if the user asks for third-person / top-down / horror, say it's not
-in this skill yet and offer the first-person starter or a hand-built approach via
+Turn one request into a scene the user can play: a first-person controller, simple
+room, visible goal, and working win/lose state. This skill currently ships one genre:
+`first_person`. For another genre, offer this starter or a hand-built workflow with
 `sbox-build-feature`.
 
-This skill is a sibling of `sbox-build-feature` and inherits its disciplines:
-**you have no eyes without a screenshot, and reflection is the source of truth, not
-your training data.** Read that skill's gotcha table too.
+Inherit the build skill's two disciplines: verify unfamiliar SDK APIs through live
+reflection, and inspect screenshots before claiming a visual result works. Open the
+`sbox-build-feature` skill's `references/gotchas.md` before building.
 
-**Invocation (v2, native MCP).** Every tool below is a bridge `[McpTool]` on s&box's
-native editor MCP server, called by its plain name through the native entry points:
-`search_tools "<terms>"` to find one, `call_tool {name, arguments}` to run one, and
-`call_tools [...]` to run a fixed sequence in one round trip. Scaffolding is full of
-fixed sequences — the Phase-A scaffold → `trigger_hotload` → `compile_status` tail is
-the canonical `call_tools` batch.
+**Invocation (v2, native MCP):** find bridge tools with `search_tools`, call them by
+plain name through `call_tool`, and batch fixed sequences with `call_tools`.
 
----
+## The sequencing constraint
 
-## The one constraint that breaks scaffolds: two-phase sequencing
+A newly generated custom component is not in `Game.TypeLibrary` until s&box
+recompiles. The current `create_player_controller` can still create a rig immediately
+because `GameObject`, `CharacterController`, and `CameraComponent` are built-in; it
+returns the player GameObject but leaves the new controller unattached.
 
-A freshly generated C# component type is **not in `Game.TypeLibrary` until s&box
-recompiles**. So you cannot generate a script and place that component in the same
-breath — `add_component_to_new_object` / `add_component_with_properties` /
-`create_*`'s own placement will fail with "Component type not found".
+Use two phases:
 
-**Therefore every scaffold runs in two phases:**
+1. **Phase A — generate and edit every custom script.** When generating the
+   controller, also let the tool create its built-in rig and camera. Then hotload and
+   prove the compile.
+2. **Phase B — attach the now-loaded custom components, build the rest of the scene,
+   and wire references.**
 
-1. **Phase A — GENERATE all scripts**, then `trigger_hotload`, then confirm a clean
-   compile with `get_compile_errors`.
-2. **Phase B — BUILD + PLACE + WIRE the scene** (create objects, attach the now-loaded
-   components, set references).
+Never attach `ObjectiveManager`, `GoalTrigger`, or a generated controller before the
+Phase-A compile succeeds.
 
-Do not interleave them. If `get_compile_errors` shows an error after Phase A, fix the
-generated file and re-hotload before touching the scene. The system scaffolds
-(`create_objective_system`, `create_pickup`, `create_health_system`) each report a
-`note` telling you when they generated the file but could **not** place the component
-yet — that note is your signal to hotload and place in Phase B.
-
----
-
-## Step 0 — Bridge alive, scene safe
+## Step 0 — Confirm the bridge and protect the scene
 
 ```
 get_bridge_status
-```
-If it fails or the server is unreachable: s&box isn't running — the **native MCP server
-lives inside the editor and dies with it** (diagnose an editor-down state through the
-lifeline server's `read_log` / `get_compile_errors`). If the editor is up but logged
-`[MCP] Couldn't start MCP server on port 7269`, a stale HTTP.sys registration from a
-dying editor instance is holding the port — restart the editor once the stale process
-exits. Stop until it responds.
-
-Defensively make sure you're not in play mode (scene-mutating tools are refused
-during play):
-```
-is_playing        # returns { isPlaying, isPaused, gameFlag, ... } — trust isPlaying
-stop_play         # if it reports playing
+is_playing
 ```
 
-**Scene safety.** Check what's there before mutating:
+If the editor is playing, call `stop_play` before mutation. Inspect the scene:
+
 ```
 get_scene_hierarchy   maxDepth=1
 ```
-- If the scene is **empty** (or just a default camera/light), proceed.
-- If it has the user's **existing work**, ASK: scaffold into a fresh scene, or into
-  this one? Default to a fresh scene to avoid clobbering anything:
-  ```
-  create_scene   name="FirstPersonStarter"
-  ```
 
-Confirm the genre. If the user was vague ("make me a game"), tell them Phase 1 builds
-a **first-person** starter and proceed unless they want something else.
+If it contains user work, ask whether to scaffold into it or create a fresh scene;
+default to a fresh scene with `create_scene name="FirstPersonStarter"`. If the user
+was vague, state that this skill builds a first-person starter and proceed unless they
+choose another direction.
 
----
-
-## Step 1 — Reuse an installed controller, or generate one
+## Step 1 — Choose the controller path
 
 ```
 list_libraries
 ```
-- If `facepunch.playercontroller` (or another community FP controller like
-  `fish.scc`) is installed, **prefer it** — it matches community norms and is less
-  code. You'll add its player component in Phase B via `add_component_with_properties`
-  instead of generating one. Use `describe_type` to confirm the component
-  type name and its move/jump property names before relying on them.
-- Otherwise, **generate** a self-contained first-person controller (Phase A below).
-  A generated controller doubles as learning material, which is the point.
 
-State which path you took.
+- Prefer an installed first-person controller such as `facepunch.playercontroller`
+  or `fish.scc`. Use `describe_type` to identify the exact component and movement
+  properties. You will build its rig in Phase B.
+- Otherwise generate `FpController` in Phase A. Its current template supports
+  `first_person`, `third_person`, and `top_down`; this workflow requests
+  `first_person` explicitly.
 
----
+Record the chosen controller type as `<controllerType>` and state which path you took.
 
-## Phase A — Generate all scripts, hotload, verify compile
+## Phase A — Generate, edit, hotload, compile
 
-Generate everything you'll place, BEFORE touching the scene.
+Generate the win/lose manager without placing it:
 
-1. **Objective system (the win/lose brain)** — for first-person, default to
-   reach-a-goal with fall-out-of-world as the lose path:
-   ```
-   create_objective_system   objective="reach_goal"  loseOn="fall"  killZ=-1000  placeInScene=false
-   ```
-   Generate with `placeInScene=false` here — you'll place it in Phase B after the
-   hotload so the singleton attaches cleanly.
+```
+create_objective_system   objective="reach_goal" loseOn="fall" killZ=-1000 placeInScene=false
+```
 
-2. **Player controller** (only if NOT reusing an installed one):
-   ```
-   create_player_controller   name="FpController"
-   ```
-   The current generator writes a WASD + jump controller that drives a
-   `CharacterController` and reads the built-in `jump` action (see the input note
-   below). It does NOT place itself — you'll attach it in Phase B.
+Generate the goal trigger now, before the one Phase-A hotload:
 
-3. *(Optional)* **Health** and **a pickup type**, if the design wants a hazard or
-   collectibles. For a minimal reach-the-goal starter you can skip these:
-   ```
-   create_health_system   maxHealth=100
-   create_pickup          action="score"   filterTag="player"
-   ```
+```
+create_trigger_zone      name="GoalTrigger"
+```
 
-Now recompile and CHECK:
+The current generator returns `{ created, path, className }`; its `action` and
+`filterTag` arguments are not applied to generated code. Use the returned `path` with
+`edit_script` before hotload. Supply one operation with `type="replace"`, using this
+exact generated method as `find`:
+
+```csharp
+private void OnPlayerEnter( GameObject player )
+{
+	Log.Info( $"[GoalTrigger] {player.Name} entered trigger" );
+}
+```
+
+and this method as `replacement`:
+
+```csharp
+private void OnPlayerEnter( GameObject player )
+{
+	ObjectiveManager.Instance?.ReachGoal();
+	Log.Info( $"[GoalTrigger] {player.Name} reached the goal" );
+}
+```
+
+The wrapper schema is `edit_script path=<returnedPath> operations=[...]`; a missing
+exact `find` is an error, not a successful edit. Inspect the returned operation result.
+
+If no library controller is being reused, generate the controller and built-in rig:
+
+```
+create_player_controller name="FpController" type="first_person" placeInScene=true createCamera=true spawnPosition="0,0,50"
+```
+
+This call returns `{ path, className, gameObject, note, ... }`. Record
+`gameObject.id` as `<playerId>`. The rig already contains a tagged player root,
+`CharacterController`, and child camera; only `FpController` remains unattached until
+hotload. If `gameObject` is null, fix the missing active scene instead of inventing an
+ID.
+
+Generate optional health or pickup scripts only when the requested design needs them.
+Do not add features merely to exercise generators.
+
+After every custom script exists and `GoalTrigger` has the win call, compile once:
+
 ```
 trigger_hotload
 compile_status
 ```
-(The scaffold calls plus this `trigger_hotload` → `compile_status` tail are a fixed
-sequence — send them as one `call_tools` batch to save the round trips.) If the editor
-is stalled or crashed, the lifeline server's `get_compile_errors` reads `sbox-dev.log`
-directly and still works. If there's a real, recent error mentioning one of YOUR
-generated files, fix the file (`edit_script`) and re-hotload. **Do not proceed to
-Phase B until the compile is clean** — placing a component whose type failed to compile
-will fail.
 
----
+If the optional lifeline is enabled, use `get_compile_errors` if the native server stalls. Fix any current
+error in the generated files and repeat hotload/status. Do not start Phase B until
+`ObjectiveManager`, `GoalTrigger`, and any generated controller resolve through
+`describe_type`.
 
-## Phase B — Build, place, and wire the scene
+## Phase B — Build, attach, and wire
 
-Now the generated types are in the TypeLibrary. Build the playable scene.
+### B1. Build a simple room
 
-### B1. Floor (so you don't fall forever)
-
-Use a known-good dev asset for geometry (avoid the broken cloud/tree assets noted in
-`sbox-build-feature`). A big flat box works:
-```
-create_gameobject        name="Floor"   position={x:0,y:0,z:0}   scale={x:20,y:20,z:1}
-assign_model             id=<floorId>   model="models/dev/box.vmdl"
-add_collider             id=<floorId>   type="box"
-```
-For first-person, add 4 walls the same way (boxes at the room edges, tall and thin)
-so the room reads as enclosed in the screenshot. Keep it simple. (Floor + walls are
-five near-identical create → assign → collide runs — another good `call_tools` batch.)
-
-### B2. Player + camera (atomic, with the now-loaded controller)
-
-Create the player body with its `CharacterController` and the controller component in
-one atomic call, then child a camera at eye height.
+Use known local/core geometry:
 
 ```
-# Player root: capsule collider + character controller + the controller component
-add_component_to_new_object   name="Player"   component="CharacterController"   position={x:0,y:0,z:50}   tags=["player"]
-# (returns the player GUID; the CharacterController is now on it)
-add_component_with_properties  id=<playerId>   component="FpController"
-# If REUSING an installed controller, add its component here instead (verified type name).
-```
-Add the eye-height camera as a child:
-```
-add_component_to_new_object   name="Camera"   component="CameraComponent"   parentId=<playerId>
-set_transform                 id=<cameraId>   local=true   position={x:0,y:0,z:64}
-```
-`CameraComponent` is the verified camera type (confirm fields with
-`describe_type name="CameraComponent"` if you need FOV etc.).
-
-> Sequencing note: once the deferred `create_player_controller` upgrade lands
-> (`placeInScene` + `createCamera`), B2 collapses to a single `create_player_controller`
-> call after the Phase-A hotload. Until then, place the body + camera manually as above.
-
-### B3. The goal (win trigger) at the far end
-
-Make a visible goal pad and a trigger volume on it. Generate a trigger-zone script in
-Phase A if you want a custom on-enter; for the simplest path, place a pickup-style
-trigger or use `create_trigger_zone` and call the objective on enter. Minimal version
-using the objective + a trigger:
-```
-create_gameobject        name="Goal"   position={x:0,y:900,z:20}   scale={x:2,y:2,z:2}
-assign_model             id=<goalId>   model="models/dev/box.vmdl"
-set_tint                 id=<goalId>   color="0,1,0,1"        # green pad
-add_collider             id=<goalId>   type="box"   isTrigger=true
-```
-Wire the goal to call the win. The cleanest Phase-1 path: generate a tiny
-`create_trigger_zone` (Phase A) whose on-enter you edit to call
-`ObjectiveManager.Instance?.ReachGoal()`, attach it to the goal here, OR use a
-`create_pickup` placed on the goal and wire its `OnCollected` to the objective.
-
-### B4. Objective singleton + wire the player reference
-
-Place the objective manager (now loaded) and point it at the player so its
-lose-on-fall check works:
-```
-add_component_to_new_object   name="ObjectiveManager"   component="ObjectiveManager"
-set_component_reference       id=<objMgrId>   component="ObjectiveManager"   property="Player"   targetId=<playerId>
-```
-`set_component_reference` is the tool that wires a LIVE scene object into a component
-property — this is how the objective knows which object to watch fall, how a camera
-gets its follow target, how a spawner gets its spawn point. Verify the wire with
-`get_property id=<objMgrId> component="ObjectiveManager" property="Player"`
-(the tool also echoes the resolved `targetName` in its own result).
-
-### B5. Minimal HUD (optional but nice)
-
-```
-create_razor_ui     name="GameHud"   panelType="hud"
-add_screen_panel    name="HUD"
-```
-Bind the HUD to `ObjectiveManager.Instance` / `Health` in the generated `.razor`. Keep
-it minimal for Phase 1 (e.g. "Reach the green pad").
-
-### B6. Input — bind to built-in actions only (Phase 1)
-
-Phase 1 does **not** register custom input actions. The generated controller uses
-`Input.AnalogMove` (WASD, always works) and the built-in `jump` action. Do not author
-custom verbs like `interact` in the starter — `ensure_input_action` can register one,
-but input config is read at project load, so it needs an editor restart to take effect
-in play mode; an unregistered verb silently does nothing in Play. If the design needs
-an interact key, bind it to a confirmed built-in (e.g. `use`) and tell the user.
-
----
-
-## Step 2 — Save, then VERIFY with your own eyes
-
-```
-save_scene        # served by the native built-in — same name, same semantics
+create_gameobject   name="Floor" position={x:0,y:0,z:0} scale={x:20,y:20,z:1}
+assign_model        id=<floorId> model="models/dev/box.vmdl"
+add_collider        id=<floorId> type="box"
 ```
 
-**Structural check** — confirm the expected objects/components exist:
+Create four tall, thin wall boxes at the room edges with the same
+create/assign/collider sequence. Batch those independent repetitions.
+
+### B2. Finish the player rig
+
+For the generated-controller path, use the player ID returned in Phase A:
+
 ```
+add_component_with_properties id=<playerId> component="FpController"
+```
+
+Do not create another camera: `createCamera=true` already built the child camera.
+Set `<controllerType>` to `FpController`.
+
+For a reused library controller, build the rig now with its already-loaded type:
+
+```
+add_component_to_new_object    name="Player" component="CharacterController" position={x:0,y:0,z:50} tags=["player"]
+add_component_with_properties  id=<playerId> component=<verifiedControllerType>
+add_component_to_new_object    name="Camera" component="CameraComponent" parentId=<playerId>
+set_transform                  id=<cameraId> local=true position={x:0,y:0,z:64}
+```
+
+Use `describe_type` before setting any library-specific follow, look, speed, or input
+properties.
+
+### B3. Create and attach the goal
+
+Choose and record a goal position; the minimal room uses `0,900,20`:
+
+```
+create_gameobject               name="Goal" position={x:0,y:900,z:20} scale={x:2,y:2,z:2}
+assign_model                    id=<goalId> model="models/dev/box.vmdl"
+set_tint                        id=<goalId> color="0,1,0,1"
+add_collider                    id=<goalId> type="box" isTrigger=true
+add_component_with_properties  id=<goalId> component="GoalTrigger"
+```
+
+`GoalTrigger.OnStart` also calls `GetOrAddComponent<BoxCollider>()` and marks it as a
+trigger, so attaching it to the visible goal reuses or guarantees the trigger collider.
+The player root must retain the `player` tag used by the generated trigger filter.
+
+### B4. Place and wire the objective manager
+
+```
+add_component_to_new_object name="ObjectiveManager" component="ObjectiveManager"
+set_component_reference id=<objectiveManagerId> component="ObjectiveManager" property="Player" targetId=<playerId>
+get_property id=<objectiveManagerId> component="ObjectiveManager" property="Player"
+```
+
+Require the read-back to resolve the player target. This reference drives the
+lose-on-fall check.
+
+### B5. Add only the UI the starter needs
+
+Optionally generate a minimal HUD that says "Reach the green goal" and reads the
+manager state. A generated Razor component needs the same generate → hotload → attach
+sequence; do not hide a working gameplay loop behind optional UI work.
+
+### B6. Keep input on built-in actions
+
+The generated controller uses `Input.AnalogMove` and built-in jump/run actions. Do not
+add a custom action unless the design needs it: input configuration requires a project
+reload before the new action is available in play mode.
+
+## Step 2 — Save and inspect the edit scene
+
+```
+save_scene
+compile_status
+get_scene_hierarchy   maxDepth=2
+screenshot_from       id=<playerId>
+screenshot_from       id=<goalId>
+```
+
+Require the hierarchy to show the room, tagged player with controller and camera,
+goal with trigger plus `GoalTrigger`, and `ObjectiveManager`. Inspect both inline PNGs.
+Fix floating/sunk geometry, missing models, bad scale, or unreadable goal contrast and
+capture again. `screenshot_from` takes `id`, not `target`.
+
+## Step 3 — Automate runtime verification
+
+Save first, then enter play and rediscover IDs from the active play scene:
+
+```
+start_play
 get_scene_hierarchy   maxDepth=2
 ```
-You should see: Floor (+walls), Player (CharacterController + your controller) with a
-child Camera (CameraComponent), Goal (BoxCollider trigger), ObjectiveManager.
 
-**Visual check** — aim the camera and LOOK AT THE PNG (you're multimodal):
+Record `<runtimePlayerId>` and `<runtimeObjectiveManagerId>` from this hierarchy.
+Do not assume edit-scene IDs remain valid in play mode.
+
+### Prove controller movement when the controller exposes a drive member
+
+The current `playtest` movement driver supports controller shapes exposing
+`WishVelocity`, `AnalogMove`, `MoveInput`, or `WishMove` (and can disable
+`UseInputControls` when present). Confirm the installed/reused controller shape with
+`describe_type`, then run:
+
+```text
+playtest id=<runtimePlayerId> component=<controllerType> steps=[
+  {"move":{"x":1,"y":0},"frames":60},
+  {"assert":{"read":"Displacement","op":">","value":25,"desc":"player moved more than 25 units"}},
+  {"capture":"after-move"}
+]
 ```
-screenshot_from   target=<playerId>     # player capsule sits ON the floor
-screenshot_from   target=<goalId>       # the green goal is visible
+
+Poll `playtest_status` until `finished:true`; require a `PASS` transcript and inspect
+`capture_view id=<runtimePlayerId>` after the job. Movement is verified only when the
+displacement assertion passes.
+
+The generated `FpController` currently reads `Input.AnalogMove` directly but exposes
+none of the writable drive members above. The bridge cannot inject analog input into
+`Input.AnalogMove`, so do not mislabel a harness failure as a broken controller. For
+that controller, leave movement explicitly human-unverified and ask for one WASD check
+after the automated win/lose tests. This is the honest fallback until the generator or
+playtest driver gains a compatible hook.
+
+### Prove the win state
+
+Use a second playtest job to move the player into the exact goal position recorded in
+Phase B. `WorldPosition` is inherited by the controller component and is the harness's
+documented robust positioning fallback:
+
+```text
+playtest id=<runtimePlayerId> component=<controllerType> steps=[
+  {"set":{"component":"<controllerType>","property":"WorldPosition","to":"0,900,20"}},
+  {"wait":10}
+]
 ```
-Each screenshot comes back **inline in the tool result** as an image — there is no
-file on disk to hunt down and read. **Look at the images.** If the player is floating,
-sunk into the floor, or the goal is missing or mis-coloured, fix the transforms/models
-and re-shoot. Don't declare it done from the code looking right — the screenshot loop
-closes faster than the guess loop. (If one framing isn't conclusive, `screenshot_orbit`
-returns several angles in a single call.)
 
-**Compile check** (belt and suspenders after all the wiring):
+Poll `playtest_status` until finished, then require:
+
 ```
-compile_status
+get_runtime_property id=<runtimeObjectiveManagerId> component="ObjectiveManager" property="IsWon"
 ```
 
----
+The value must be `true`. If the goal position was themed or moved, use that recorded
+position instead of `0,900,20`.
 
-## Step 3 — Hand it back in plain language
+### Prove the lose state in a fresh run
 
-Tell the user, in non-coder terms, exactly what was built and **how to play it**:
+Winning locks the manager against a later loss, so restart play and rediscover runtime
+IDs:
 
-> Built a first-person starter you can play now:
-> - A floored room with walls, a player you control, and a green goal pad at the far end.
-> - **Press Play, move with WASD, look with the mouse, jump with Space, and reach the
->   green pad to win.** Fall off the edge and it's game over.
-> - The win/lose logic lives in `ObjectiveManager`, your movement in `<controller>.cs`
->   — both are plain, commented C# you can read and tweak.
+```
+stop_play
+start_play
+get_scene_hierarchy   maxDepth=2
+```
 
-Then note the **human verification step**: edit-mode screenshots prove the scene is
-laid out right, but they can't prove movement or the win actually fires — that's
-runtime. Ask the user to press Play and confirm they can move and reach the goal.
-(Play-mode auto-verification is being researched separately; when it lands this skill
-will enter Play, screenshot mid-play, and confirm win/lose itself.)
+Run a playtest that moves the fresh player below `KillZ` (the default uses `-1200`,
+below the scaffolded `-1000` threshold):
 
----
+```text
+playtest id=<freshRuntimePlayerId> component=<controllerType> steps=[
+  {"set":{"component":"<controllerType>","property":"WorldPosition","to":"0,0,-1200"}},
+  {"wait":10}
+]
+```
 
-## Adapt, don't hardcode
+Poll status, then require:
 
-- **Library reuse:** always `list_libraries` first; prefer an installed controller,
-  fall back to generating one. Confirm any reused component's type + property names
-  with `describe_type` before wiring.
-- **Theme/name:** if the user gave a theme, name the scene/objects accordingly and
-  pick fitting dev geometry; the structure is identical.
-- **Don't gold-plate:** a playable reach-the-goal room beats a half-wired epic. Ship
-  the minimal playable loop, then offer to extend (pickups, health/hazard, HUD polish)
-  as follow-ups using the same tools.
+```
+get_runtime_property id=<freshRuntimeObjectiveManagerId> component="ObjectiveManager" property="IsLost"
+```
 
-## When something half-works
+The value must be `true`. Finish with `stop_play`.
 
-The usual failure is the two-phase ordering. If a placement returns "Component type
-not found" or a scaffold's `note` says the type isn't loaded: you skipped or raced the
-hotload. Re-run `trigger_hotload` → `compile_status` (confirm clean) → retry the
-placement. If a reference won't set, `get_all_properties` on the component to confirm
-the property name and that its type is a GameObject/Component (set_component_reference
-only wires object/component references, not primitives — use `set_property` for those).
+If runtime teleport succeeds but the trigger does not fire, inspect the runtime goal
+and player tags/components, confirm `GoalTrigger` compiled and is enabled, and capture
+the goal in play mode. If a controller does not expose a component-level
+`WorldPosition` property to the harness, use `set_runtime_property` with the same
+runtime player ID, controller component, property, and vector value, then read the
+manager state. Ask the human to verify only a capability the current runtime tools
+cannot drive; do not replace all automation with a generic "press Play and tell me."
+
+## Step 4 — Hand off only what was proved
+
+Tell the user what exists, how to play, and the verification state:
+
+- **WASD** moves, mouse looks, **Space** jumps, and the green goal wins.
+- Falling below the room loses.
+- Report edit-scene screenshots, compile result, movement transcript, `IsWon`, and
+  `IsLost` separately.
+- If the generated `FpController` required the movement fallback, say exactly:
+  "Win and loss were automated; WASD movement still needs one human check because the
+  current controller template exposes no bridge-driveable analog member."
+
+Never turn a partial transcript into "fully verified."
+
+## Adapt without gold-plating
+
+- Reuse installed libraries after live type verification.
+- Keep the same structure when changing names, theme, geometry, or goal position.
+- Ship the minimal playable loop before optional health, pickups, hazards, or HUD
+  polish.
+- When placement says a component type is missing, return to the Phase-A compile gate;
+  do not keep retrying scene mutation.
+- When a reference fails, inspect `get_all_properties`; use
+  `set_component_reference` only for GameObject/component references and
+  `set_property` for primitive/value properties.

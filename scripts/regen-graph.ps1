@@ -97,6 +97,21 @@ foreach ($a in $artifacts) {
     }
 }
 
+# Graphify may embed absolute machine roots in generated node IDs. Sanitize the
+# copied artifacts immediately so a successful regeneration cannot leave private
+# workstation paths behind, then fail closed if the privacy audit still finds any.
+Push-Location $RepoRoot
+try {
+    Write-Host "  Sanitizing generated graph artifacts" -ForegroundColor DarkGray
+    & node scripts/audit-repo-privacy.mjs --fix-generated
+    if ($LASTEXITCODE -ne 0) {
+        throw "generated-artifact privacy audit exited with code $LASTEXITCODE"
+    }
+}
+finally {
+    Pop-Location
+}
+
 Write-Host ""
 Write-Host "Done - docs/graph/ refreshed from the CODE/AST (deterministic, no LLM)." -ForegroundColor Cyan
 Write-Host "NOTE: this did NOT re-read the prose docs. For the FULL doc-inclusive graph" -ForegroundColor Yellow

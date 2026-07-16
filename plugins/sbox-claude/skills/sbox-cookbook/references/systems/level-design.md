@@ -1,4 +1,27 @@
 # Level Design & Mapping (modern s&box)
+
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model: four ways to source a level's geometry](#mental-model-four-ways-to-source-a-levels-geometry)
+  - [How a level decomposes into the scene graph](#how-a-level-decomposes-into-the-scene-graph)
+  - [Three structural patterns worth stealing](#three-structural-patterns-worth-stealing)
+- [Composition & blockout](#composition--blockout)
+- [Lighting & atmosphere](#lighting--atmosphere)
+- [Collision & physics props](#collision--physics-props)
+- [Triggers, checkpoints, spawns](#triggers-checkpoints-spawns)
+- [Navmesh](#navmesh)
+- [Performance & budgets](#performance--budgets)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Weighted spawn nodes with anti-repeat + occupancy guard (despawn.murder)](#weighted-spawn-nodes-with-anti-repeat--occupancy-guard-despawnmurder)
+  - [Per-map metadata as a GameResource (despawn.murder)](#per-map-metadata-as-a-gameresource-despawnmurder)
+  - [Auto-classifying map size from spawn-point geometry (despawn.murder)](#auto-classifying-map-size-from-spawn-point-geometry-despawnmurder)
+  - [Per-map C# loader components as "map plugins" (despawn.murder)](#per-map-c-loader-components-as-map-plugins-despawnmurder)
+  - [Atmospheric level dressing: 3-state flicker light (mishmaps.backrooms)](#atmospheric-level-dressing-3-state-flicker-light-mishmapsbackrooms)
+  - [Document/object inspection interaction (dimmies.terryspapers)](#documentobject-inspection-interaction-dimmiesterryspapers)
+<!-- reference-toc:end -->
+
 How 27 shipped modern s&box games actually build their playspaces — the transferable techniques for composing, lighting, collisioning, and budgeting a level via the GameObject/Component/Scene model (no Hammer required).
 
 ## Mental model: four ways to source a level's geometry
@@ -54,21 +77,25 @@ public sealed class MovingPlatform : Component
 This mesh-art / stateless-component split is why one component type recurs dozens of times in a level with different tuning (obstacle-course: a conveyor component ×17 in a single level). Reference endpoints/pivots/shot-origins as **empty marker GOs**, never baked coordinates.
 
 ## Lighting & atmosphere
-Modern s&box leans on **`SkyBox2D` with `SkyIndirectLighting = true` as the ambient/bounce source — no baked lightmaps required.** The reusable outdoor recipe, copyable verbatim:
+Modern s&box leans on **`SkyBox2D` with `SkyIndirectLighting = true` as the ambient/bounce source — no baked lightmaps required.** A practical outdoor setup is:
 
-```csharp
-// Environment node, authored once, dropped in every scene.
-var sun = env.AddComponent<DirectionalLight>();
-sun.LightColor = new Color(6f, 4.94f, 3.66f);   // HDR >1, WARM
-sun.SkyColor   = new Color(0.42f, 0.60f, 0.76f); // COOL fill — the warm-sun/cool-shadow split
-sun.Shadows = true;                              // ShadowCascadeCount 4, SplitRatio ~0.91
-sun.FogMode = FogMode.Enabled;                   // sun drives the fog (no separate volume needed)
+```text
+OUTDOOR ENVIRONMENT SETUP
+  create one environment root for the scene
+  add a directional light to that root
+  configure the light with:
+    warm HDR key color
+    cool sky-fill color
+    shadows enabled
+    four shadow cascades with a split ratio near 0.91
+    fog contribution enabled
 
-var sky = env.AddComponent<SkyBox2D>();          // + SkyIndirectLighting = true
+  add a 2D sky component to the same root
+  enable sky-based indirect lighting
 ```
 - **Warm key + cool sky = free color contrast**, used by nearly every outdoor game (tycoon, rp-urban, obstacle-course).
 - **Distance fog**: `CubemapFog` pointing at the *same skybox material* so aerial perspective matches the sky (rp-urban: `EndDistance 22000`, height fog via `HeightStart`). `GradientFog` for height-banded murk (survival sdiver: deep-navy `0.012,0.051,0.149,0.9`, End 2048 — sells "deep underwater" in one component).
-- **Indoor stack** is point/spot-light-heavy + baked GI: SkyBox2D (warm tint) + a "Sun" DirectionalLight (fog on, 4 cascades) + `VolumetricFogVolume` (god-rays) + `IndirectLightVolume` (baked DDGI under `scenes/<scene>_data/ddgi/`) + `EnvmapProbe` + many small Point/Spot lights for local pools (shop-interiors). **Author one light, duplicate it down the corridor** — params are copy-pasted identically (social-hub: a spotlight repeated 210×).
+- **Indoor stack** is point/spot-light-heavy + baked GI: SkyBox2D (warm tint) + a "Sun" DirectionalLight (fog on, 4 cascades) + `VolumetricFogVolume` (god-rays) + `IndirectLightVolume` (baked DDGI under `scenes/<scene>_data/ddgi/`) + `EnvmapProbe` + many small Point/Spot lights for local pools (shop-interiors). **Author one light, duplicate it down the corridor** — parameters can remain identical across repeated fixtures (social-hub: a spotlight repeated 210×).
 - **Reflections need a bake.** A placed `EnvmapProbe` (`Projection: Box`, `UpdateStrategy: OnEnabled`) captures *nothing* until baked — bake once for a static hub since geometry never moves (tycoon). Same for `IndirectLightVolume`. Via the bridge: `add_envmap_probe` then `bake_reflections`.
 - **Atmosphere is a swappable post-FX dial.** Standardize ONE camera post-FX chain (Bloom + Tonemapping[HableFilmic] + Sharpen) and vary mood by toggling passes — add a PSX shader per horror room, FilmGrain+Vignette for grade, an Underwater/Wobble shader scoped to a water `PostProcessVolume` (social-hub / survival).
 - **Time-of-day is a component, not a bake** — a `DayNightCycle` (`UseCurveDrivenSky`, `DayDurationSeconds`) drives the sky on a curve at runtime (tycoon, shop-interiors).
@@ -89,19 +116,18 @@ var sky = env.AddComponent<SkyBox2D>();          // + SkyIndirectLighting = true
 ## Triggers, checkpoints, spawns
 **Gameplay flow is wired with Components and marker GameObjects, not geometry.**
 - **Triggers** = `BoxCollider { IsTrigger = true }` + a behavior Component reading overlaps (`CashRegister`, `SellStation`, `KioskTrigger`). Engine-stock `Sandbox.AchievementTrigger` / `TagApplyTrigger` / `KillPlane` are free generic "enter this box → fire" volumes (obstacle-course, social-hub). Bridge: `create_trigger_zone`.
-- **The "course loop"** is a clean copyable set (obstacle-course): a `LevelDefinition` on the root with metadata + **gold/silver/bronze time tiers**, a start `SpawnPoint`, per-stage `Checkpoint` components (each owning its own respawn-point GO + gib config), an `OutOfBounds` kill-trigger routing back to the last checkpoint, and a `Finish` trigger.
+- **The "course loop"** is a compact reusable set (obstacle-course): a `LevelDefinition` on the root with metadata + **gold/silver/bronze time tiers**, a start `SpawnPoint`, per-stage `Checkpoint` components (each owning its own respawn-point GO + gib config), an `OutOfBounds` kill-trigger routing back to the last checkpoint, and a `Finish` trigger.
 
-```csharp
-// A checkpoint = a trigger volume + a respawn marker GO. Modern overlap hook:
-public sealed class Checkpoint : Component, Component.ITriggerListener
-{
-    [Property] public GameObject RespawnPoint { get; set; } // empty marker GO
-    public void OnTriggerEnter( Collider other )
-    {
-        if ( other.GameObject.Root.Components.Get<PlayerProgress>() is { } p )
-            p.LastCheckpoint = RespawnPoint;   // route death back here
-    }
-}
+```text
+CHECKPOINT COMPONENT
+  properties:
+    trigger volume
+    empty GameObject used as this checkpoint's respawn marker
+
+  WHEN another collider enters the trigger:
+    resolve player progress from the entering object's root
+    IF player progress exists:
+      set its last checkpoint to this respawn marker
 ```
 - **Spawns are layered markers** — raw `SpawnPoint`s plus distinct `PlayerSpawnDestination` "where the round drops you" markers, often under an `INITIAL SPAWN` group (social-hub). Mode-specific spawn *types* (`PlayerSpawnTDM`, per-role `*_spawnpoint.prefab`) let one map serve many game modes (rp-urban). Bridge: the spawn recipe is in `references/engine/player-controller.md` + `add_network_helper`.
 - **Spawn density/contents as data** — place a *zone* (a Bounds box), let a `.loot`/`.clutter`/curve table fill it: `TreasureSpawnGroup` + depth-keyed loot tables, `OreGenerator` with a `DepthDistribution` curve (survival/tycoon). Place fixtures by hand; **runtime-spawn restockable/consumable items** (a `ShelfableSpawner` drops product onto shelves) rather than hand-placing every can.
@@ -281,7 +307,7 @@ public sealed class NeonFlickerLight : Component
 
 Drop this on any `PointLight` in a horror map. Extend to a `Style` enum (FluorescentDying / Sparking / StormStrobe) by varying the parameter ranges. The same skeleton drives any "intermittent ambient effect" — blinking signs, sparking consoles, pulsing growl sounds.
 
-**Note:** the backrooms source export contains only this component — the actual maze geometry, collision, and player code were not included in the open-source package (see `sbox-lessons/mining-v2/games/mishmaps.backrooms.md` for scope warning).
+**Note:** the backrooms source export contains only this component — the actual maze geometry, collision, and player code were not included in the public-source package. See [source provenance](../SOURCE-PROVENANCE.md) for corpus scope and terminology.
 
 ### Document/object inspection interaction (dimmies.terryspapers)
 
@@ -306,6 +332,6 @@ protected override void OnFixedUpdate()
 ---
 
 **Read these games for the patterns above:**
-- `sbox-lessons/mining-v2/games/despawn.murder.md` — weighted spawn nodes, map-size auto-classification, per-map GameResource knobs, C# map-loader plugins, AI Director pacing
-- `sbox-lessons/mining-v2/games/mishmaps.backrooms.md` — NeonFlickerLight (3-state machine atmosphere)
-- `sbox-lessons/mining-v2/games/dimmies.terryspapers.md` — ViewDocument lerp-to-camera inspection, TCS scene-settle gate
+- [`despawn.murder`](../SOURCE-PROVENANCE.md) — weighted spawn nodes, map-size auto-classification, per-map GameResource knobs, C# map-loader plugins, AI Director pacing
+- [`mishmaps.backrooms`](../SOURCE-PROVENANCE.md) — NeonFlickerLight (3-state machine atmosphere)
+- [`dimmies.terryspapers`](../SOURCE-PROVENANCE.md) — ViewDocument lerp-to-camera inspection, TCS scene-settle gate

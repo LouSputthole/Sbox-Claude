@@ -1,5 +1,29 @@
 # Vehicles / Driving Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [How the real game does it](#how-the-real-game-does-it)
+  - [Raycast wheel: trace, then push ONE body — WheelCollider.Suspension.cs:39](#raycast-wheel-trace-then-push-one-body--wheelcollidersuspensioncs39)
+  - [Tire friction: bake Pacejka into a Curve, combine with a friction circle — PacejkaCurve.cs:62](#tire-friction-bake-pacejka-into-a-curve-combine-with-a-friction-circle--pacejkacurvecs62)
+  - [Drivetrain: recursive Query/ForwardStep over a Component tree — PowertrainComponent.cs:103](#drivetrain-recursive-queryforwardstep-over-a-component-tree--powertraincomponentcs103)
+  - [Engine + transmission — Engine.cs / Transmission.cs](#engine--transmission--enginecs--transmissioncs)
+  - [Seat: IPressable enter/exit — SuitableVehicle.cs:36](#seat-ipressable-enterexit--suitablevehiclecs36)
+  - [Multiplayer spawn with ownership transfer — VehicleSpawner.cs:25](#multiplayer-spawn-with-ownership-transfer--vehiclespawnercs25)
+- [Reusable standout patterns](#reusable-standout-patterns)
+- [Pitfalls](#pitfalls)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [1. Generic "possess any contraption" seat-drive — dexlab.sandbox-reforged](#1-generic-possess-any-contraption-seat-drive--dexlabsandbox-reforged)
+  - [2. Buoyant boat: IPressable + ISitTarget, force driving, self-righting torque — pldr.duckpond](#2-buoyant-boat-ipressable--isittarget-force-driving-self-righting-torque--pldrduckpond)
+  - [3. Multi-point spring-damper buoyancy (wave-transport, flooding) — treehaven.sdiver](#3-multi-point-spring-damper-buoyancy-wave-transport-flooding--treehavensdiver)
+  - [4. vault77.choptheforest vehicles note](#4-vault77choptheforest-vehicles-note)
+  - [Updated "read these games" pointer](#updated-read-these-games-pointer)
+<!-- reference-toc:end -->
+
 How to build a drivable vehicle game in modern s&box (GameObject/Component/Scene), distilled from one deep mined game: `meteorlab.vehicle_tool_example` ("Car&Race") — a production-grade, sim-leaning raycast-wheel toolkit built entirely on the modern API (no engine built-in vehicle, no Entity/Pawn).
 
 ## What defines the genre
@@ -17,17 +41,17 @@ The genre's defining decision is **how the car drives**. There are two camps; th
 
 The first four are the genre spine (the car drives with these). The rest are flavor and multiplayer.
 
-1. **Raycast wheel collider** — per-wheel Component: cylinder-trace down, spring+damper suspension as `ApplyImpulseAt`, tire friction as `ApplyForceAt`, all onto one shared body (vehicle/Code/Vehicle/Wheel/WheelCollider.cs:77 PhysUpdate). The reusable core. See **references/systems/player-controller.md** for the analogous "forces onto a body" mindset.
+1. **Raycast wheel collider** — per-wheel Component: cylinder-trace down, spring+damper suspension as `ApplyImpulseAt`, tire friction as `ApplyForceAt`, all onto one shared body (vehicle/Code/Vehicle/Wheel/WheelCollider.cs:77 PhysUpdate). The reusable core. See **references/engine/physics-traces-movement.md** for trace and rigid-body force patterns.
 2. **Tire friction model** — Pacejka magic-formula curve baked into a `Curve` LUT, longitudinal+lateral slip combined through a friction circle, per-surface presets auto-selected from the hit surface (Wheel/PacejkaCurve.cs:62; Wheel/WheelCollider.Friction.cs:119).
 3. **Drivetrain** — a tree of `PowertrainComponent`s (Engine→Clutch→Transmission→Differential→WheelPowertrain) implementing recursive `QueryInertia`/`QueryAngularVelocity`/`ForwardStep` (Powertrain/PowertrainComponent.cs:103).
 4. **Engine + transmission** — power-curve torque, rev limiter, ICE/electric modes; automatic/manual/CVT shifting (Powertrain/Engine.cs; Powertrain/Transmission.cs).
 5. **Aerodynamics** — drag + speed²-scaled downforce + airborne pitch/yaw control (VehicleController.cs:137 SimulateAerodinamics).
-6. **Chase camera** — follow behind with collision pullback + first/third toggle (VehicleController.Camera.cs:50). See **references/systems/camera.md**.
+6. **Chase camera** — follow behind with collision pullback + first/third toggle (VehicleController.Camera.cs:50). See **references/engine/player-controller.md**.
 7. **Steering assist** — speed-sensitive max angle + counter-steer toward velocity when sliding (VehicleController.Steering.cs:48).
 8. **Engine sound bank** — multi-layer clips RPM-crossfaded (VehicleController.Sound.cs).
 9. **Skid-mark trails** — `LineRenderer` points spawned when slip exceeds a threshold (Code/WheelSkidMark.cs:34).
 10. **Seat interaction** — `Component.IPressable` enter/exit that swaps control + camera (SuitableVehicle.cs:36).
-11. **Multiplayer spawn** — `Singleton` manager + `[Rpc.Host]` clone with ownership transfer (Manager/VehicleSpawner.cs:25). See **references/systems/game-manager.md** and **references/systems/networking-multiplayer.md**.
+11. **Multiplayer spawn** — `Singleton` manager + `[Rpc.Host]` clone with ownership transfer (Manager/VehicleSpawner.cs:25). See **references/engine/architecture.md** and **references/engine/networking-authority.md**.
 12. **Editor auto-rigger (optional)** — a `[Button]` that builds the whole rig from tagged wheel GameObjects then self-destructs (VehicleCreator.cs:20).
 
 ## Build order
@@ -286,7 +310,7 @@ The `WaterManager.GetWaterHeightAt` / `GetWaveVelocityAt` static API (same libra
 
 ### 4. vault77.chop_the_forest vehicles note
 
-The `vault77.chop_the_forest` game lists "vehicles (expedition harvesting)" as a genre tag but the mined source does not expose a standalone vehicle component. Its vehicle content is integrated inside `PlayerProgression.cs` (5 083 lines) as expedition-unlock state, not as a composable physics module. **No net-new vehicle physics technique was extractable from this game.** For tycoon-style "unlock a truck that auto-harvests," see how `PlayerProgression` uses a dual-path economy with `BackendPaid` variants, documented in `references/genres/tycoon.md`.
+The `vault77.chop_the_forest` game lists "vehicles (expedition harvesting)" as a genre tag but the mined source does not expose a standalone vehicle component. Its vehicle content is integrated inside `PlayerProgression.cs` (5 083 lines) as expedition-unlock state, not as a composable physics module. **No net-new vehicle physics technique was extractable from this game.** For tycoon-style "unlock a truck that auto-harvests," see how `PlayerProgression` uses a dual-path economy with `BackendPaid` variants, documented in `references/genres/tycoon-idle.md`.
 
 ---
 

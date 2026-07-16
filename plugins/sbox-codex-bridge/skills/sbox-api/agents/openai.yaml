@@ -1,0 +1,4 @@
+interface:
+  display_name: "S&box API Brain"
+  short_description: "Write idiomatic s&box C# with live API checks"
+  default_prompt: "Use $sbox-api to write an idiomatic s&box component for this feature."

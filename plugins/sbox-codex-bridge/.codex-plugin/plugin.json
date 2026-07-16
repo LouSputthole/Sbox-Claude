@@ -1,0 +1,46 @@
+{
+  "name": "sbox-codex-bridge",
+  "version": "2.1.0",
+  "description": "Build s&box games with Codex through the native editor MCP bridge, an API brain, a code-grounded cookbook, and screenshot-driven workflows.",
+  "author": {
+    "name": "sboxskins.gg",
+    "url": "https://sboxskins.gg"
+  },
+  "homepage": "https://github.com/LouSputthole/Sbox-Claude/tree/main/plugins/sbox-codex-bridge",
+  "repository": "https://github.com/LouSputthole/Sbox-Claude",
+  "license": "LicenseRef-Sbox-Bridge-Source-Available-1.0",
+  "keywords": [
+    "sbox",
+    "s&box",
+    "game-engine",
+    "game-dev",
+    "source2",
+    "ai",
+    "mcp",
+    "bridge",
+    "codex",
+    "openai-codex",
+    "codex-bridge"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "s&box Codex Bridge",
+    "shortDescription": "Build and verify s&box games from Codex.",
+    "longDescription": "Connect Codex to the native s&box editor MCP server, write idiomatic s&box C# with a schema-grounded API brain, route through a code-grounded cookbook, scaffold playable starters, and verify runtime or visual changes through inline screenshots and lifeline diagnostics.",
+    "developerName": "sboxskins.gg",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://sboxskins.gg",
+    "defaultPrompt": [
+      "Use the s&box Codex Bridge to build a scene from a description.",
+      "Check the s&box bridge status.",
+      "Use the s&box cookbook to design an inventory system."
+    ],
+    "brandColor": "#10A37F"
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Set Up the S&box Bridge"
+  short_description: "Connect and orient the s&box editor bridge"
+  default_prompt: "Use $sbox-setup to check and orient the s&box bridge."

@@ -1,5 +1,28 @@
 # Inventory (item storage, slots/hotbar, pickup & drop)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it IS / when you need it](#what-it-is--when-you-need-it)
+- [Canonical recipe (modern s&box)](#canonical-recipe-modern-sbox)
+  - [1. Single-player / local: a Component with a change-event](#1-single-player--local-a-component-with-a-change-event)
+  - [2. Slots + hotbar + deploy (the common "weapons/tools" shape)](#2-slots--hotbar--deploy-the-common-weaponstools-shape)
+  - [3. Multiplayer pickup: host-authoritative consume](#3-multiplayer-pickup-host-authoritative-consume)
+  - [4. Shared/host-authoritative pool: optimistic client + [Rpc.Host] twin](#4-sharedhost-authoritative-pool-optimistic-client--rpchost-twin)
+  - [5. Race-locked pickup (many clients grab the same item one tick)](#5-race-locked-pickup-many-clients-grab-the-same-item-one-tick)
+  - [6. Drop = inverse of deploy](#6-drop--inverse-of-deploy)
+- [Notable variations](#notable-variations)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [A. Three-tier bag + equipment-driven expansion (bublic.stonebystone)](#a-three-tier-bag--equipment-driven-expansion-bublicstonebystone)
+  - [B. Static service + per-instance data bag (lowkeynetworks.newrp)](#b-static-service--per-instance-data-bag-lowkeynetworksnewrp)
+  - [C. Reconnect snapshot via GetRawNetworkData (treehaven.sdiver)](#c-reconnect-snapshot-via-getrawnetworkdata-treehavensdiver)
+  - [D. Phase-aware inventory grant + ammo gating (klavs.basebuilder)](#d-phase-aware-inventory-grant--ammo-gating-klavsbasebuilder)
+  - [Updated "read these games" pointer](#updated-read-these-games-pointer)
+<!-- reference-toc:end -->
+
 How to build the "player holds items" system in modern s&box: a Component that owns the items, networked pickup/drop, slot selection, and capacity rules — distilled from 12+ real games.
 
 ## What it IS / when you need it

@@ -5,7 +5,7 @@ description: Use when building a whole s&box game or a specific game SYSTEM and 
 
 # s&box Cookbook — Master Router
 
-A library of **code-grounded recipes** mined from **51 current (2026), hand-built open-source s&box games** (2026-06 refresh re-mined all 51 — added 6 genres + 2 systems below; cross-reference them with `references/CORPUS-INDEX.md`) plus the modern engine repos (Facepunch `sandbox`, `sbox-scenestaging`, `sandbox-plus-plus`, `grubs`, …). Every recipe is **modern GameObject/Component/Scene API** and cites real source you can open. (The original 27 deep-mined games supply the bulk of the genre/system spine; a second batch of 20 — basebuilder, scoops, sneguborka, duck_pond, phenodex, lumberyard, stone_by_stone, newrp, sweeper_otso, wjse, farm_land, garden, suspectra, sandmoney_, minigolf, fill_the_void, chess_otb, nice_putt_idiot, s_sino, sandbox-reforged — adds the host-migration/day-night/buoyancy/genetics/module-loader/sidewalk-NPC variations cited in the references below.)
+A library of **independently authored recipes and language-neutral pseudocode** informed by research into 51 current public-source s&box packages plus cited modern engine repositories. The citations support technical facts and comparison; they are not permission to reuse upstream code. No upstream source code is bundled. See `references/SOURCE-PROVENANCE.md` for the research boundary, `references/SOURCE-REGISTRY.json` for machine-readable source and license status, and `references/CORPUS-INDEX.md` for the pattern index.
 
 **This file is an index, not the answer.** Find your system or genre below, then **open that reference** so you load only what you need.
 
@@ -22,7 +22,7 @@ A library of **code-grounded recipes** mined from **51 current (2026), hand-buil
 ## 🎮 Building a whole game? → Genre recipes
 Each `references/genres/<x>.md` gives the **system stack to compose**, a **build order**, and **how the real games do it** (with code refs).
 
-| You're building… | Open | Mined from |
+| You're building… | Open | Research citations |
 |---|---|---|
 | Tycoon / idle / incremental (chop, mine, dig) | `references/genres/tycoon-idle.md` | chop_the_forest, s_miner, digging_simulator |
 | Shopkeeper / management (kiosk, store, restaurant) | `references/genres/shopkeeper.md` | doner_kiosk, shop_manager, everything_must_go |

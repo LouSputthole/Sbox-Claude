@@ -1,0 +1,118 @@
+name: codex-release
+
+on:
+  push:
+    branches: [main]
+    tags: ["codex-v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate-and-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: "24"
+          - os: windows-latest
+            node: "18"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      CODEX_HOME: ${{ runner.temp }}/codex-home
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install MCP dependencies
+        working-directory: sbox-mcp-server
+        run: npm ci
+
+      - name: Build and test MCP server
+        working-directory: sbox-mcp-server
+        run: npm test
+
+      - name: Audit npm package contents
+        run: node scripts/audit-npm-pack.mjs
+
+      - name: Audit repository privacy
+        run: node scripts/audit-repo-privacy.mjs
+
+      - name: Audit bridge parity
+        run: node scripts/audit-parity.mjs
+
+      - name: Audit MCP quality
+        run: node scripts/audit-mcp-quality.mjs
+
+      - name: Audit skill links
+        run: node scripts/audit-skill-links.mjs
+
+      - name: Validate reference TOCs
+        run: node scripts/sync-reference-tocs.mjs
+
+      - name: Audit cookbook provenance
+        run: |
+          node scripts/audit-cookbook-provenance.mjs --self-test
+          node scripts/audit-cookbook-provenance.mjs
+
+      - name: Check Codex plugin generation
+        run: node scripts/gen-codex-plugin.mjs --check
+
+      - name: Audit Codex release version
+        run: node scripts/audit-codex-version.mjs
+        env:
+          CODEX_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+      - name: Validate Codex release package
+        run: node scripts/validate-codex-release.mjs
+
+      - name: Check C# syntax
+        run: python scripts/check-csharp-syntax.py
+
+      - name: Install current Codex CLI
+        run: npm install --global @openai/codex@0.144.5
+
+      - name: Register repository marketplace
+        run: codex plugin marketplace add .
+
+      - name: Install Codex plugin
+        run: codex plugin add sbox-codex-bridge@sboxskins
+
+      - name: Verify installed Codex plugin cache
+        run: node scripts/verify-installed-codex-plugin.mjs
+
+      - name: Register GitHub marketplace from main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home-git
+        run: codex plugin marketplace add LouSputthole/Sbox-Claude --ref main
+
+      - name: Install Codex plugin from GitHub marketplace
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home-git
+        run: codex plugin add sbox-codex-bridge@sboxskins
+
+      - name: Verify GitHub-installed Codex plugin cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          CODEX_HOME: ${{ runner.temp }}/codex-home-git
+        run: node scripts/verify-installed-codex-plugin.mjs

@@ -1,5 +1,29 @@
 # Shop / Vendor System
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it IS / when you need it](#what-it-is--when-you-need-it)
+- [Canonical modern approach (recipe)](#canonical-modern-approach-recipe)
+  - [1. Currency holder with a guarded spend](#1-currency-holder-with-a-guarded-spend)
+  - [2. Catalog with a geometric cost curve](#2-catalog-with-a-geometric-cost-curve)
+  - [3. Buy: spend, increment, apply the effect to a live component](#3-buy-spend-increment-apply-the-effect-to-a-live-component)
+  - [4. Vendor surface: proximity + use → open UI → purchase](#4-vendor-surface-proximity--use--open-ui--purchase)
+  - [5. Confirm + purchase (with an Action hook for non-item buys)](#5-confirm--purchase-with-an-action-hook-for-non-item-buys)
+- [Notable variations](#notable-variations)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Player-set price → buy-probability demand curve (supermarket sim)](#player-set-price--buy-probability-demand-curve-supermarket-sim)
+  - [Spawn-and-charge world vendor with a per-player cap](#spawn-and-charge-world-vendor-with-a-per-player-cap)
+  - [Category-gated unlock wall (own N first) + per-level upgrade ladder](#category-gated-unlock-wall-own-n-first--per-level-upgrade-ladder)
+  - [Reason-tagged transactions (self-instrumenting economy) + vendor-as-building](#reason-tagged-transactions-self-instrumenting-economy--vendor-as-building)
+  - [Shop entry that doubles as a scene-object unlocker](#shop-entry-that-doubles-as-a-scene-object-unlocker)
+  - [In-round powerup store (currency = a gameplay resource, price from ConVar)](#in-round-powerup-store-currency--a-gameplay-resource-price-from-convar)
+  - [Read these games](#read-these-games)
+<!-- reference-toc:end -->
+
 How to build an in-game shop where a player walks up to a kiosk, spends currency, and gets an upgrade, item, or stock delivery — in modern s&box (GameObject/Component/Scene).
 
 ## What it IS / when you need it
@@ -21,41 +45,51 @@ Keep money in one place and never let callers touch the field directly — go th
 ```csharp
 public sealed class Wallet : Component
 {
-    [Sync] public int Money { get; set; }            // [Sync] only if multiplayer
+    [Sync( SyncFlags.FromHost )]
+    public int Money { get; private set; }
 
     public bool TrySpend( int cost )
     {
+        if ( Networking.IsActive && !Networking.IsHost ) return false;
         if ( cost < 0 || Money < cost ) return false;
         Money -= cost;
         return true;
     }
-    public void Add( int amount ) => Money += amount;
+
+    public bool TryAdd( int amount )
+    {
+        if ( Networking.IsActive && !Networking.IsHost ) return false;
+        if ( amount < 0 ) return false;
+        Money += amount;
+        return true;
+    }
 }
 ```
 
-In multiplayer, money is **host-authoritative**: a client check is advisory, the host re-validates (digging_simulator keeps a plain `int Money` for single-player; restaurant_dev's `Restaurant.Money` is `[Sync(SyncFlags.FromHost)]` and only the host decrements it — `RestaurantShop.cs:48-61`).
+This version is safe as the default: offline play may mutate locally, while a networked session only accepts host mutations and replicates money from the host. Client purchase checks remain advisory; an `[Rpc.Host]` purchase handler must re-derive the price and re-validate caller, distance, limits, inventory capacity, and funds. A strictly single-player game may use a plain field instead (digging_simulator); restaurant_dev's `Restaurant.Money` is `[Sync(SyncFlags.FromHost)]` and only the host decrements it (`RestaurantShop.cs:48-61`).
 
 ### 2. Catalog with a geometric cost curve
 
 The canonical idle/tycoon price is `BaseCost * Multiplier^currentLevel`. Expose the tuning as a `[Serializable]` config so designers edit it in the inspector.
 
-```csharp
-[Serializable]
-public class UpgradeConfig
-{
-    [Property] public int BaseCost { get; set; } = 100;
-    [Property] public float CostMultiplier { get; set; } = 1.5f;
-    [Property] public int MaxLevel { get; set; } = 5;
-    [Property] public float BaseStat { get; set; } = 50f;
-    [Property] public float StatPerLevel { get; set; } = 15f;
-}
+```text
+UPGRADE CONFIGURATION
+  base cost       = 100
+  cost multiplier = 1.5
+  maximum level   = 5
+  base stat       = 50
+  stat per level  = 15
 
-public int GetCost( int currentLevel, UpgradeConfig c )
-    => currentLevel >= c.MaxLevel ? -1                       // -1 sentinel = maxed
-     : (int)(c.BaseCost * MathF.Pow( c.CostMultiplier, currentLevel ));
+FUNCTION costForLevel(currentLevel, configuration)
+  IF currentLevel is at least configuration.maximumLevel
+    RETURN -1  // sentinel meaning the upgrade is maxed
+
+  scaledCost = configuration.baseCost
+               * POWER(configuration.costMultiplier, currentLevel)
+  RETURN scaledCost rounded down to an integer
 ```
 
-Verbatim from digging_simulator (`ShopTerminal.cs:9` config, `:49-66` the `MathF.Pow` formula returning `-1` at max). Note `MathF` works in s&box (`Math.Pow` is also fine).
+digging_simulator uses this configuration and cost formula (`ShopTerminal.cs:9` config, `:49-66` the `MathF.Pow` formula returning `-1` at max). Note `MathF` works in s&box (`Math.Pow` is also fine).
 
 ### 3. Buy: spend, increment, apply the effect to a live component
 
@@ -93,18 +127,23 @@ This 2D-distance proximity scan is xtrem_road's pattern (`PlayerInventory.cs:553
 
 ### 5. Confirm + purchase (with an Action hook for non-item buys)
 
-```csharp
-private void TryPurchase( ElevatorPlayer player )
-{
-    if ( player.Balance < Item.Cost ) return;
-    player.RemoveCoins( Item.Cost );
-    if ( Item.ShouldGiveEquipment )
-        player.Components.Get<InventoryComponent>()?.GiveItem( Item );
-    Item.OnPurchase?.Invoke( player );                       // upgrades/effects with no item
-}
+```text
+PROCEDURE completePurchase(player, offer)
+  IF player balance is less than offer cost
+    STOP without purchasing
+
+  remove offer cost from the player's balance
+
+  IF the offer grants equipment
+    find the player's inventory
+    IF an inventory exists
+      add the offered equipment
+
+  IF the offer defines an additional purchase action
+    run that action for the player
 ```
 
-Verbatim from elevator (`ShopInteraction.cs:19-27`), gated behind a `ShopConfirmation.Open(item, callback)` razor dialog (`:16`). The `OnPurchase` `Action<Player>` on the definition lets one code path handle items *and* effect-only purchases.
+elevator uses this flow (`ShopInteraction.cs:19-27`), gated behind a `ShopConfirmation.Open(item, callback)` razor dialog (`:16`). The `OnPurchase` `Action<Player>` on the definition lets one code path handle items *and* effect-only purchases.
 
 ## Notable variations
 
@@ -112,7 +151,7 @@ Verbatim from elevator (`ShopInteraction.cs:19-27`), gated behind a `ShopConfirm
 
 **Host-authoritative procurement over RPC** — client calls a method that ships only resource **Ids + quantities** to `[Rpc.Host] TryPurchaseOrder`, which reconstructs from `ResourceLibrary.GetAll<T>().FirstOrDefault(r=>r.Id==id)`, re-checks `Cost() vs Money`, attempts physical delivery, *then* deducts (restaurant_dev `RestaurantShop.cs:21-69`). Never send `GameResource` refs over RPC — they don't round-trip.
 
-**Multi-tier upgrade tables** — parallel `static readonly float[]` cost/effect arrays, one `TryBuyX` per line, effects read pull-based via getters (`GetPatienceMultiplier()`) so consumers query the manager rather than the upgrade pushing changes (shop_manager `ShopManager.cs:175,208`). Copy-pasteable but verbose (~12 near-identical blocks).
+**Multi-tier upgrade tables** — parallel `static readonly float[]` cost/effect arrays, one `TryBuyX` per line, effects read pull-based via getters (`GetPatienceMultiplier()`) so consumers query the manager rather than the upgrade pushing changes (shop_manager `ShopManager.cs:175,208`). Straightforward but verbose (~12 near-identical blocks).
 
 **3D "look at item to buy"** — a raycast from the eye with a `'shopitem'` tag, hovered `ShopItem` gets `OnHovered` (spin + tooltip); cost/purchase are `virtual` on a base `ShopItem` component, subclasses override (natural_disaster_survival `ShopItem.cs:58`, `PlayerStats.cs:182`). Variant: kiosk **trigger collider** + `box.Touching` instead of a raycast (multis_cases `Interactable.cs:14`, `PlayerInteractor.cs:40`).
 
@@ -171,7 +210,7 @@ static (float t, float chance)[] BuyChanceCurve =
 // Rich customers ignore markup (GetRichBuyChance = 100% until the ceiling).
 ```
 
-Two more lift-able bits from the same game: a third spend path **`ForceSpend`** that *allows* a negative balance (salaries, loan auto-repay, firing penalties) alongside the gated `SpendMoney`/`CanAfford` (`Code/Economy/ShopFunds.cs`), and broadcasting the whole price table to clients as **one `[Sync] string` of `"id:price,id:price"`** rather than a synced `Dictionary` — non-host edits are optimistic-local then reconciled by an `[Rpc.Host]`.
+Two more reusable techniques from the same game: a third spend path **`ForceSpend`** that *allows* a negative balance (salaries, loan auto-repay, firing penalties) alongside the gated `SpendMoney`/`CanAfford` (`Code/Economy/ShopFunds.cs`), and broadcasting the whole price table to clients as **one `[Sync] string` of `"id:price,id:price"`** rather than a synced `Dictionary` — non-host edits are optimistic-local then reconciled by an `[Rpc.Host]`.
 
 ### Spawn-and-charge world vendor with a per-player cap
 

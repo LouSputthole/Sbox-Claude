@@ -1,5 +1,27 @@
 # Crafting
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it is / when you need it](#what-it-is--when-you-need-it)
+- [Canonical modern approach](#canonical-modern-approach)
+  - [1. A recipe is a GameResource](#1-a-recipe-is-a-gameresource)
+  - [2. Each step matches an ingredient by id + bit-flag state](#2-each-step-matches-an-ingredient-by-id--bit-flag-state)
+  - [3. Complete: consume inputs, spawn output, host-authoritative](#3-complete-consume-inputs-spawn-output-host-authoritative)
+  - [4. Fusion variant: validate, consume, generate](#4-fusion-variant-validate-consume-generate)
+  - [5. Steer output with a [Flags] ingredient-effect enum](#5-steer-output-with-a-flags-ingredient-effect-enum)
+- [Variations seen across games](#variations-seen-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Conveyor-trigger transmutation chain (enum-keyed, no recipe asset)](#conveyor-trigger-transmutation-chain-enum-keyed-no-recipe-asset)
+  - [Timed offline-safe converter (DateTime-stamped completion)](#timed-offline-safe-converter-datetime-stamped-completion)
+  - [Timed slot-growth as crafting-over-time](#timed-slot-growth-as-crafting-over-time)
+  - [Sell terminal as implicit item-to-currency conversion](#sell-terminal-as-implicit-item-to-currency-conversion)
+  - [Anti-patterns flagged in these games](#anti-patterns-flagged-in-these-games)
+  - [Read these games](#read-these-games)
+<!-- reference-toc:end -->
+
 How to build a crafting system in modern s&box: turn input items into output items via designer-authored recipes. Covers ingredient-assembly cooking, fusion/upgrade tables, and meta-passthrough expression crafting.
 
 ## What it is / when you need it

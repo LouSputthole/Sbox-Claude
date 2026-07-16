@@ -10,7 +10,7 @@ If you build s&box games and you talk to an AI to do it, this is the release tha
 
 Here's the honest problem with using *any* AI to write s&box code: the engine moves fast, the API drifts between SDK builds, and a general-purpose model fills the gaps with plausible-sounding nonsense. It'll happily hand you a multiplayer economy that desyncs the moment a second player joins, a save system a client can forge, and a loot table that's "random" in a way players can exploit. It looks right. It compiles. It's wrong in exactly the ways that bite you three weeks later.
 
-v1.9.0 fixes that at the root. We built a **massive brain** into the plugin — a skill called `sbox-cookbook` — and we trained it on **real, shipped, open-source s&box games**. The best games in the ecosystem. Not toy samples, not docs paraphrased, not the model's training data: the actual source of games people built and shipped, plus the modern s&box engine source itself.
+v1.9.0 fixes that at the root. We built a **massive brain** into the plugin — a skill called `sbox-cookbook` — and we trained it on **real, shipped, public-source s&box games**. The best games in the ecosystem. Not toy samples, not docs paraphrased, not the model's training data: the actual source of games people built and shipped, plus the modern s&box engine source itself.
 
 Then we distilled what those games do into **code-grounded recipes**. It covers the systems that are genuinely hard to get right:
 

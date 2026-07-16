@@ -7,7 +7,7 @@ description: Use when writing or modifying code for s&box, sbox, the Facepunch s
 
 ## READ BEFORE WRITING CODE
 
-**s&box is not Unity.** `MonoBehaviour`, `Start()`, `Update()`, `GetComponent<T>()` call sites, `Instantiate()`, `Destroy(gameObject)`, `Debug.Log`, `[SerializeField]`, `Input.GetKey()`, `Physics.Raycast` — **none of these exist**. If you write any of them you have hallucinated.
+**s&box is not Unity.** `MonoBehaviour`, `Start()`, `Update()`, Unity-style `GetComponent<T>()` assumptions, `Instantiate()`, `Destroy(gameObject)`, `Debug.Log`, `[SerializeField]`, `Input.GetKey()`, `Physics.Raycast` — **do not carry over as Unity patterns**. s&box does provide `GetComponent<T>()`; use it only with the s&box component model and verify the exact lookup behavior in the installed SDK. If you copy the surrounding Unity pattern, you have hallucinated.
 
 s&box is a C# scripting layer on Source 2 by Facepunch. The scene system uses `GameObject` + `Component` with a different lifecycle, a different networking model, and a different API surface. **The single source of truth is the LIVE editor reflection via the Claude Bridge** — `describe_type` / `search_types` / `get_method_signature` (bridge tools on s&box's native MCP server, invoked by plain name via `call_tool`) query the actually-installed SDK. If anything in this skill disagrees with what the bridge reports for your build, the live reflection wins. The curated references here teach the patterns + mental model; verify exact signatures live.
 
@@ -22,10 +22,10 @@ s&box is a C# scripting layer on Source 2 by Facepunch. The scene system uses `G
 ```
 Scene (is-a GameObject — the root)
   └── GameObject (transform, tags, children, components)
-        └── Component (all gameplay code extends this)
+        └── Component (the base for attachable gameplay behaviours)
 ```
 
-- **All gameplay code** is a `sealed class` extending `Sandbox.Component`.
+- **Most attachable gameplay behaviours** are `sealed` classes extending `Sandbox.Component`. Valid non-`Component` types also exist: `GameObjectSystem<T>` scene systems, `GameResource` data assets, Razor/UI panel types, interfaces/events, and plain helper or DTO classes. Choose the base type that matches the engine role.
 - **Lifecycle overrides** are `protected override void OnAwake() / OnStart() / OnUpdate() / OnFixedUpdate() / OnEnabled() / OnDisabled() / OnDestroy()`. Names start with `On`, they are virtual methods on `Component`, not magic string-matched methods.
 - **Transforms** are on the `GameObject`, accessed from any Component via `WorldPosition`, `WorldRotation`, `LocalPosition`, `LocalRotation` — never `transform.position`.
 - **UI** is Razor (`.razor` files) — HTML + SCSS + C#. Panels use flexbox layout. Hot-reloads in the editor.
@@ -75,7 +75,7 @@ Match the task, open the file. Do not guess; open the file.
 | Use `Time.Now`, `Time.Delta`, `TimeSince`, `TimeUntil` | `references/input-and-physics.md` → *Time* |
 | Draw debug gizmos (`DrawGizmos`, `Gizmo.Draw`) | `references/input-and-physics.md` → *Gizmo* |
 | Need the full signature of `GameObject`, `Component`, `Scene`, `Input`, etc. | **Claude Bridge (live):** `describe_type` / `get_method_signature` via `call_tool` |
-| Look up whether a given type exists & what it does | **Claude Bridge (live):** `search_types` / `describe_type` via `call_tool`; prose guides via `search_docs` (lifeline server) |
+| Look up whether a given type exists & what it does | **Claude Bridge (live):** `search_types` / `describe_type` via `call_tool`; prose guides via `search_docs` (optional lifeline server) |
 | See a complete worked example of a pattern before writing your own | `references/patterns-and-examples.md` |
 
 ---
@@ -142,7 +142,7 @@ If a Unity pattern isn't in the table, assume it doesn't exist in s&box and veri
 
 ## The Ten Rules You Must Not Break
 
-1. **Every gameplay class extends `Component`.** Not `MonoBehaviour`, not `object`, not `ScriptableObject` — just `Component`. Mark it `sealed` unless inheritance is required.
+1. **Every attachable gameplay behaviour extends `Component`.** Do not use `MonoBehaviour` or `ScriptableObject`. Scene-wide systems use `GameObjectSystem<T>`; data assets, UI, interfaces/events, and plain helpers use their appropriate s&box or C# type. Mark concrete component behaviours `sealed` unless inheritance is required.
 2. **Lifecycle methods are `protected override void On*()`.** If you wrote `void Update()` instead of `protected override void OnUpdate()`, your code does nothing.
 3. **Serialize fields with `[Property]`.** Not `[SerializeField]`, not `public` alone. `[Property]` both shows in the inspector and saves to prefab/scene.
 4. **Networked state uses `[Sync]`.** Only the object owner may assign. Everyone else sees replicated values. Combine with `[Change(nameof(Method))]` for change callbacks.

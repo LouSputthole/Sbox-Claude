@@ -1,5 +1,21 @@
 # Leaderboards & Live Services (Stats / Leaderboards / Achievements)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What this IS and when you need it](#what-this-is-and-when-you-need-it)
+- [Canonical modern approach](#canonical-modern-approach)
+  - [1. Submit a stat (the write side)](#1-submit-a-stat-the-write-side)
+  - [2. Read the leaderboard back (the query side)](#2-read-the-leaderboard-back-the-query-side)
+  - [3. Read your own stat directly (no board needed)](#3-read-your-own-stat-directly-no-board-needed)
+  - [4. Achievements](#4-achievements)
+  - [5. The networking rule that bites everyone](#5-the-networking-rule-that-bites-everyone)
+- [Notable variations seen across games](#notable-variations-seen-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+<!-- reference-toc:end -->
+
 How to wire global leaderboards, persistent player stats, and achievements in modern s&box using the built-in `Sandbox.Services` cloud — no custom backend required.
 
 ## What this IS and when you need it

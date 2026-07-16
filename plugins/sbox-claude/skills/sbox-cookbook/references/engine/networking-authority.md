@@ -1,5 +1,48 @@
 # Networking & Authority
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Patterns](#patterns)
+  - [1. Gate input & simulation on !IsProxy (owner-authoritative)](#1-gate-input--simulation-on-isproxy-owner-authoritative)
+  - [2. Host-authoritative writes: guard every mutator with Networking.IsHost](#2-host-authoritative-writes-guard-every-mutator-with-networkingishost)
+  - [3. The host-wrapper idiom (one authoritative writer, callable from anywhere)](#3-the-host-wrapper-idiom-one-authoritative-writer-callable-from-anywhere)
+  - [4. NEVER trust the client — re-validate inside every [Rpc.Host]](#4-never-trust-the-client--re-validate-inside-every-rpchost)
+  - [5. Pick the right replication attribute](#5-pick-the-right-replication-attribute)
+  - [6. React with [Change], don't poll](#6-react-with-change-dont-poll)
+  - [7. Separate authority from presentation (compute on host, broadcast effects)](#7-separate-authority-from-presentation-compute-on-host-broadcast-effects)
+  - [8. Choose the RPC target deliberately](#8-choose-the-rpc-target-deliberately)
+  - [9. Unicast / exclude with Rpc.FilterInclude / Rpc.FilterExclude](#9-unicast--exclude-with-rpcfilterinclude--rpcfilterexclude)
+  - [10. Spawn networked objects: configure → NetworkSpawn](#10-spawn-networked-objects-configure--networkspawn)
+  - [11. Lobby + connection lifecycle via INetworkListener](#11-lobby--connection-lifecycle-via-inetworklistener)
+  - [12. Production lifecycle: validate-before-spawn, reuse-on-reconnect, reap orphans](#12-production-lifecycle-validate-before-spawn-reuse-on-reconnect-reap-orphans)
+  - [13. Non-replicable types: sync a Guid, resolve it](#13-non-replicable-types-sync-a-guid-resolve-it)
+  - [14. Network.Refresh() after out-of-band host mutations](#14-networkrefresh-after-out-of-band-host-mutations)
+  - [15. Host-loss failover: heartbeat + RealTimeSince timeout](#15-host-loss-failover-heartbeat--realtimesince-timeout)
+  - [16. Send intent, not state (sparse discrete events)](#16-send-intent-not-state-sparse-discrete-events)
+  - [17. Host-migration watchdog: reclaim orphans, reconcile the [Sync] registry, sanity-restart](#17-host-migration-watchdog-reclaim-orphans-reconcile-the-sync-registry-sanity-restart)
+  - [18. Vote-kick + temp-ban (host-authoritative, enforced on connect)](#18-vote-kick--temp-ban-host-authoritative-enforced-on-connect)
+  - [19. Lobby: map-vote with tie-break + per-slot networked character preview](#19-lobby-map-vote-with-tie-break--per-slot-networked-character-preview)
+  - [20. NetworkMode.Never for local-only cosmetics + a per-client static registry](#20-networkmodenever-for-local-only-cosmetics--a-per-client-static-registry)
+- [Gotcha table](#gotcha-table)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [21. Host-migration-safe round timer: re-arm TimeUntil against the new host's clock](#21-host-migration-safe-round-timer-re-arm-timeuntil-against-the-new-hosts-clock)
+  - [22. Host-event + mirror RPC: converge host and clients instantly on phase transitions](#22-host-event--mirror-rpc-converge-host-and-clients-instantly-on-phase-transitions)
+  - [23. Paired ApplyXLocal + [Rpc.Broadcast] RpcApplyX for low-latency phase transitions](#23-paired-applyxlocal--rpcbroadcast-rpcapplyx-for-low-latency-phase-transitions)
+  - [24. Spawn-disabled → await Task.Frame() → enable to fix proxy replication race](#24-spawn-disabled--await-taskframe--enable-to-fix-proxy-replication-race)
+  - [25. Double-write authority: owner writes to Stats, host writes to the authoritative store](#25-double-write-authority-owner-writes-to-stats-host-writes-to-the-authoritative-store)
+  - [26. Hash-gated NetList mirror to suppress per-frame network churn](#26-hash-gated-netlist-mirror-to-suppress-per-frame-network-churn)
+  - [27. Targeted RPC for per-player cloud writes: Rpc.FilterInclude + re-validate Rpc.Caller.IsHost](#27-targeted-rpc-for-per-player-cloud-writes-rpcfilterinclude--re-validate-rpccallerishost)
+  - [28. Tag-based player state instead of list-of-references (migration-resilient)](#28-tag-based-player-state-instead-of-list-of-references-migration-resilient)
+  - [29. [Sync] NetList position registry as migration-proof truth](#29-sync-netlist-position-registry-as-migration-proof-truth)
+  - [30. Optimistic tag-before-spawn to close the race between "flagged" and "stepped"](#30-optimistic-tag-before-spawn-to-close-the-race-between-flagged-and-stepped)
+  - [31. Reliable networked Destroy of multi-owner objects: broadcast then host-seize](#31-reliable-networked-destroy-of-multi-owner-objects-broadcast-then-host-seize)
+  - [32. De-duped teleport with serial number: send 3× for packet-loss resilience](#32-de-duped-teleport-with-serial-number-send-3-for-packet-loss-resilience)
+  - [33. Counter + authoritative recount cross-check before any irreversible round decision](#33-counter--authoritative-recount-cross-check-before-any-irreversible-round-decision)
+  - [Gotcha additions (corpus refresh)](#gotcha-additions-corpus-refresh)
+<!-- reference-toc:end -->
+
 Host-authoritative multiplayer in modern s&box: who simulates, who writes, and how clients request changes without trusting each other. Read this before touching `[Sync]`, `[Rpc.*]`, ownership, or the lobby lifecycle.
 
 ## Mental model
@@ -12,7 +55,7 @@ Every machine runs the same C#. Three roles decide who is allowed to *act*:
 
 The single most-repeated convention: at the top of a networked component's `OnUpdate`/`OnFixedUpdate`, `if ( IsProxy ) return;` before reading `Input` or running movement/AI/shooting (sbox-scenestaging: `Code/ExampleComponents/Gun.cs:7`). The owner is authoritative for *its own* object; the host is authoritative for *everyone's* shared state. Clients never write authoritative state directly — they receive it via `[Sync(SyncFlags.FromHost)]` and request changes through `[Rpc.Host]`.
 
-> `Network.IsOwner` is null/false in a solo editor playtest (no lobby → no owner), so an `IsOwner`-only guard silently disables whole systems until real multiplayer starts. Prefer `!IsProxy`, or pair with a `LocalSimulation` `[Property]`: `ShouldSimulate => LocalSimulation || Network.IsOwner`.
+> `Network.IsOwner` is null/false in a solo editor playtest (no lobby → no owner), so an `IsOwner`-only guard silently disables whole systems until real multiplayer starts. Prefer `!IsProxy`, or expose a local-simulation property and simulate when either that override or ownership is active.
 
 ---
 
@@ -20,28 +63,28 @@ The single most-repeated convention: at the top of a networked component's `OnUp
 
 ### 1. Gate input & simulation on `!IsProxy` (owner-authoritative)
 
-```csharp
-protected override void OnUpdate()
-{
-    if ( IsProxy ) return;                 // proxies only render replicated state
-    var look = Components.GetInAncestors<PlayerController>().EyeAngles.ToRotation();
-    if ( Input.Pressed( "Attack1" ) ) Fire( look.Forward );
-}
+```text
+on each simulation tick
+  if this machine is a proxy for the object, stop
+  resolve owner-local input and aim state
+  translate input into an intent such as fire or move
+  mutate only owner-authoritative state
+  leave proxies to render replicated results
 ```
 
 Owner-authoritative state is plain `[Sync]` and only mutated when `!IsProxy` — e.g. `[Sync] public Angles EyeAngles`, `[Sync] public bool IsRunning`, written only inside the `!IsProxy` branch (sbox-scenestaging: `Code/ExampleComponents/PlayerController.cs:17,27,42`). Pair effect bodies with `if ( Application.IsDedicatedServer ) return;` so a headless server skips particles/sounds.
 
 ### 2. Host-authoritative writes: guard every mutator with `Networking.IsHost`
 
-```csharp
-[Sync( SyncFlags.FromHost )] public float SalaryMultiplier { get; set; } = 1f;
+```text
+authoritative field
+  replicate from the host only
 
-public void SetMultiplier( float v )
-{
-    Assert.True( Networking.IsHost, "SetMultiplier is host-only" ); // loud in dev
-    if ( !Networking.IsHost ) return;                              // bail in release
-    SalaryMultiplier = v;
-}
+setAuthoritativeValue(candidate)
+  assert host authority during development
+  return without mutation when this machine is not the host
+  validate and clamp candidate
+  write the replicated field once
 ```
 
 Authoritative, cheat-sensitive fields are `[Sync(SyncFlags.FromHost)]` so only the host may author them (dxrp: `game/code/GameManager.cs:21`). A host-only broadcast can also self-assert with `Networking.IsHost` before counting (sbox-scenestaging: `Code/ExampleComponents/SnapshotTest.cs:13`).
@@ -50,40 +93,32 @@ Authoritative, cheat-sensitive fields are `[Sync(SyncFlags.FromHost)]` so only t
 
 Make the public mutator network-transparent: if not the host, forward through a private `[Rpc.Host]` that re-calls the public method on the host. The mutation body only ever executes host-side.
 
-```csharp
-public void SwitchWeapon( BaseCarryable weapon, bool allowHolster = false )
-{
-    if ( !Networking.IsHost ) { HostSwitchWeapon( weapon, allowHolster ); return; }
-    // ... real mutation runs only on the host ...
-    ActiveWeapon = weapon;
-}
+```text
+publicMutation(request)
+  if already on the host
+    validate request and perform the single authoritative mutation
+  otherwise
+    send a host RPC containing only the requested intent
 
-[Rpc.Host]
-private void HostSwitchWeapon( BaseCarryable weapon, bool allowHolster = false )
-    => SwitchWeapon( weapon, allowHolster );
+hostRpc(request)
+  call publicMutation(request) on the host
 ```
 
-Verbatim shape from the base game (sandbox: `Code/Player/PlayerInventory.cs:530`). `ActiveWeapon` itself is `[Sync(SyncFlags.FromHost)]` so clients can't author it directly.
+The base game demonstrates this host-wrapper structure (sandbox: `Code/Player/PlayerInventory.cs:530`). `ActiveWeapon` itself is `[Sync(SyncFlags.FromHost)]` so clients can't author it directly.
 
 ### 4. NEVER trust the client — re-validate inside every `[Rpc.Host]`
 
 A malicious client can invoke any `[Rpc.Host]` directly with forged args. `NetFlags` restrict who may *invoke*, which is **not** security. Inside the host body: validate the caller, re-check authority, clamp inputs, and rate-limit.
 
-```csharp
-[Rpc.Host]
-private void RequestOwnershipHost( GameObject go )
-{
-    var caller = Rpc.Caller;                // trusted server-side identity
-    var callerId = Rpc.CallerId;
-
-    // rate-limit, keyed by caller, so spamming the RPC can't bypass limits
-    if ( !go.IsValid() ||
-         Cooldown.Current.CheckAndStartCooldown( $"{callerId}:ownership:take", cost ) )
-        return;
-
-    if ( !GameUtils.HasPermission( caller, go ) ) return; // re-check authority server-side
-    // ... mutate ...
-}
+```text
+hostRpc(requestedObject, requestedValue)
+  derive caller identity from RPC context, never from arguments
+  reject invalid or missing objects
+  reject callers over their per-action rate limit
+  recompute permission from host-owned state
+  clamp or normalize requestedValue
+  perform the mutation only after every check passes
+  record security-relevant rejection or success as appropriate
 ```
 
 From dxrp (`game/code/GameManager.cs:212`). The base sandbox-plus-plus equivalent re-checks `if ( !c.GameObject.HasAccess( Rpc.Caller ) ) return;` before a reflection setter (sandbox-plus-plus: `Code/GameLoop/GameManager.cs:235`). `HasAccess` = admin bypass / unowned-is-public / owner==caller via an `Ownable` component.
@@ -100,15 +135,12 @@ Plain `[Sync]` on money/health/score is a classic exploit — the client can aut
 
 ### 6. React with `[Change]`, don't poll
 
-```csharp
-[Sync( SyncFlags.FromHost ), Change] public BaseCarryable ActiveWeapon { get; private set; }
-
-// Convention: On<PropertyName>Changed( old, @new ) — fires on every client when it changes
-void OnActiveWeaponChanged( BaseCarryable oldW, BaseCarryable newW )
-{
-    if ( oldW.IsValid() ) oldW.GameObject.Enabled = false;
-    if ( newW.IsValid() ) newW.GameObject.Enabled = true;
-}
+```text
+when replicatedValue changes from oldValue to newValue
+  disable or detach presentation associated with oldValue
+  enable or attach presentation associated with newValue
+  tolerate either value being absent
+  rebuild the same presentation from current synced state on late join
 ```
 
 Drive client visuals/audio off replicated state instead of diffing in `OnUpdate` (sandbox: `Code/Player/PlayerInventory.cs:15`). Late-joining proxies rebuild visual state in `OnStart` by reading synced flags.
@@ -117,12 +149,16 @@ Drive client visuals/audio off replicated state instead of diffing in `OnUpdate`
 
 Damage/ammo/death/score are computed host-side; cosmetic results fan out with `[Rpc.Broadcast]`.
 
-```csharp
-[Rpc.Broadcast( NetFlags.HostOnly )]                 // only the host may originate
-public void NotifyDeath( string victim, string killer ) { /* kill-feed UI everywhere */ }
+```text
+host gameplay path
+  compute damage, resource changes, death, and score
+  commit authoritative state
+  emit a reliable presentation event when ordering matters
 
-[Rpc.Broadcast( NetFlags.Unreliable )]               // high-frequency cosmetic only
-public void ShootEffects() { if ( Application.IsDedicatedServer ) return; /* sfx */ }
+client presentation path
+  skip work on a dedicated server
+  play UI, audio, particles, or animation only
+  never apply gameplay mutation here
 ```
 
 `NetFlags.HostOnly` marks a broadcast only the host may send (sbox-scenestaging: `Code/ExampleComponents/SnapshotTest.cs:19`). State-critical broadcasts (death, spawn) keep `NetFlags.Reliable`; high-frequency cosmetic-only calls use `Unreliable`/`UnreliableNoDelay`. A common beginner failure is running gameplay inside a broadcast, or running effects only on the shooter.
@@ -133,9 +169,12 @@ public void ShootEffects() { if ( Application.IsDedicatedServer ) return; /* sfx
 - `[Rpc.Owner]` — a command only the owning client should run (`Kill`, `Kick`, `Refuel`), or push owner-targeted reliable state with `[Rpc.Owner(NetFlags.HostOnly | NetFlags.Reliable)]`.
 - `[Rpc.Host]` — a client→host request. Add `NetFlags.OwnerOnly` so only an object's owner may request its own action:
 
-```csharp
-[Rpc.Host( NetFlags.OwnerOnly | NetFlags.Reliable )]
-private void RequestRespawn() { /* host validates, then respawns this owner */ }
+```text
+requestRespawn
+  send an owner-only, reliable request to the host
+  on the host, confirm the caller owns the relevant player object
+  validate cooldown and current life state
+  perform the respawn through the authoritative spawn path
 ```
 
 Funnel each kind of mutation through exactly one authority.
@@ -144,24 +183,30 @@ Funnel each kind of mutation through exactly one authority.
 
 Scope a broadcast server-side instead of sending to everyone and filtering on the client (which leaks data and wastes bandwidth).
 
-```csharp
-using ( Rpc.FilterInclude( c => c.Id == player.ConnectionId ) )
-    PromptPlayerConsent();                                   // unicast to one player
+```text
+sendPrivatePrompt(targets)
+  enter an include-filter scope for the intended connections
+  invoke the broadcast presentation RPC
+  leave the scope immediately
 
-using ( Rpc.FilterExclude( Owner.GameObject.Network.Owner ) )
-    PlayWorldSound();                                        // everyone except the local shooter
+sendWorldEffectExcept(localOwner)
+  enter an exclude-filter scope for that owner
+  invoke the cosmetic broadcast RPC
 ```
 
-The include form is verbatim from dxrp (`game/code/GameNetworkManager.cs:387`); the wrapped RPC is typically `[Rpc.Broadcast(NetFlags.HostOnly | NetFlags.Reliable)]`. Filter-exclude on the shooter is the reusable first-person audio idiom (simple-weapon-base: `code/swb_base/Weapon.cs:391`).
+DXRP demonstrates an include filter around a host-only reliable broadcast (`game/code/GameNetworkManager.cs:387`). Simple Weapon Base demonstrates excluding the shooter from a world-audio broadcast (`code/swb_base/Weapon.cs:391`).
 
 ### 10. Spawn networked objects: configure → `NetworkSpawn`
 
 `Clone()` alone makes a **local-only** object. Configure it FIRST, then call `NetworkSpawn` — passing a `Connection` assigns ownership (the owner is who simulates it).
 
-```csharp
-var o = ObjectToSpawn.Clone( pos );
-o.Components.Get<Rigidbody>().Velocity = dir * 500f;  // configure BEFORE spawning
-o.NetworkSpawn();                                     // or NetworkSpawn( connection ) to assign owner
+```text
+spawnAuthoritativeObject(prefab, transform, optionalOwner)
+  require exactly one spawning authority
+  clone locally in a disabled or pre-start state when setup needs time
+  configure initial components, transform, and velocity
+  network-spawn only after configuration is complete
+  assign optionalOwner when that connection should simulate the object
 ```
 
 From sbox-scenestaging (`Code/ExampleComponents/Gun.cs:20`). Spawn on exactly one machine — that `Gun` already sits behind `if ( IsProxy ) return;`, so only the owner clones. Forgetting `NetworkSpawn`, or calling it before configuring, or spawning on every client (→ N duplicates) are the three classic bugs. After spawning props that must survive their owner leaving, set the knobs in pattern 12.
@@ -170,51 +215,50 @@ From sbox-scenestaging (`Code/ExampleComponents/Gun.cs:20`). Spawn on exactly on
 
 Implement `Component.INetworkListener` on a manager. Create the lobby if none exists so a solo playtest auto-hosts; spawn host-side in `OnActive`.
 
-```csharp
-public sealed class GameNetworkManager : Component, Component.INetworkListener
-{
-    [Property] public GameObject PlayerPrefab { get; set; }
+```text
+network manager startup
+  create a lobby only when networking is inactive
 
-    protected override void OnStart()                         // auto-host for solo playtest
-    {
-        if ( !Networking.IsActive ) Networking.CreateLobby( new LobbyConfig() );
-    }
+when a connection becomes active
+  require host authority
+  validate connection metadata
+  clone the player at an approved spawn transform
+  apply optional avatar data through validated fields
+  network-spawn the player with the joining connection as owner
 
-    public void OnActive( Connection channel )                // host-side, per join
-    {
-        var clothing = new ClothingContainer();
-        clothing.Deserialize( channel.GetUserData( "avatar" ) );
-        var player = PlayerPrefab.Clone( SpawnPoint.WorldTransform );
-        if ( player.Components.TryGet<SkinnedModelRenderer>( out var body,
-                FindMode.EverythingInSelfAndDescendants ) )
-            clothing.Apply( body );
-        player.NetworkSpawn( channel );                       // assign ownership to the joiner
-    }
-}
+when a connection leaves
+  locate objects owned by that connection
+  apply the documented cleanup or orphan policy
 ```
 
-`OnActive` is verbatim from sbox-scenestaging (`Code/ExampleComponents/GameNetworkManager.cs:8`). Set `channel.CanSpawnObjects = false` so clients can't spawn networked objects directly; `OnDisconnected` finds the player by `Network.Owner == connection` and cleans up; lobby metadata syncs via `Networking.SetData`/`GetData`.
+Scene Staging demonstrates host-side player creation from the active-connection callback (`Code/ExampleComponents/GameNetworkManager.cs:8`). Disable direct client spawning on the connection; on disconnect, locate the player's owned objects and apply the cleanup policy. Exchange lobby metadata through the networking data APIs.
 
 ### 12. Production lifecycle: validate-before-spawn, reuse-on-reconnect, reap orphans
 
 Reject in `AcceptConnection` BEFORE the player exists, and `await`-validate before `NetworkSpawn` so a banned player never flashes into the world.
 
-```csharp
-public bool AcceptConnection( Connection channel, ref string reason )
-{
-    if ( !Config.Current.Game.AllowFamilySharePlayers && channel.OwnerSteamId != channel.SteamId )
-    { reason = "Family shared accounts are not permitted."; return false; }
-    return true;
-}
+```text
+acceptConnection(connection)
+  reject before spawning when account-sharing policy fails
+  reject active temporary bans and malformed required metadata
+  provide a user-safe reason
+  return accepted only after all synchronous gates pass
+
+before network-spawning the player
+  await remaining host-side validation
+  reuse an eligible disconnected player object when reconnecting
+  otherwise create exactly one new player
 ```
 
 From dxrp (`game/code/GameNetworkManager.cs:62`). On reconnect, find the disconnected player object and `AssignOwnership(channel)` (reusing equipment) instead of respawning (`:276`). Run a ~1 Hz pass that kicks connections that never got a player (`:141`). Naive "spawn first, validate later" leaks half-init connections and loses state on rejoin.
 
 After spawning persistent objects:
 
-```csharp
-go.Network.SetOwnerTransfer( OwnerTransfer.Fixed );          // pin ownership
-go.Network.SetOrphanedMode( NetworkOrphaned.Host );          // host takes over on owner disconnect
+```text
+after spawning a persistent object
+  choose a fixed ownership-transfer policy
+  choose host takeover when the owner disconnects
+  document whether the object should instead be destroyed or cleared
 ```
 
 Without `OrphanedMode.Host`, props vanish when their owner leaves (sbox-grubs: `Code/Systems/Network/GrubsNetworkManager.cs:27`).
@@ -223,26 +267,30 @@ Without `OrphanedMode.Host`, props vanish when their owner leaves (sbox-grubs: `
 
 `Connection` and `GameObject` are local handles, NOT network-serializable. Sync the stable `Guid` and resolve.
 
-```csharp
-[Sync( SyncFlags.FromHost )] private Guid _ownerId { get; set; }
+```text
+replicated state
+  store only the stable connection identifier
 
-public Connection Owner
-{
-    get => Connection.All.FirstOrDefault( c => c.Id == _ownerId );
-    set => _ownerId = value?.Id ?? Guid.Empty;
-}
+resolveOwner
+  search current connections for that identifier
+  return no owner when the identifier is empty or no longer present
+
+assignOwner(connection)
+  write the connection's stable identifier, or the empty identifier
 ```
 
-Verbatim from sandbox-plus-plus (`Code/Components/Ownable.cs:8`). For object refs, `[Sync] Guid OccupantId` + resolve via `Scene.Directory.FindByGuid( occupantId )`. The client whose input drives a shared object must OWN it — `vehicle.Network.AssignOwnership( occupant.Network.Owner )` on enter — and clear the driver gate in `OnDestroy` so input doesn't get stuck.
+Sandbox++ demonstrates replicating a stable connection identifier and resolving the current connection locally (`Code/Components/Ownable.cs:8`). Apply the same approach to object references by syncing an object identifier and resolving it through the scene directory. Transfer ownership of a shared controllable object to the connection that supplies its input, and clear the driver gate when that relationship ends.
 
 ### 14. `Network.Refresh()` after out-of-band host mutations
 
 Properties set via reflection (`TypeLibrary…SetValue`) or any non-`[Sync]` path won't auto-replicate. Force a re-snapshot:
 
-```csharp
-prop.SetValue( c, value );
-// c.GameObject.Network.Refresh( c );   // per-component overload is unreliable, in-repo "doesn't work??"
-c.GameObject.Network?.Refresh();         // whole-object refresh — use this
+```text
+after an out-of-band host mutation
+  complete the local mutation
+  request a whole-object network refresh
+  do not rely on a component-specific refresh path
+  after a hard teleport, also clear interpolation
 ```
 
 The base game's own comment flags the per-component overload as broken (sandbox-plus-plus: `Code/GameLoop/GameManager.cs:243`). Use the whole-object refresh. Also call `Network.ClearInterpolation()` after any hard teleport (not just spawn) to avoid one-frame origin ghosts.
@@ -251,15 +299,16 @@ The base game's own comment flags the per-component overload as broken (sandbox-
 
 s&box doesn't always cleanly notify clients when a host vanishes, so relying only on `Connection` events leaves clients frozen.
 
-```csharp
-[Rpc.Broadcast( NetFlags.UnreliableNoDelay )]
-private void RpcHostHeartbeat() => _timeSinceHostHeartbeat = 0;   // client resets on receipt
+```text
+host heartbeat loop
+  periodically broadcast a cheap, non-stateful heartbeat
 
-protected override void OnUpdate()
-{
-    if ( !Connection.Host.IsValid() || _timeSinceHostHeartbeat > 45f )
-        LeaveOrResumeSolo();                                       // don't hang
-}
+when a client receives a heartbeat
+  reset its monotonic elapsed-heartbeat timer
+
+client liveness check
+  if the host handle is invalid or elapsed time exceeds the threshold
+    leave cleanly or enter the documented solo-recovery path
 ```
 
 Pattern from sgba (`Code/Networking/NetworkManager.cs:221`). Cheap, robust liveness every networked game should copy.
@@ -272,50 +321,35 @@ For death/round-result/role-reveal style events, don't replicate a stateful netw
 
 s&box has a known bug where networked GameObjects are **often destroyed during host migration regardless of `NetworkOrphaned` setting**, and the new host inherits stale transient state. Don't try to preserve mid-game state through a migration — detect becoming host, aggressively reconcile, and force a clean restart if anything looks broken. Detect the transition with `isHost && !_wasHost`, then **defer the sanity check ~1s** so in-flight packets that haven't applied yet don't make a healthy board look broken.
 
-```csharp
-protected override void OnUpdate()
-{
-    bool isHost = Networking.IsHost;
-    if ( isHost && !_wasHost ) OnBecameHost();
-    _wasHost = isHost;
-
-    if ( !_settled && _timeSinceBecameHost > 1.0f ) { _settled = true; ValidatePostMigration(); }
-}
-
-void OnBecameHost()
-{
-    _timeSinceBecameHost = 0f; _settled = false;
-    _generator.ForceResetTransientFlags();   // wipe flags the dead host's async tasks would have cleared
-    ReclaimOrphanedFlags();                   // Network.TakeOwnership() each orphan so we can manage/destroy it
-    RebuildFlagMappings();                    // rebuild handle→handle maps by world-position matching
-    ReconcileFlaggedRegistry();               // make the [Sync] list match the visible scene
-}
+```text
+when this machine first becomes the replacement host
+  wait briefly for migration state to settle
+  take authority over objects whose owners disappeared
+  rebuild transient object mappings from stable scene evidence
+  reconcile replicated registries with visible scene objects
+  validate critical round invariants against the live scene
+  continue when intact; otherwise perform one clean authoritative restart
 ```
 
-The four moves, all verbatim from sweeper_otso (`Code/HostWatchdog.cs`): **(1)** `Network.TakeOwnership()` every orphaned object (`:162`) — without authority the new host can't destroy ownerless objects, and they float forever; **(2)** rebuild any handle→handle mapping by matching `WorldPosition.Distance(...) < tol` because object `Id`s don't survive (`:225`); **(3)** reconcile the `[Sync]` registry against what's actually in the scene — drop entries with no visible object, add visible objects missing from the list — because a place/remove broadcast can be lost mid-migration (`:180`); **(4)** the deferred `ValidatePostMigration()` (`:80`) decides intact-vs-broken from the *real scene* (expected-vs-actual child count with a 10% tolerance, plus "is anyone still tagged `playing`?") and calls `ClearBoard()` for a clean round rather than limping along. Pair with the market-recovery variant `RecoverFromHostMigration` (lavagame.sandmoney_ `Code/Core/MarketManager.cs`).
+Sweeper Otso's watchdog demonstrates four recovery responsibilities (`Code/HostWatchdog.cs`): reclaim orphan authority (`:162`), rebuild transient mappings by spatial proximity because runtime identifiers change (`:225`), reconcile the replicated registry with visible scene objects (`:180`), and defer an invariant check that either continues an intact round or performs a clean restart (`:80`). Sandmoney provides a related market-recovery variant (`Code/Core/MarketManager.cs`).
 
 ### 18. Vote-kick + temp-ban (host-authoritative, enforced on connect)
 
 Player-moderation in a host-authoritative game: clients `[Rpc.Host]`-request a vote, the host owns the tally and the ban map, and bans are re-checked on every connection.
 
-```csharp
-private Dictionary<long, DateTime> _bans = new();          // host-only: steamId -> expiry
-private const float BanDurationMinutes = 30f;
+```text
+requestVoteKick(target)
+  execute on the host and derive the voter from RPC context
+  reject self-targets, missing targets, ineligible voters, and vote cooldown abuse
+  create or update host-only vote state
 
-void EnforceBans()                                         // run on the host each tick / on connect
-{
-    foreach ( var conn in Connection.All )
-        if ( _bans.TryGetValue( conn.SteamId, out var expiry ) && DateTime.UtcNow < expiry )
-            conn.Kick( "You were voted out. Try another server." );
-}
+when the vote resolves
+  compute the result from the eligible electorate
+  on success, store a host-only account-id to expiry entry and kick the target
 
-[Rpc.Host]
-public void RequestVoteKick( long targetSteamId )
-{
-    var caller = Rpc.Caller;
-    if ( (long)caller.SteamId == targetSteamId ) return;   // can't kick yourself
-    // ... open a vote, auto-yes the initiator, 20s timer ...
-}
+when any connection activates
+  remove expired entries
+  kick connections whose account id still has an active ban
 ```
 
 From sweeper_otso `Code/VoteKickSystem.cs`: the ban map is `steamId → DateTime expiry` (`:23`), expired entries are swept each pass (`:46-53`), `conn.Kick(reason)` enforces (`:59`), the threshold is majority `(playerCount / 2) + 1`, and players can change their vote. **The whole tally and ban map are host-only state** — a client never holds them; it only sends the `[Rpc.Host]` request, which (per pattern 4) re-validates the caller.
@@ -324,25 +358,17 @@ From sweeper_otso `Code/VoteKickSystem.cs`: the ban map is `steamId → DateTime
 
 A pre-game lobby that votes on a map and shows each joined player's chosen character. Votes/picks live in `NetDictionary<Guid,…>` (collections can't be plain `[Sync]`), the winning map is chosen with a **random tie-break**, and each slot spawns a clone with `NetworkSpawn(conn)` so everyone sees everyone's avatar — cleaned up on leave.
 
-```csharp
-[Sync] public NetDictionary<Guid, int> MapVotes { get; set; } = new();
-[Sync] public NetDictionary<Guid, int> CharacterPicks { get; set; } = new();
+```text
+map vote state
+  replicate voter-id to option-index with a network-aware dictionary
+  let the host validate each submitted option
+  tally all valid ballots at the deadline
+  choose uniformly among tied leaders
 
-int ResolveWinningMap()
-{
-    var tally = new int[Maps.Count];
-    foreach ( var v in MapVotes.Values ) tally[v]++;
-    int best = tally.Max();
-    var winners = Enumerable.Range( 0, tally.Length ).Where( i => tally[i] == best ).ToList();
-    return winners[Game.Random.Int( winners.Count - 1 )];   // random tie-break, never index 0 bias
-}
-
-void ShowPreviewFor( Connection conn, int characterIndex )
-{
-    var preview = CharacterPrefabs[characterIndex].Clone( SlotTransform( conn ) );
-    preview.NetworkSpawn( conn );                            // everyone sees this player's avatar
-    _previews[conn.Id] = preview;                            // destroy in OnDisconnected
-}
+character preview state
+  keep one networked preview object per lobby slot
+  replace that slot's preview when its selection changes
+  destroy the preview when its connection leaves
 ```
 
 Pattern from wjse `Code/Map and Lobby/LobbyManager.cs` (`NetDictionary` votes/picks, tie-break random, clone + `NetworkSpawn(conn)` per slot, floating Steam nameplates, `BroadcastStartGame` scene load). The cleanup-on-leave is load-bearing — orphaned preview clones accumulate every rejoin otherwise.
@@ -351,25 +377,16 @@ Pattern from wjse `Code/Map and Lobby/LobbyManager.cs` (`NetDictionary` votes/pi
 
 For a **purely cosmetic** visual a proxy can recompute locally (a crowd body, a thought-bubble, a held-item prop), don't replicate it — set the child's `NetworkMode = NetworkMode.Never`. On a late-join, a replicated cosmetic spawns a *second* body/bubble alongside the locally-built one; `NetworkMode.Never` keeps it strictly local so there's exactly one. And to reach all instances of a hot component without the per-frame cost of `GetAllComponents`, keep a `static List<T> _all` maintained in `OnEnabled`/`OnDisabled`.
 
-```csharp
-public sealed class CustomerNpc : Component
-{
-    static readonly List<CustomerNpc> _all = new();
-    public static IReadOnlyList<CustomerNpc> All => _all;
-    protected override void OnEnabled()  { if ( !_all.Contains( this ) ) _all.Add( this ); }
-    protected override void OnDisabled() => _all.Remove( this );
-
-    void BuildVisuals()
-    {
-        var body = new GameObject( true, "body" );
-        body.NetworkMode = NetworkMode.Never;       // local-only — no doubled body on late-join
-        body.SetParent( GameObject );
-        // ...bubble + held item also NetworkMode.Never...
-    }
-}
+```text
+local cosmetic component
+  mark the cosmetic child as never networked
+  register the component in a process-local collection when enabled
+  unregister it when disabled or destroyed
+  derive cosmetic state locally from replicated gameplay state
+  iterate the registry instead of scanning the scene every frame
 ```
 
-Verbatim from scoops `Code/CustomerNpc.cs` (`_all` registry `:14-18`, `body.NetworkMode = NetworkMode.Never` `:92`, bubble/item `:136,:162`). Use the `_all` registry anywhere a system iterates "every X each frame" (separation/boids, nearest-of, counts) — it turns an O(n) scene scan into a cached list.
+Scoops demonstrates a component registry (`Code/CustomerNpc.cs:14-18`) and local-only networking mode for cosmetic children (`:92,136,162`). Use a lifecycle-maintained registry anywhere a hot loop repeatedly visits every component of one kind; it replaces a full scene scan with iteration over the relevant set.
 
 ---
 
@@ -413,14 +430,12 @@ Five shipped games added net-new networking patterns beyond patterns 1–20. Cit
 
 `TimeUntil` stores an absolute time off the *old* host's clock — after migration the remaining seconds are still correct, but the epoch is wrong. Re-arm explicitly (despawn.murder `Systems/Rounds/RoundManager.cs::ValidateStateAfterMigration`):
 
-```csharp
-void ValidateStateAfterMigration()
-{
-    if ( State is null ) { StateIndex = -1; TransitionNext(); return; }     // stale ref
-    float remaining = MathX.Max( State.TimeLeft.Relative, 0f );             // seconds left off the dead clock
-    State.TimeLeft = remaining;                                              // re-arm against THIS host's epoch
-    if ( State is PostRoundState ) { TransitionNext(); return; }            // migrated mid-post-round → skip
-}
+```text
+validateTimerAfterMigration
+  if the referenced round state is missing, select a safe next state
+  read non-negative remaining duration from the migrated timer
+  assign that duration again so it uses the replacement host's clock epoch
+  if migration occurred during a terminal transition, advance safely
 ```
 
 Without this, the timer is either already expired (instant round-end) or astronomically far in the future (frozen round) depending on clock drift.
@@ -429,22 +444,17 @@ Without this, the timer is either already expired (instant round-end) or astrono
 
 The host mutates authoritative state locally AND sends a `[Rpc.Broadcast(HostOnly)]` that re-raises the same event on every client. Both paths call the same local handler, so a client that also happens to be the host doesn't miss or double-apply (despawn.murder `Systems/Rounds/RoundManager.cs`):
 
-```csharp
-void TransitionTo<T>( Action<T> init = null ) where T : RoundState
-{
-    State?.Finish();
-    State = States.OfType<T>().First();
-    init?.Invoke( (T)State );
-    State.Begin();                               // host applies immediately
-    BroadcastRoundStateStart( State.Identifier ); // proxies re-apply via same local Begin path
-}
+```text
+transitionTo(nextPhase)
+  require host authority
+  finish the previous phase
+  initialize and store the next authoritative phase
+  apply nextPhase locally on the host
+  broadcast a reliable phase-start event carrying a stable phase identifier
 
-[Rpc.Broadcast( NetFlags.HostOnly | NetFlags.Reliable )]
-void BroadcastRoundStateStart( string identifier )
-{
-    var s = States.FirstOrDefault( x => x.Identifier == identifier );
-    s?.Begin();
-}
+on phase-start event
+  resolve the identifier locally
+  apply the same idempotent local phase handler
 ```
 
 Anti-pattern: calling `Begin()` host-side only and waiting for `[Sync]` to trickle to clients — clients react to the round-state change up to one replication interval late, causing desync in timers and phase-gated actions.
@@ -453,20 +463,15 @@ Anti-pattern: calling `Begin()` host-side only and waiting for `[Sync]` to trick
 
 `[Sync]` is the durable source of truth; the RPC is the low-latency nudge so clients converge *this frame* rather than one tick later. Each transition calls both (vault108.suspectra `GameManager.cs`):
 
-```csharp
-void BeginDiscussion()
-{
-    if ( !Networking.IsHost ) return;
-    CurrentState = GameState.Discussion;
-    _discussionTimer = DiscussionDuration;
-    ApplyDiscussionStateLocal();               // host converges immediately
-    RpcApplyDiscussionState();                 // proxies converge immediately
-}
+```text
+beginPhase
+  require host authority
+  write the durable replicated phase and timer
+  invoke applyPhaseLocally on the host
+  broadcast a reliable host-only apply-phase event
 
-[Rpc.Broadcast( NetFlags.HostOnly | NetFlags.Reliable )]
-void RpcApplyDiscussionState() => ApplyDiscussionStateLocal();
-
-void ApplyDiscussionStateLocal() { /* enable chat, show skip button, etc. */ }
+on apply-phase event
+  invoke the same idempotent applyPhaseLocally routine
 ```
 
 Revision-counter variant for edge-only events (start/cancel) without an extra RPC: increment a `[Sync] int LobbyCountdownStartRevision` on start; the client detects the edge (`if ( rev != _lastRev ) { _lastRev = rev; PlayStartSFX(); }`). Cheaper than a broadcast when you only need "did this counter change" (suspectra `GameManager.cs`).
@@ -475,12 +480,14 @@ Revision-counter variant for edge-only events (start/cancel) without an extra RP
 
 Cloning a prefab and immediately enabling it races with replication — proxies can receive the `Start()` call before they have the GameObject. Spawn with `StartEnabled = false`, wait one frame for the object to arrive on all clients, then enable (slamdunk.minigolf `RoundManager.cs::NextHole`):
 
-```csharp
-var hole = nextHolePrefab.GameObject.Clone();
-hole.NetworkSpawn( new NetworkSpawnOptions { StartEnabled = false } );
-await Task.Frame();          // let the GameObject arrive at proxies
-hole.Enabled = true;         // now safe to start — everyone has it
-hole.GetComponent<HoleDefinition>().Start();
+```text
+startNetworkedRoundObject(prefab)
+  clone the object without starting it
+  network-spawn it while disabled
+  wait one frame so proxies can receive the object
+  enable it
+  invoke round-start behavior only after enablement
+  destroy the previous object after any required transition display
 ```
 
 The old hole is destroyed only *after* a scoreboard-display delay, never during the race window.
@@ -489,15 +496,14 @@ The old hole is destroyed only *after* a scoreboard-display delay, never during 
 
 Two authorities coexist in the same callback. The owning client is the only one who can write to Facepunch `Stats` (it's Steam-account-local). The host is the one who writes the authoritative score (slamdunk.minigolf `HoleTrigger.cs`):
 
-```csharp
-void OnTriggerEnter( Collider other )
-{
-    if ( !other.IsProxy )                          // I am the ball's owner
-        StatManager.LogScore( holeName, strokes ); // write MY stat — only I can
+```text
+when a scoring trigger is entered
+  if this machine owns the triggering player object
+    write that player's account-local statistic
+  independently, if this machine is the host
+    commit the authoritative shared score
 
-    if ( Networking.IsHost )                       // I am the authoritative host
-        RoundManager.Instance.OnHoleCompleted( ... ); // write shared scorecard
-}
+both branches may run on a listen host that also owns the player
 ```
 
 These two guards are independent; on the host-who-is-also-the-owner BOTH run. On a pure client only the first runs. On a dedicated server only the second runs.
@@ -506,23 +512,16 @@ These two guards are independent; on the host-who-is-also-the-owner BOTH run. On
 
 When a host maintains a private `Dictionary` that must be mirrored to a `[Sync] NetList`, only rewrite the list when the content actually changes. Compute an order-independent hash over every field; skip the rewrite if it matches (fluffybagel.chess_otb `ArenaSystem.cs::HostSyncPlayers`):
 
-```csharp
-int ComputePlayersHash()
-{
-    var h = new HashCode();
-    foreach ( var p in _players.Values.OrderBy( x => x.SteamId ) )
-        h.Add( HashCode.Combine( p.SteamId, p.Score, p.Streak ) );
-    return h.ToHashCode();
-}
+```text
+computeMirrorFingerprint(records)
+  sort by a stable identity so iteration order cannot change the result
+  combine every replicated field into one deterministic fingerprint
 
-void HostSyncPlayers()
-{
-    int hash = ComputePlayersHash();
-    if ( hash == _lastSyncHash ) return;           // nothing changed — skip the NetList rewrite
-    _lastSyncHash = hash;
-    ArenaPlayers.Clear();
-    foreach ( var p in _players.Values ) ArenaPlayers.Add( p );
-}
+syncMirror
+  require host authority
+  compute the new fingerprint
+  return when it matches the last published fingerprint
+  rebuild the replicated list and store the new fingerprint
 ```
 
 Without the hash gate, a host calling this every tick rewrites the `NetList` every frame even during a stable arena — generating constant replication traffic.
@@ -531,66 +530,50 @@ Without the hash gate, a host calling this every tick rewrites the `NetList` eve
 
 `Stats.SetValue` is local to the Steam account — only the owning client can write their own stat. The host computes the new value and pushes it to exactly one client with `Rpc.FilterInclude`. The RPC body re-validates the caller is the host so a client can't invoke it directly (fluffybagel.chess_otb `ChessOtbModeRpcs.cs::HostPushEloStat`):
 
-```csharp
-void HostPushEloStat( Connection target, int newElo, int wDelta, int lDelta, int dDelta )
-{
-    if ( !Networking.IsHost ) return;
-    Assert.True( wDelta + lDelta + dDelta == 1 );   // exactly one result per game
-    using ( Rpc.FilterInclude( target ) )
-        RpcWriteMyEloStat( newElo, wDelta, lDelta, dDelta );
-}
+```text
+pushAccountStat(target, validatedResult)
+  require host authority
+  validate that exactly one match outcome is represented
+  enter an include-filter scope for target
+  broadcast a reliable host-only account-write request
 
-[Rpc.Broadcast( NetFlags.HostOnly | NetFlags.Reliable )]
-void RpcWriteMyEloStat( int newElo, int wDelta, int lDelta, int dDelta )
-{
-    if ( !Rpc.Caller.IsHost ) return;              // re-validate: only host may call this
-    Stats.SetValue( "Otb_elo_blitz", newElo );
-    Stats.Increment( "Otb_wins", wDelta );
-    // …
-}
+on account-write request
+  reject unless RPC caller is the host
+  write only the receiving user's account-local stats
+  make the operation idempotent or attach a match id to prevent duplicate writes
 ```
 
 ### 28. Tag-based player state instead of list-of-references (migration-resilient)
 
 Lists of `GameObject` or `Connection` references to "who is playing" are wiped or corrupted on host migration. Tags on each player's own `GameObject` survive — a fresh host can re-derive all round-membership state with a single `GetAllObjects(tag:"playing")` pass (mostudio.sweeper_otso `MINESWEEPER.cs`):
 
-```csharp
-// Host writes state via tags, never via a private list
-void ExcludePlayer( GameObject player )
-{
-    player.Tags.Remove( "playing" );
-    player.Tags.Add( "excluded" );
-    BroadcastTagUpdate( player.Id, "excluded" );  // replicate the tag change explicitly
-}
+```text
+setRoundMembership(player, stateTag)
+  require host authority
+  remove mutually exclusive round-state tags
+  add the selected state tag
+  replicate the change through the supported tag/state channel
 
-// Any system can query without a stale list
-int PlayingCount => Scene.GetAllObjects( false )
-    .Count( go => go.Tags.Has( "playing" ) );
+derivePlayingPlayers
+  query current scene players carrying the playing tag
 
-// Fresh joiner auto-detected in OnUpdate — no list to update
-protected override void OnUpdate()
-{
-    if ( !Networking.IsHost ) return;
-    foreach ( var p in Scene.GetAllObjects( false ).Where( IsPlayer ) )
-        if ( !p.Tags.Has( "playing" ) && !p.Tags.Has( "excluded" ) )
-            ExcludePlayer( p );   // late joiner mid-round → auto-exclude
-}
+during an active round
+  detect newly joined players with no round-state tag
+  assign the documented late-join state
 ```
 
 ### 29. `[Sync] NetList<Vector3>` position registry as migration-proof truth
 
 `Dictionary<Guid,…>` and per-object `[Sync]` fields don't survive host migration — Guids, network ids, and per-component ownership all shift. A `[Sync(SyncFlags.FromHost)] NetList<Vector3>` of world positions on the **manager** survives migration, auto-delivers to joiners, and lets the new host re-derive ownership by spatial matching (mostudio.sweeper_otso `Mine.cs`):
 
-```csharp
-// On the manager — survives host migration and late joins
-[Sync( SyncFlags.FromHost )] public NetList<Vector3> FlaggedPositions { get; set; } = new();
+```text
+manager-owned migration registry
+  replicate a host-written list of stable world positions
 
-// Query from anywhere — no per-flag ownership needed
-bool IsFlagged( Vector3 tileWorldPos )
-    => FlaggedPositions.Any( p => p.Distance( tileWorldPos ) < 10f )  // (a) registry
-    || GameObject.Tags.Has( "flagged" )                                 // (b) fast tag
-    || Scene.GetAllObjects(false).Any( go =>                            // (c) last-ditch scan
-           go.Name == "Flag_Cover" && go.WorldPosition.Distance(tileWorldPos) < 10f );
+isMarked(tilePosition)
+  first compare against the replicated position registry within tolerance
+  then check the tile's local fast-path tag
+  finally scan visible marker objects near the tile as a recovery fallback
 ```
 
 The three-layer fallback order — synced registry → local tag → scene scan — is the key resilience design. Only the manager's `NetList` is truly migration-safe; the others degrade gracefully.
@@ -599,20 +582,13 @@ The three-layer fallback order — synced registry → local tag → scene scan 
 
 NetworkSpawn takes several milliseconds. A player who flags a tile and immediately steps on it can detonate in the gap because the flag's GameObject hasn't arrived yet. Broadcast the tag before spawning; revert it on failure (mostudio.sweeper_otso `FlagPlacer.cs`):
 
-```csharp
-[Rpc.Broadcast]
-void RequestPlaceFlag( Guid tileId )
-{
-    if ( !Networking.IsHost ) return;
-    var tile = Scene.Directory.FindByGuid( tileId );
-    tile.Tags.Add( "flagged" );                     // tag first — immediate protection
-    FlaggedPositions.Add( tile.WorldPosition );
-
-    var flag = FlagPrefab.Clone( tile.WorldPosition );
-    flag.NetworkSpawn();                             // may take a frame to arrive at proxies
-    // if spawn throws, revert:
-    // tile.Tags.Remove("flagged"); FlaggedPositions.Remove(tile.WorldPosition);
-}
+```text
+placeMarker(tile, requester)
+  execute on the host after validating requester and tile
+  add the protected tag and registry entry before spawning visuals
+  clone and network-spawn the marker object
+  if spawning fails, remove both optimistic state changes
+  identify the requester from authoritative ownership, not a client argument
 ```
 
 Note from the source: `Rpc.Caller` inside an `[Rpc.Host]` returned the host's own connection even for a proxy-initiated call on this SDK version — use `Network.Owner` of the *component* as the real placer identity.
@@ -621,86 +597,47 @@ Note from the source: `Rpc.Caller` inside an `[Rpc.Host]` returned the host's ow
 
 `host.Destroy(someoneElsesObject)` silently no-ops. `TakeOwnership()+Destroy()` back-to-back is a race condition because the transfer hasn't propagated yet. The robust pattern: broadcast so *every client destroys the objects it owns*, then a host-only pass seizes and destroys any genuinely ownerless leftovers (mostudio.sweeper_otso `MINESWEEPER.cs::BroadcastForceDestroyAllFlags`):
 
-```csharp
-[Rpc.Broadcast]
-void BroadcastForceDestroyAllFlags()
-{
-    // Each client destroys their own flags
-    foreach ( var flag in Scene.GetAllObjects( false )
-                  .Where( go => go.Name == "Flag_Cover" && go.Network.Owner == Connection.Local ) )
-        flag.Destroy();
-
-    // Host seizes any ownerless ones left behind
-    if ( Networking.IsHost )
-        foreach ( var orphan in Scene.GetAllObjects( false )
-                      .Where( go => go.Name == "Flag_Cover" && go.Network.Owner is null ) )
-        {
-            orphan.Network.TakeOwnership();
-            orphan.Destroy();
-        }
-}
+```text
+destroyDistributedMarkers
+  broadcast a cleanup request
+  on each client, destroy marker objects owned by that local connection
+  on the host, collect markers that are genuinely ownerless
+  take ownership of each orphan and destroy it after authority is established
+  repeat or verify cleanup if ownership transfer is asynchronous
 ```
 
 ### 32. De-duped teleport with serial number: send 3× for packet-loss resilience
 
 `[Rpc.Owner]` doesn't reliably loop back to the caller (especially during or just after host migration), and a single send may be lost during packet bursts. Use a serial number to de-dupe, and send the same teleport RPC up to 3 times (mostudio.sweeper_otso `Teleport.cs`):
 
-```csharp
-int _teleportSerial;
-RealTimeSince _lastTeleport;
+```text
+teleport(target, destination)
+  allocate a monotonically increasing teleport serial
+  if the target is locally owned, apply once without an owner RPC
+  otherwise send the owner-targeted command with the same serial several times
+  yield between attempts
 
-async Task TeleportPlayer( GameObject player, Vector3 pos )
-{
-    int serial = ++_teleportSerial;
-    for ( int attempt = 0; attempt < 3; attempt++ )
-    {
-        if ( player.Network.Owner == Connection.Local )   // host teleporting self — skip RPC
-            DoTeleport( pos );
-        else
-            ReceiveTeleport( pos, serial );               // [Rpc.Owner] call
-        await Task.Frame();
-    }
-}
-
-[Rpc.Owner]
-void ReceiveTeleport( Vector3 pos, int serial )
-{
-    if ( serial <= _lastAppliedSerial ) return;           // de-dupe: discard old/duplicate
-    _lastAppliedSerial = serial;
-    DoTeleport( pos );
-}
-
-void DoTeleport( Vector3 pos )
-{
-    _controller.Enabled = false;
-    WorldPosition = pos;
-    GameObject.Network.ClearInterpolation();
-    _controller.Enabled = true;
-    _freezeVelocityUntil = 1.5f;                         // freeze velocity for 1.5s to prevent sweep-off
-}
+on teleport command(destination, serial)
+  ignore serials at or below the last applied serial
+  remember serial before changing state
+  temporarily disable movement, set position, and clear interpolation
+  restore movement and suppress stale velocity for a short recovery window
 ```
 
 ### 33. Counter + authoritative recount cross-check before any irreversible round decision
 
 A maintained counter is fast but can drift from overlapping concurrent events, host-migration packet loss, or simultaneous flood-fills. Gate every round-ending action on a fresh scene recount, and if they disagree, resync the counter and abort (mostudio.sweeper_otso `MINESWEEPER.cs`):
 
-```csharp
-void RegisterUncovered( TileCover tile )
-{
-    SafeTilesRemaining--;
-    if ( SafeTilesRemaining <= 0 ) TryTriggerWin();
-}
+```text
+registerReveal
+  decrement the maintained fast counter
+  request a win check only when the counter reaches the boundary
 
-void TryTriggerWin()
-{
-    int actual = Scene.GetAllComponents<TileCover>().Count( t => !t.IsRevealed );
-    if ( actual != SafeTilesRemaining )
-    {
-        SafeTilesRemaining = actual;          // re-sync the counter
-        if ( actual > 0 ) return;             // counter was wrong — not actually won yet
-    }
-    TriggerWin();                             // only reach here if scene agrees
-}
+tryResolveWin
+  recount unrevealed safe tiles directly from the authoritative scene
+  if recount differs, replace the maintained counter
+  stop when the authoritative recount is still above zero
+  trigger the irreversible win transition only when both sources agree
 ```
 
 Anti-pattern: trusting only the counter. A simultaneous flood-fill or a mid-migration packet can send `SafeTilesRemaining` negative (false win) or leave it stuck at 1 (round never ends).

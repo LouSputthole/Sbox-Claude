@@ -1,5 +1,23 @@
 # Dialogue & Speech-Bubble Systems
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it IS (and when)](#what-it-is-and-when)
+- [Canonical modern-s&box recipe](#canonical-modern-sbox-recipe)
+  - [1. Author lines as a GameResource](#1-author-lines-as-a-gameresource)
+  - [2. Trigger on the player entering a zone](#2-trigger-on-the-player-entering-a-zone)
+  - [3. Reveal it with a typewriter PanelComponent](#3-reveal-it-with-a-typewriter-panelcomponent)
+- [Variations seen across games](#variations-seen-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Pattern A — Polymorphic per-player objective generator (despawn.murder)](#pattern-a--polymorphic-per-player-objective-generator-despawnmurder)
+  - [Pattern B — Imperative awaited branching narrative (dimmies.terryspapers)](#pattern-b--imperative-awaited-branching-narrative-dimmiesterryspapers)
+  - [Pattern C — Host-authoritative time-boxed vote (lowkeynetworks.newrp)](#pattern-c--host-authoritative-time-boxed-vote-lowkeynetworksnewrp)
+  - [How these three compose](#how-these-three-compose)
+<!-- reference-toc:end -->
+
 Showing NPC lines, branch choices, or confirm prompts to a player — author the text as data, trigger on proximity/interaction, then reveal it with a `PanelComponent` (often a typewriter). Use this whenever you need talking NPCs, story beats, tutorial barks, or a yes/no modal.
 
 ## What it IS (and when)
@@ -16,62 +34,47 @@ Keep them separate so the same UI panel serves NPC barks, tutorial prompts, and 
 
 ### 1. Author lines as a GameResource
 
-```csharp
-[GameResource( "NPC TEXT", "npct", "NPC dialogue", Icon = "sentiment_very_satisfied" )]
-public class NPCTextGameResource : GameResource
-{
-    [Property] public string NPCName { get; set; }
-    [Property] public List<string> NPCText { get; set; } = new();
-    [Property, ResourceType( "sound" )] public string NPCVoice { get; set; }
-}
+```text
+DialogueAsset
+  register the asset type with a dialogue-specific extension
+  expose an editable speaker name
+  expose an ordered collection of lines
+  expose an optional sound-resource reference for the voice cue
+  validate that at least one line exists before the asset is used
 ```
 
-This makes editable `.npct` assets in the asset browser; no code change to add lines (repo facepunch.jumper: `jumper/Code/FunStuff/JumperNPCYapper.cs:1-18`). Verbatim from source.
+This makes editable `.npct` assets in the asset browser; no code change is needed to add lines (repo facepunch.jumper: `jumper/Code/FunStuff/JumperNPCYapper.cs:1-18`).
 
 ### 2. Trigger on the player entering a zone
 
 The NPC component implements `Component.ITriggerListener` and gates on a tag. Note the collider that carries the `player` tag is a child, so the code climbs to `other.GameObject.Parent` for the real player root.
 
-```csharp
-public sealed class NpcTalkTrigger : Component, Component.ITriggerListener
-{
-    [Property] List<NPCTextGameResource> Resources { get; set; }
-    NPCTextGameResource _pack;
+```text
+when the trigger component becomes enabled
+  if no dialogue assets are configured, mark the trigger unavailable
+  otherwise choose an eligible dialogue asset for this activation
 
-    protected override void OnEnabled()
-    {
-        if ( Resources is { Count: > 0 } )
-            _pack = Resources[ Game.Random.Int( 0, Resources.Count - 1 ) ];
-    }
+when a collider enters
+  ignore colliders that do not carry the player tag
+  resolve the logical player root from the collider object
+  find that player's local dialogue presentation component
+  if either the asset or presentation component is missing, stop safely
+  pass the speaker, voice cue, and a non-repeating line to the presenter
 
-    void ITriggerListener.OnTriggerEnter( Collider other )
-    {
-        if ( !other.GameObject.Tags.Has( "player" ) ) return;
-        var talker = other.GameObject.Parent
-            .Components.Get<DialoguePanel>( FindMode.EnabledInSelfAndChildren );
-        talker.NPCName = _pack.NPCName;
-        talker.Voice   = _pack.NPCVoice;
-        talker.DisplayMessage( PickNonRepeating() );
-    }
-
-    void ITriggerListener.OnTriggerExit( Collider other ) { }
-}
+when a collider exits
+  optionally cancel or hide any dialogue owned by this trigger
 ```
 
 Pattern verified in `JumperNPCLooker.cs:24-40` (tag-gate + `Parent` climb + random pack on enable) and `JumperFinishLine.cs:14` (same `ITriggerListener` + tag shape). The trigger needs a sibling `Collider` with **IsTrigger = true** and matching collision tags set in the prefab — without that, `OnTriggerEnter` never fires.
 
 A non-repeating line picker avoids saying the same thing twice:
 
-```csharp
-int _last = -1;
-string PickNonRepeating()
-{
-    int i = Game.Random.Int( 0, _pack.NPCText.Count - 1 );
-    while ( _pack.NPCText.Count > 1 && i == _last )
-        i = Game.Random.Int( 0, _pack.NPCText.Count - 1 );
-    _last = i;
-    return _pack.NPCText[ i ];
-}
+```text
+chooseNonRepeatingLine(lines, previousIndex)
+  if lines is empty, return no line
+  if lines has one entry, return it and index zero
+  choose uniformly from every index except previousIndex
+  return the selected line and remember its index for the next call
 ```
 
 (repo facepunch.jumper: `jumper/Code/FunStuff/JumperNPCLooker.cs:52-61`).
@@ -80,55 +83,37 @@ string PickNonRepeating()
 
 A `PanelComponent` razor panel appends one char at a time, plays a pitch-randomized blip per letter (Undertale-style), and auto-hides via `RealTimeSince`.
 
-```razor
-@inherits PanelComponent
+```text
+panel state
+  speakerName
+  completeMessage
+  revealedMessage
+  voiceCue
+  revealGeneration
+  timeSinceLastCharacter
 
-<root class=@(Visible ? "visible" : "")>
-    <label class="message">@OutputText</label>
-    <label class="name">@NPCName</label>
-</root>
+displayMessage(nextMessage)
+  increment revealGeneration so any older reveal stops
+  store nextMessage as completeMessage
+  clear revealedMessage
+  start reveal(nextMessage, revealGeneration)
 
-@code {
-    public string OutputText { get; set; }
-    public string NPCName { get; set; } = "Ben";
-    public string Voice { get; set; } = "beep1";
+reveal(message, generation)
+  for each character in message
+    stop if generation is no longer current
+    append the character to revealedMessage
+    reset the visibility timer
+    invalidate the panel so the new text renders
+    wait for a small randomized interval
+    optionally play a quiet voice cue with slight pitch variation
 
-    private string _message = "";
-    private RealTimeSince _shown = 999;
-    private bool Visible => _shown < 4;   // auto-hide 4s after last char
-
-    public void DisplayMessage( string message )
-    {
-        _message = message;
-        OutputText = null;                // null = "start a fresh reveal"
-    }
-
-    private async Task RevealTextAsync( string message )
-    {
-        foreach ( char c in message )
-        {
-            OutputText += c;
-            _shown = 0f;
-            await Task.DelaySeconds( Game.Random.Float( 0.05f, 0.2f ) );
-            var snd = Sound.Play( Voice );
-            snd.Pitch = Game.Random.Float( 0.9f, 1.1f );
-            snd.Volume = 0.25f;
-        }
-    }
-
-    protected override void OnUpdate()
-    {
-        if ( OutputText == _message ) return;
-        if ( OutputText == null ) _ = RevealTextAsync( _message );
-        _message = OutputText;            // guard: don't re-fire mid-reveal
-    }
-
-    protected override int BuildHash()
-        => HashCode.Combine( OutputText, Visible ? 1 : 0 );
-}
+render
+  show speakerName and revealedMessage
+  apply the visible style while the visibility timer is below the hide delay
+  include revealedMessage and visibility state in render invalidation
 ```
 
-Faithful to `jumper/Code/UI/JumperNPCTalker.razor:33-78`. The `.visible` opacity is driven from SCSS off the `visible` class. `BuildHash` must include `OutputText` so the panel re-renders each appended char.
+This behavior is demonstrated in `jumper/Code/UI/JumperNPCTalker.razor:33-78`. Drive the `.visible` opacity from the panel's visible class, and include the revealed text in render invalidation so each appended character appears. The generation check prevents an older reveal from interleaving with a newer message.
 
 ## Variations seen across games
 
@@ -175,39 +160,21 @@ Key shapes:
 - String-encoded task params: `ZoneVisitTracker.FromExtraData("zone1,zone2|seconds")` — lightweight, no extra asset type.
 - Anti-pattern: progress tracked as plain fields with no cancellation path. Fix: add a `Cancel()` method to `GunTaskState` so tasks can be voided when a round ends without leaving dangling event hooks.
 
-```csharp
-// despawn.murder: Systems/GunAcquisition/Tasks/GunTaskDefinition.cs (condensed)
-public abstract class GunTaskDefinition
-{
-    public abstract bool IsEnabled( Scene scene );
-    public virtual string Group => null;           // null = no exclusion
-    public abstract GunTaskState Make();
-}
+```text
+ObjectiveDefinition contract
+  canUse(currentScene) -> boolean
+  exclusionGroup -> optional stable key
+  createState(randomSource) -> fresh per-player objective state
 
-public class FindCluesTask : GunTaskDefinition
-{
-    static readonly int[] _targets = { 2, 3, 4 };
-    public override bool IsEnabled( Scene scene ) => true;  // always available
-    public override GunTaskState Make()
-        => new GunTaskState { Description = $"Find {_target} clues", Target = _target = Game.Random.FromArray(_targets) };
-}
-
-// Manager rolls the set
-void GenerateTasks( IEnumerable<GunTaskDefinition> defs )
-{
-    var shuffled = defs.Where( d => d.IsEnabled( Scene ) ).OrderBy( _ => Guid.NewGuid() ).ToList();
-    var used = new HashSet<string>();
-    var picked = new List<GunTaskState>();
-    foreach ( var d in shuffled )
-    {
-        if ( d.Group != null && !used.Add( d.Group ) ) continue;
-        picked.Add( d.Make() );
-        if ( picked.Count >= TaskCount ) break;
-    }
-    // push [x/y] display string per-player via Rpc.FilterInclude
-    using ( Rpc.FilterInclude( _ownerConnection ) )
-        SyncTasks( picked.Select( t => t.Description ).ToArray() );
-}
+generateObjectives(definitions, requestedCount, player)
+  keep only definitions that can run in the current scene
+  randomize their order with the match's authoritative random source
+  walk the candidates until requestedCount is reached
+    skip a candidate when its non-empty exclusionGroup was already selected
+    create a new state and record its exclusionGroup
+  if the set is short, add well-defined fallback objectives
+  format progress from the resulting states
+  send the display payload only to the owning player's connection
 ```
 
 ---
@@ -216,47 +183,26 @@ void GenerateTasks( IEnumerable<GunTaskDefinition> defs )
 
 `PhoneUI.razor` (~2100 lines) is the entire life-sim story delivered as straight-line C# `async Task` methods. No tree-asset, no node graph — branches are plain `if/else`, state is flags on `PlayerData`. Three micro-primitives create a full VN engine:
 
-```razor
-@inherits PanelComponent
-@* dimmies.terryspapers: Code/UI/PhoneUI.razor (condensed) *@
-@code {
-    bool clicked;
-    string selectedChoice = "";
+```text
+waitForAdvance(cancellation)
+  show the continue affordance
+  suspend until the input signal arrives or cancellation is requested
+  consume the signal and hide the affordance
 
-    // Awaitable "tap to continue"
-    async Task WaitForClick()
-    {
-        interactUI.clickToContinue = true;
-        while ( !clicked ) await GameTask.Delay( 1 );
-        clicked = false;
-        interactUI.clickToContinue = false;
-    }
+askChoice(prompt, options, cancellation)
+  show the prompt and enabled options
+  suspend until one valid option is selected or cancellation is requested
+  hide the choice controls
+  return a stable choice identifier, not display text
 
-    // Awaitable binary choice — returns "left" or "right"
-    async Task<string> StartChoice( string question, string left, string right )
-    {
-        choiceActive = true;
-        choiceLeft = left; choiceRight = right; choiceQuestion = question;
-        while ( selectedChoice == "" ) await GameTask.Delay( 1 );
-        var result = selectedChoice;
-        selectedChoice = ""; choiceActive = false;
-        return result;
-    }
-
-    // "Days-since" scheduler — no timers, no queue; stamp IS the schedule
-    async Task StartScene()
-    {
-        // e.g. "baby born 3 shifts after pregnancy start"
-        if ( gameHandler.Shift - playerData.PregnancyOn == 3 ) { await BabyBornEvent(); goto send_day_stats; }
-        if ( gameHandler.Shift - playerData.PregnancyOn == 8 ) { await MomDiesEvent();  goto send_day_stats; }
-        // flavor events fall through; story events short-circuit via goto
-        await FlavorEvent();
-        send_day_stats: await SendDayStats();
-    }
-}
+runShiftStory(currentShift, playerState)
+  build prioritized story conditions from currentShift minus stored milestone shifts
+  run the first matching major story event and mark the shift as consumed
+  if no major event consumed the shift, run an eligible flavor event
+  always publish the end-of-shift summary in a finalization step
 ```
 
-Key lesson: **ordering encodes priority** — checking story beats before flavor beats, then `goto` short-circuits so only one life-changing event fires per shift. The `...On` shift-stamp fields in `PlayerData` are the scheduler; no timer component needed.
+Key lesson: **ordering encodes priority** — check story beats before flavor beats, and stop selecting once one life-changing event claims the shift. The milestone-shift fields in `PlayerData` are the scheduler; no timer component is needed.
 
 Anti-pattern from the source: `playerData` is written directly to disk client-side with no server — fine for single-player but breaks under any multiplayer authority model. For networked games, keep the flag store server-side and push read-only copies via `[Sync]`.
 
@@ -266,59 +212,30 @@ Anti-pattern from the source: `playerData` is written directly to disk client-si
 
 `Code/modules/jobs/JobVoteService.cs` is a complete, reusable yes/no vote: snapshot electorate → filtered-RPC UI to voters only → host-tallied ballots → async countdown → apply. The cleanest vote-flow reference in the corpus.
 
-```csharp
-// lowkeynetworks.newrp: Code/modules/jobs/JobVoteService.cs (condensed)
-public class VoteSession
-{
-    public Dictionary<Guid, bool> Votes = new();
-    public List<Connection> Voters;
-    public float Duration = 18f;
-}
+```text
+startVote(candidate)
+  require host authority and reject if another vote is active
+  snapshot every eligible voter except the candidate
+  if the snapshot is empty, resolve using the documented no-voter policy
+  create a vote session with a stable id, deadline, electorate, and empty ballot map
+  show the vote UI only to the snapshotted electorate
+  schedule resolution at the deadline
 
-VoteSession _active;
+submitBallot(sessionId, caller, choice)
+  execute on the host
+  reject a missing, expired, or mismatched session
+  reject callers outside the electorate
+  validate the choice and record at most one current ballot per voter
+  resolve early when every eligible voter has responded
 
-// Host-only: kick off a vote targeting a candidate
-public void StartVote( Connection candidate )
-{
-    if ( !Networking.IsHost ) return;
-    var voters = Connection.All.Where( c => c != candidate ).ToList();
-    if ( voters.Count == 0 ) { Apply( passed: true ); return; }   // auto-pass with no voters
-    _active = new() { Voters = voters };
-    using ( Rpc.FilterInclude( voters ) )   // UI shown ONLY to voters
-        ShowVote( candidate.DisplayName );
-    _ = FinishLater();
-}
-
-[Rpc.Host]
-public void SubmitVote( bool yes )
-{
-    if ( _active == null ) return;
-    if ( !_active.Voters.Any( v => v.Id == Rpc.Caller.Id ) ) return;  // non-voter guard
-    _active.Votes[Rpc.Caller.Id] = yes;
-    if ( _active.Votes.Count >= _active.Voters.Count ) Finish();       // early-finish when all in
-}
-
-async Task FinishLater()
-{
-    float remaining = _active.Duration;
-    while ( remaining > 0 && _active != null )
-    {
-        await GameTask.Delay( 1000 );
-        remaining -= 1f;
-        BroadcastCountdown( (int)remaining );
-    }
-    if ( _active != null ) Finish();
-}
-
-void Finish()
-{
-    bool passed = _active.Votes.Count( kv => kv.Value ) > _active.Votes.Count( kv => !kv.Value );
-    _active = null;
-    Apply( passed );
-}
+resolveVote(sessionId)
+  ignore stale timer callbacks for an older session
+  atomically detach the active session before applying effects
+  tally using an explicit pass and tie policy
+  notify participants, close their UI, and apply the result once
 ```
 
-Key technique: `using ( Rpc.FilterInclude( voters ) ) ShowVote(...)` — sends a `[Rpc.Broadcast]` only to those connections. This is the idiomatic "whisper / area / team" networking pattern and composes with any vote, notification, or reveal system.
+Key technique: scope the vote-display broadcast with `Rpc.FilterInclude` so only eligible connections receive it. This same targeting pattern composes with whispers, area notifications, team prompts, and private reveals.
 
 Anti-pattern to avoid: storing `_active` as a plain field with no null-guard on `SubmitVote` after a round ends. Always null-check `_active` and return early if a late ballot arrives after `Finish()` has cleared it.
 

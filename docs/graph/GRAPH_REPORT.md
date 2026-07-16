@@ -1128,7 +1128,7 @@ Nodes (5): Community 81 — Scaffold Family Cluster (Create*Handler + ScaffoldHe
 
 ### Community 178 - "Community 178"
 Cohesion: 0.40
-Nodes (4): Bridge Tool Backlog — mined from 51 open-source s&box games (2026-06-09), Notes for whoever builds these, Tier 1 — multi-game, high-confidence scaffolds (do these first), Tier 2 — by theme (single-game but clearly reusable)
+Nodes (4): Bridge Tool Backlog — mined from 51 public-source s&box games (2026-06-09), Notes for whoever builds these, Tier 1 — multi-game, high-confidence scaffolds (do these first), Tier 2 — by theme (single-game but clearly reusable)
 
 ### Community 179 - "Community 179"
 Cohesion: 0.40

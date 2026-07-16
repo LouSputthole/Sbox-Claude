@@ -1,0 +1,14 @@
+# Deterministic Codex plugin generation across Windows, macOS, and Linux.
+.agents/plugins/marketplace.json text eol=lf
+plugins/sbox-claude/**/*.md text eol=lf
+plugins/sbox-claude/**/*.json text eol=lf
+plugins/sbox-claude/**/*.yaml text eol=lf
+plugins/sbox-codex-bridge/**/*.md text eol=lf
+plugins/sbox-codex-bridge/**/*.json text eol=lf
+plugins/sbox-codex-bridge/**/*.yaml text eol=lf
+plugins/sbox-codex-bridge/LICENSE text eol=lf
+plugins/sbox-codex-bridge/NOTICE text eol=lf
+scripts/*.mjs text eol=lf
+scripts/**/*.mjs text eol=lf
+scripts/vendor/**/LICENSE text eol=lf
+scripts/codex-overrides/** text eol=lf

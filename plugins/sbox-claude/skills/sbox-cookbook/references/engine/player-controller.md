@@ -1,5 +1,33 @@
 # Player Controller (modern s&box scene system)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Recipe: CharacterController movement loop](#recipe-charactercontroller-movement-loop)
+- [Recipe: extend locomotion with MoveMode (don't fork the controller)](#recipe-extend-locomotion-with-movemode-dont-fork-the-controller)
+- [Recipe: spawn a networked pawn (host-authoritative)](#recipe-spawn-a-networked-pawn-host-authoritative)
+- [Recipe: first-person view-model (render-tag isolation)](#recipe-first-person-view-model-render-tag-isolation)
+- [Recipe: death → ragdoll + spectator](#recipe-death--ragdoll--spectator)
+- [Recipe: possession / input takeover via MoveMode.OnInput](#recipe-possession--input-takeover-via-movemodeoninput)
+- [Recipe: dress a controller-driven / code-spawned citizen at RUNTIME](#recipe-dress-a-controller-driven--code-spawned-citizen-at-runtime)
+- [Recipe: kinematic limp-drape carry on a built-in controller](#recipe-kinematic-limp-drape-carry-on-a-built-in-controller)
+- [Gotcha table](#gotcha-table)
+- [Cross-cutting (apply to every pawn)](#cross-cutting-apply-to-every-pawn)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Pattern: host-migration-safe active-fighter refs — use [Sync] GameObject, not private fields](#pattern-host-migration-safe-active-fighter-refs--use-sync-gameobject-not-private-fields)
+  - [Pattern: [Rpc.Owner] damage routing — let the victim's machine decide](#pattern-rpcowner-damage-routing--let-the-victims-machine-decide)
+  - [Pattern: disconnect grace to avoid false draws](#pattern-disconnect-grace-to-avoid-false-draws)
+  - [Pattern: trauma/Perlin screenshake as a GameResource](#pattern-traumaperlin-screenshake-as-a-gameresource)
+  - [Pattern: OTS "virtual aim point" camera framing](#pattern-ots-virtual-aim-point-camera-framing)
+  - [Pattern: UseInputControls = false to freeze a player (admin / UI modal)](#pattern-useinputcontrols--false-to-freeze-a-player-admin--ui-modal)
+  - [Pattern: viewmodel wall-clip pullback via forward trace](#pattern-viewmodel-wall-clip-pullback-via-forward-trace)
+  - [Anti-pattern: "first proxy player" scan for opponent resolution](#anti-pattern-first-proxy-player-scan-for-opponent-resolution)
+  - [Gotcha: stats Flush() is mandatory for leaderboard propagation](#gotcha-stats-flush-is-mandatory-for-leaderboard-propagation)
+  - [Gotcha: hot-reload does not reinitialize static fields - use properties for condition tables](#gotcha-hot-reload-does-not-reinitialize-static-fields---use-properties-for-condition-tables)
+<!-- reference-toc:end -->
+
 Recipes for building, extending, and networking a player pawn: `CharacterController` movement, `MoveMode` arbitration, networked spawn/respawn, view-models, and death/ragdoll/spectator flow. Modern `GameObject`/`Component`/`Scene` API only — no legacy `Entity`/`Pawn`/`[Net]`.
 
 ## Mental model

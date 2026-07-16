@@ -15,7 +15,8 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc",
     "test": "npm run build && node --test",
     "start": "node dist/index.js",
     "dev": "tsc --watch",

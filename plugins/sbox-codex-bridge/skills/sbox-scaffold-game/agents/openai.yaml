@@ -1,0 +1,4 @@
+interface:
+  display_name: "Scaffold an S&box Game"
+  short_description: "Scaffold a playable first-person s&box starter"
+  default_prompt: "Use $sbox-scaffold-game to create a playable s&box starter."

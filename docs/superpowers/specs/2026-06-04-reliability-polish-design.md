@@ -5,7 +5,7 @@
 **Direction:** #4 — make the bridge feel solid and trustworthy.
 **Scope:** (1) a self-cleaning `run_self_test` health-check battery; (2) a prioritized fix punch-list for known rough edges; (3) a richer `get_bridge_status`.
 
-> All file/line references are against the repo at `C:\Users\cargi\Desktop\sbox-claude` as read on 2026-06-04. The C# addon is `sbox-bridge-addon\Editor\MyEditorMenu.cs`; the MCP server is `sbox-mcp-server\src\`. Anything marked **[CONFIRM LIVE]** must be verified against a running bridge during implementation (per the constraint that we must not call the live `mcp__sbox__*` tools here).
+> All file/line references are repository-relative as read on 2026-06-04. The C# addon is `sbox-bridge-addon\Editor\MyEditorMenu.cs`; the MCP server is `sbox-mcp-server\src\`. Anything marked **[CONFIRM LIVE]** must be verified against a running bridge during implementation (per the constraint that we must not call the live `mcp__sbox__*` tools here).
 
 ---
 

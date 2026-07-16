@@ -2,6 +2,11 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## Codex distribution [2.1.0] -- 2026-07-16
+
+- Prepared the first Codex distribution: the GitHub-backed marketplace, s&box Codex Bridge plugin 2.1.0, native editor MCP, optional lifeline diagnostics, API brain, cookbook, and workflow skills.
+- When published, this distribution should use the separate immutable tag `codex-v2.1.0`. The existing `v2.1.0` tag predates the Codex package and remains unchanged.
+
 ## [2.1.0] -- 2026-07-13 "Action!"
 
 **+30 tools — Tier-2 completion + gameplay recording + the cinematic wave. 275 tools / 267 handlers / 262 native across 28 toolsets / 7 lifeline (was 245/237/232). Seven new families, all additive — no existing tool contract changed. All 30 live-verified on Gravehold (the Tier-2/recording 25 on 2026-07-12, the 5 cinematic tools e2e 2026-07-13): every handler executed for real, every generated scaffold hotload-compiled clean + TypeLibrary-load-confirmed, and the scene + project left pristine.**
@@ -443,7 +448,7 @@ With v1.10.0's `create_economy_wallet`, these complete a **"game director" trio*
 
 ### Changed — Cookbook (51-game re-mine)
 
-- The **`sbox-cookbook`** skill was re-mined across **51** current open-source s&box games (was 47 — added `facepunch.ss2`, `despawn.murder`, `facepunch.fair`, `barrelproto.ragroll`). **+6 genre references** (social-deduction, survivor-roguelite, coop-kitchen, board-game, casino-gambling, physics-sports) and **+2 system references** (ai-director, services-backend). High-traffic references (economy-currency, save-persistence, round-match, shop-vendor, progression-upgrades, leaderboards-services, building-placement, anti-cheat, tycoon-idle, deathmatch-arena) got a "Corpus refresh" pass with the newly-mined implementations. New **`references/CORPUS-INDEX.md`** cross-references which games implement each system/genre — so a recipe can be composed by pulling pieces from several games. Per-game findings live in the local `sbox-lessons/mining-v2/`.
+- The **`sbox-cookbook`** skill was re-mined across **51** current public-source s&box games (was 47 — added `facepunch.ss2`, `despawn.murder`, `facepunch.fair`, `barrelproto.ragroll`). **+6 genre references** (social-deduction, survivor-roguelite, coop-kitchen, board-game, casino-gambling, physics-sports) and **+2 system references** (ai-director, services-backend). High-traffic references (economy-currency, save-persistence, round-match, shop-vendor, progression-upgrades, leaderboards-services, building-placement, anti-cheat, tycoon-idle, deathmatch-arena) got a "Corpus refresh" pass with the newly-mined implementations. New **`references/CORPUS-INDEX.md`** cross-references which games implement each system/genre — so a recipe can be composed by pulling pieces from several games. Per-game sources and provenance are recorded in the cookbook's bundled reference files.
 
 ### Added — Bridge map (knowledge graph)
 
@@ -470,7 +475,7 @@ With v1.10.0's `create_economy_wallet`, these complete a **"game director" trio*
 
 ### Added — `sbox-cookbook` skill
 
-- A new bundled skill: a master **router** indexing **code-grounded recipes** mined from **27 current (2026) open-source s&box games** plus the modern engine repos. Its `references/` hold **11 engine** references (networking-authority, architecture, components-lifecycle, player-controller, ui-razor, combat-weapons, input-interaction, physics-traces-movement, worldgen-rendering, performance-threading, data-assets), **15 systems** (inventory, economy-currency, shop-vendor, save-persistence, progression-upgrades, gacha-loot, leaderboards-services, idle-offline, building-placement, crafting, dialogue, round-match, spawning-waves, anti-cheat, level-design), and **14 genre recipes** (tycoon-idle, shopkeeper, document-sim, roleplay, sandbox-voxel, social-hub, platformer-obstacle, deathmatch-arena, card-battler, survival-horror, gacha-crawler, puzzle, vehicles, party-microgame). Ask "how do I build a tycoon / an inventory / a save system?" and it routes to a grounded how-to. Full bundled skill set: `sbox-api`, `sbox-build-feature`, `sbox-setup`, `sbox-scaffold-game`, `sbox-cookbook`.
+- A new bundled skill: a master **router** indexing **code-grounded recipes** mined from **27 current (2026) public-source s&box games** plus the modern engine repos. Its `references/` hold **11 engine** references (networking-authority, architecture, components-lifecycle, player-controller, ui-razor, combat-weapons, input-interaction, physics-traces-movement, worldgen-rendering, performance-threading, data-assets), **15 systems** (inventory, economy-currency, shop-vendor, save-persistence, progression-upgrades, gacha-loot, leaderboards-services, idle-offline, building-placement, crafting, dialogue, round-match, spawning-waves, anti-cheat, level-design), and **14 genre recipes** (tycoon-idle, shopkeeper, document-sim, roleplay, sandbox-voxel, social-hub, platformer-obstacle, deathmatch-arena, card-battler, survival-horror, gacha-crawler, puzzle, vehicles, party-microgame). Ask "how do I build a tycoon / an inventory / a save system?" and it routes to a grounded how-to. Full bundled skill set: `sbox-api`, `sbox-build-feature`, `sbox-setup`, `sbox-scaffold-game`, `sbox-cookbook`.
 
 ### Changed — License
 

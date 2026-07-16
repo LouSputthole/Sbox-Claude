@@ -3,7 +3,7 @@
 
 **262 native tools · 28 toolsets**, served by **s&box's built-in editor MCP server** — an AI working *inside* your s&box editor: writing scripts, creating GameObjects, wiring components, and building whole systems: physics, networking, UI, lighting, characters, terrain, vehicles, and more. You describe what you want; Claude builds it, screenshots it — **and sees the image right in the tool result** — and fixes it.
 
-But the tools aren't the real story. **The bridge ships a brain.** The companion plugin bundles `sbox-cookbook` — a deep, code-grounded knowledge base of how to actually build games in s&box, mined from **real, shipped, open-source s&box games** and the modern engine source. So the AI reaches for *proven, shipped patterns* — real inventories, economies, save systems, shops, gacha, progression, multiplayer netcode, whole genre playbooks — instead of guessing.
+But the tools aren't the real story. **The bridge ships a brain.** The companion plugin bundles `sbox-cookbook` — a deep, code-grounded knowledge base of how to actually build games in s&box, mined from **real, shipped, public-source s&box games** and the modern engine source. So the AI reaches for *proven, shipped patterns* — real inventories, economies, save systems, shops, gacha, progression, multiplayer netcode, whole genre playbooks — instead of guessing.
 
 📖 **Full docs, guides & changelog:** **[sboxskins.gg/claudebridge](https://sboxskins.gg/claudebridge)** — [setup](https://sboxskins.gg/claudebridge/plugin) · [changelog](https://sboxskins.gg/claudebridge/changelog) · [troubleshooting](https://sboxskins.gg/claudebridge/troubleshooting) · [FAQ](https://sboxskins.gg/claudebridge/faq)
 
@@ -39,7 +39,7 @@ This is the headline feature, so it gets its own section.
 
 The hardest part of building an s&box game with an AI isn't typing C# — it's *knowing the right pattern*. How do shipped games actually structure an inventory? Where does the money live so a client can't forge it? How do they sign and version a save file? How does a tycoon tick offline earnings? Get those wrong and you get something that compiles but desyncs, dupes currency, or corrupts saves the first time you change a balance number.
 
-`sbox-cookbook` is a **massive, code-grounded knowledge base** that answers exactly those questions — built by mining **51 real, shipped, open-source s&box games** plus the modern engine repos, then distilling them into recipes that cite real source you can open: **11 engine references, 18 system how-tos, and 20 genre playbooks**. It's a router: ask "how do I build a tycoon / an inventory / a save system?" and it loads the grounded how-to for *that* problem.
+`sbox-cookbook` is a **massive, code-grounded knowledge base** that answers exactly those questions — built by mining **51 real, shipped, public-source s&box games** plus the modern engine repos, then distilling them into recipes that cite real source you can open: **11 engine references, 18 system how-tos, and 20 genre playbooks**. It's a router: ask "how do I build a tycoon / an inventory / a save system?" and it loads the grounded how-to for *that* problem.
 
 What it knows, with proven patterns from real games:
 

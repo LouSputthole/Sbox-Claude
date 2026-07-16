@@ -1,5 +1,30 @@
 # Party / Microgame-Collection Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [The director: one FSM, one clock](#the-director-one-fsm-one-clock)
+- [The microgame contract: state-mirrored virtuals](#the-microgame-contract-state-mirrored-virtuals)
+- [Data-driven microgame pool with lobby constraints](#data-driven-microgame-pool-with-lobby-constraints)
+- [Pawn-swap elimination (player ↔ spectator)](#pawn-swap-elimination-player--spectator)
+- [Win/condition resolution (decoupled from elimination)](#wincondition-resolution-decoupled-from-elimination)
+- [Per-mode synced sub-timer (late-joiner-safe sequencing)](#per-mode-synced-sub-timer-late-joiner-safe-sequencing)
+- [Trigger-zone gameplay (the microgames themselves)](#trigger-zone-gameplay-the-microgames-themselves)
+- [The push verb + scaffolding](#the-push-verb--scaffolding)
+- [Build order](#build-order)
+- [Pitfalls (from the real game)](#pitfalls-from-the-real-game)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Variation 1 — Three-manager hub split (playbtg.elevator)](#variation-1--three-manager-hub-split-playbtgelevator)
+  - [Variation 2 — Synced-bool state machine + tag-based player exclusion (mostudio.sweeperotso)](#variation-2--synced-bool-state-machine--tag-based-player-exclusion-mostudiosweeperotso)
+  - [Variation 3 — HostWatchdog: round recovery after host disconnect (mostudio.sweeperotso)](#variation-3--hostwatchdog-round-recovery-after-host-disconnect-mostudiosweeperotso)
+  - [Variation 4 — IGameMode swappable interface cloned by a controller (barrelproto.ragroll)](#variation-4--igamemode-swappable-interface-cloned-by-a-controller-barrelprotoragroll)
+  - [Variation 5 — Anti-streak fairness across rounds (despawn.murder)](#variation-5--anti-streak-fairness-across-rounds-despawnmurder)
+  - [Read these games](#read-these-games)
+<!-- reference-toc:end -->
+
 How to build a Fall-Guys-style party game — a rotating collection of short microgames with elimination — in modern s&box (GameObject/Component/Scene), distilled from one deep mined game: `vidya.terry_games` (Terry Games), a host-authoritative collection of ~15 microgames (Red Light Green Light, Tag, King of the Hill, Color Shuffle, Floor is Lava, Race, Soccer, Glass Bridge, Punch-Out, Mingle…) driven by one networked state machine and one synced clock.
 
 ## What defines the genre

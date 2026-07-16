@@ -1,0 +1,436 @@
+{
+  "schemaVersion": 1,
+  "sources": [
+    {
+      "id": "aethercore.versus",
+      "url": "https://sbox.game/aethercore/versus/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "alcoholics.nice_putt_idiot",
+      "url": "https://sbox.game/alcoholics/nice_putt_idiot/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "apl.sandboxwars",
+      "url": "https://sbox.game/apl/sandboxwars/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "artisan.darkrpog",
+      "url": "https://sbox.game/artisan/darkrpog/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "ataco.sdoomresurrection",
+      "url": "https://sbox.game/ataco/sdoomresurrection/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "barrelproto.ragroll",
+      "url": "https://sbox.game/barrelproto/ragroll/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "bublic.stone_by_stone",
+      "url": "https://sbox.game/bublic/stone_by_stone/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "clearlyy.s_miner",
+      "url": "https://sbox.game/clearlyy/s_miner/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "despawn.murder",
+      "url": "https://sbox.game/despawn/murder/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "dexlab.sandbox-reforged",
+      "url": "https://sbox.game/dexlab/sandbox-reforged/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "dimmies.terryspapers",
+      "url": "https://sbox.game/dimmies/terryspapers/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "dxrp",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "emg.everything_must_go",
+      "url": "https://sbox.game/emg/everything_must_go/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "enifun.shop_manager",
+      "url": "https://sbox.game/enifun/shop_manager/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "facepunch.fair",
+      "url": "https://sbox.game/facepunch/fair/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "facepunch.jumper",
+      "url": "https://sbox.game/facepunch/jumper/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "facepunch.ss1",
+      "url": "https://sbox.game/facepunch/ss1/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "facepunch.ss2",
+      "url": "https://sbox.game/facepunch/ss2/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "fluffybagel.chess_otb",
+      "url": "https://sbox.game/fluffybagel/chess_otb/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "freddo.scoops",
+      "url": "https://sbox.game/freddo/scoops/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "gabreusenra.wjse",
+      "url": "https://sbox.game/gabreusenra/wjse/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "garryware",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "goders.natural_disaster_survival",
+      "url": "https://sbox.game/goders/natural_disaster_survival/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "intercrusstudio.sneguborka",
+      "url": "https://sbox.game/intercrusstudio/sneguborka/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "itacho.fill_the_void",
+      "url": "https://sbox.game/itacho/fill_the_void/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "khamitech.battledraft",
+      "url": "https://sbox.game/khamitech/battledraft/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "klavs.basebuilder",
+      "url": "https://sbox.game/klavs/basebuilder/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "klibatocorp.phenodex",
+      "url": "https://sbox.game/klibatocorp/phenodex/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "lavagame.multis_cases",
+      "url": "https://sbox.game/lavagame/multis_cases/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "lavagame.sandmoney_",
+      "url": "https://sbox.game/lavagame/sandmoney_/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "lowkeynetworks.newrp",
+      "url": "https://sbox.game/lowkeynetworks/newrp/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "luckygaming.doner_kiosk",
+      "url": "https://sbox.game/luckygaming/doner_kiosk/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "master.digging_simulator",
+      "url": "https://sbox.game/master/digging_simulator/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "meteorlab.garden",
+      "url": "https://sbox.game/meteorlab/garden/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "meteorlab.vehicle_tool_example",
+      "url": "https://sbox.game/meteorlab/vehicle_tool_example/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "mishmaps.backrooms",
+      "url": "https://sbox.game/mishmaps/backrooms/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "mostudio.sweeper_otso",
+      "url": "https://sbox.game/mostudio/sweeper_otso/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "namicry.gacha_crawler",
+      "url": "https://sbox.game/namicry/gacha_crawler/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "playbtg.elevator",
+      "url": "https://sbox.game/playbtg/elevator/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "pldr.duck_pond",
+      "url": "https://sbox.game/pldr/duck_pond/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "redsnail.watertool",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": [
+        "watertool"
+      ]
+    },
+    {
+      "id": "sandbox",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": [
+        "facepunch.sandbox"
+      ]
+    },
+    {
+      "id": "sandbox-plus-plus",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "sbox-grubs",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": [
+        "grubs"
+      ]
+    },
+    {
+      "id": "sbox-scenestaging",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": [
+        "scenestaging"
+      ]
+    },
+    {
+      "id": "sbox-vehicle-kit",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "simalami.15_puzzle_master",
+      "url": "https://sbox.game/simalami/15_puzzle_master/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "simple-weapon-base",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "sino.s_sino",
+      "url": "https://sbox.game/sino/s_sino/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "slamdunk.minigolf",
+      "url": "https://sbox.game/slamdunk/minigolf/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "stellawisps.lumberyard",
+      "url": "https://sbox.game/stellawisps/lumberyard/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "stepdev.fishy",
+      "url": "https://sbox.game/stepdev/fishy/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "suburbianites.blindloaded",
+      "url": "https://sbox.game/suburbianites/blindloaded/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "thefancylads.farm_land",
+      "url": "https://sbox.game/thefancylads/farm_land/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "thefancylads.restaurant_dev",
+      "url": "https://sbox.game/thefancylads/restaurant_dev/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "treehaven.sdiver",
+      "url": "https://sbox.game/treehaven/sdiver/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "ttt-reborn",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "vault108.suspectra",
+      "url": "https://sbox.game/vault108/suspectra/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "vault77.chop_the_forest",
+      "url": "https://sbox.game/vault77/chop_the_forest/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "vidya.terry_games",
+      "url": "https://sbox.game/vidya/terry_games/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "wirebox",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    },
+    {
+      "id": "yellowletter.terrys_crash_course",
+      "url": "https://sbox.game/yellowletter/terrys_crash_course/source",
+      "licenseStatus": "unverified",
+      "use": "research-citation-only",
+      "aliases": []
+    }
+  ]
+}

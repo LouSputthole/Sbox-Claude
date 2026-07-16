@@ -1,5 +1,28 @@
 # Data Assets & Content Pipelines
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Pattern: data-drive content with GameResource + [AssetType]](#pattern-data-drive-content-with-gameresource--assettype)
+- [Pattern: discover assets at runtime — and FILTER the suffix collision](#pattern-discover-assets-at-runtime--and-filter-the-suffix-collision)
+- [Pattern: prefab registry — pre-clone, BreakFromPrefab, index by id](#pattern-prefab-registry--pre-clone-breakfromprefab-index-by-id)
+- [Pattern: service-locator singleton for registries/settings](#pattern-service-locator-singleton-for-registriessettings)
+- [Pattern: runtime file discovery & persistence](#pattern-runtime-file-discovery--persistence)
+- [Pattern: render-to-texture surface (CCTV / scope / minimap / mirror)](#pattern-render-to-texture-surface-cctv--scope--minimap--mirror)
+- [Pattern: editor-live custom visuals — [ExecuteInEditor] + raw scene objects](#pattern-editor-live-custom-visuals--executeineditor--raw-scene-objects)
+- [Pattern: ship editor tooling inside a library](#pattern-ship-editor-tooling-inside-a-library)
+- [Gotcha table](#gotcha-table)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Pattern: GameResource carries both a data sheet AND a behavior prefab (despawn.murder)](#pattern-gameresource-carries-both-a-data-sheet-and-a-behavior-prefab-despawnmurder)
+  - [Pattern: per-asset metadata resource matched at runtime by scene identity (despawn.murder)](#pattern-per-asset-metadata-resource-matched-at-runtime-by-scene-identity-despawnmurder)
+  - [Pattern: GameResource as a pure data sheet for a modifier bus (thefancylads.farmland)](#pattern-gameresource-as-a-pure-data-sheet-for-a-modifier-bus-thefancyladsfarmland)
+  - [Pattern: [Flags] enum category mask on GameResource items (thefancylads.farmland)](#pattern-flags-enum-category-mask-on-gameresource-items-thefancyladsfarmland)
+  - [Counter-pattern: when NOT to use GameResource (facepunch.ss2)](#counter-pattern-when-not-to-use-gameresource-facepunchss2)
+  - [Counter-pattern: reflection-driven catalog as an alternative to ResourceLibrary (facepunch.ss2)](#counter-pattern-reflection-driven-catalog-as-an-alternative-to-resourcelibrary-facepunchss2)
+  - [Updated gotcha table additions](#updated-gotcha-table-additions)
+<!-- reference-toc:end -->
+
 Purpose: data-drive game content in modern s&box — `GameResource` catalogs, prefab registries, runtime file discovery, render-to-texture surfaces, and shipping editor authoring tools — without hand-writing C# per variant.
 
 ## Mental model

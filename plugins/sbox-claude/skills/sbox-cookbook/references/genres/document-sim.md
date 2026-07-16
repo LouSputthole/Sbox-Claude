@@ -1,5 +1,29 @@
 # Document-Sim (Papers-Please-like) Genre Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+  - [Core loop](#core-loop)
+- [System stack (compose these)](#system-stack-compose-these)
+- [Build order](#build-order)
+- [How the real game does it](#how-the-real-game-does-it)
+  - [1. The interaction dispatcher (most portable recipe)](#1-the-interaction-dispatcher-most-portable-recipe)
+  - [2. Rules roller mirrored into world props](#2-rules-roller-mirrored-into-world-props)
+  - [3. Verdict as two reason-lists (not a bool)](#3-verdict-as-two-reason-lists-not-a-bool)
+  - [4. Generate forgeries coherently](#4-generate-forgeries-coherently)
+- [Modern-API notes & pitfalls](#modern-api-notes--pitfalls)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [A. Named-event delta table as the entire progression system](#a-named-event-delta-table-as-the-entire-progression-system)
+  - [B. TaskCompletionSource as a "wait for all animations to settle" barrier](#b-taskcompletionsource-as-a-wait-for-all-animations-to-settle-barrier)
+  - [C. Clock-driven day (simulated time in OnUpdate, not a wave count)](#c-clock-driven-day-simulated-time-in-onupdate-not-a-wave-count)
+  - [D. Save-on-every-mutation rather than autosave-on-timer](#d-save-on-every-mutation-rather-than-autosave-on-timer)
+  - [E. [ConCmd] Monte-Carlo balance harness for the data generator](#e-concmd-monte-carlo-balance-harness-for-the-data-generator)
+  - [F. Embedded async minigame as a sub-state-machine inside the inspection loop](#f-embedded-async-minigame-as-a-sub-state-machine-inside-the-inspection-loop)
+  - [G. Random recurring threat on a reset timer (boss visit)](#g-random-recurring-threat-on-a-reset-timer-boss-visit)
+  - [H. Static email/hint DB as the tutorial layer](#h-static-emailhint-db-as-the-tutorial-layer)
+<!-- reference-toc:end -->
+
 Build a first-person inspection game: an NPC presents procedurally-generated documents, the player checks them against a randomized rule set, and accepts/denies — scored against a verdict engine. Mined from `dimmies.terryspapers` (Terry's Papers), a single-player, offline, modern GameObject/Component/Scene build.
 
 ## What defines the genre
@@ -16,15 +40,15 @@ Build a first-person inspection game: an NPC presents procedurally-generated doc
 
 | System | Role | Reference |
 |---|---|---|
-| Raycast-tag interaction dispatcher | "look at thing, press use" on any prop | `references/systems/interaction-use-prompt.md` |
-| Rules-vs-data verdict engine | the actual Papers-Please core | `references/systems/rules-validation-engine.md` |
-| Procedural subject + planted-error generator | data-table / weighted-roll NPC factory | `references/systems/procedural-data-generator.md` |
-| Camera-to-texture mugshot | live 3D portrait on ID/passport UI | `references/systems/render-to-texture-portrait.md` |
-| In-game clock & day flow | tick clock, quota, EndDay gate | `references/systems/day-cycle-round-flow.md` |
-| JSON persistence | save/continue to `FileSystem.Data` | `references/systems/json-save-load.md` |
-| Async scripted-sequence pattern | skippable cutscenes / staggered reveals | `references/systems/async-sequence.md` |
-| Cinematic camera handler | fade + SmoothDamp/Slerp scripted beats | `references/systems/cinematic-camera.md` |
-| Mood/economy progression | soft-fail meter + promotion/permadeath | `references/systems/economy-progression.md` |
+| Raycast-tag interaction dispatcher | "look at thing, press use" on any prop | `references/engine/input-interaction.md` |
+| Rules-vs-data verdict engine | the actual Papers-Please core | (verdict pattern below) |
+| Procedural subject + planted-error generator | data-table / weighted-roll NPC factory | (generator pattern below) |
+| Camera-to-texture mugshot | live 3D portrait on ID/passport UI | `references/engine/ui-razor.md` |
+| In-game clock & day flow | tick clock, quota, EndDay gate | (clock-driven day pattern below) |
+| JSON persistence | save/continue to `FileSystem.Data` | `references/systems/save-persistence.md` |
+| Async scripted-sequence pattern | skippable cutscenes / staggered reveals | `references/systems/cutscenes-dialogue.md` |
+| Cinematic camera handler | fade + SmoothDamp/Slerp scripted beats | `references/systems/cutscenes-dialogue.md` |
+| Mood/economy progression | soft-fail meter + promotion/permadeath | `references/systems/economy-currency.md` |
 | Service-locator (`GameCore`) | typed `[Property]` handles to every manager | (pattern below) |
 
 The first three are the irreducible core — a document-sim is *interaction dispatcher + verdict engine + data generator*. The rest are polish.

@@ -1,5 +1,30 @@
 # Combat & Weapons
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Pick an architecture (commit to ONE spine)](#pick-an-architecture-commit-to-one-spine)
+- [Recipes](#recipes)
+  - [1. Shot cooldown with TimeUntil + AddShootDelay](#1-shot-cooldown-with-timeuntil--addshootdelay)
+  - [2. Fire a hitscan shot (modern fluent trace + broadcast effects)](#2-fire-a-hitscan-shot-modern-fluent-trace--broadcast-effects)
+  - [3. Physical (travel-time) projectile as a per-step integrating mover](#3-physical-travel-time-projectile-as-a-per-step-integrating-mover)
+  - [4. Radial explosion: sphere query → falloff → per-body knockback → networked damage](#4-radial-explosion-sphere-query--falloff--per-body-knockback--networked-damage)
+  - [5. Ballistic arc prediction (aim reticle / trajectory line / AI targeting)](#5-ballistic-arc-prediction-aim-reticle--trajectory-line--ai-targeting)
+  - [6. Cancellable reload/channel/build — capture-then-compare the token](#6-cancellable-reloadchannelbuild--capture-then-compare-the-token)
+- [Gotcha table](#gotcha-table)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [A. Anim-event damage windows instead of timers (aethercore.versus)](#a-anim-event-damage-windows-instead-of-timers-aethercoreversus)
+  - [B. [Rpc.Owner] damage routing preserves private timers (aethercore.versus)](#b-rpcowner-damage-routing-preserves-private-timers-aethercoreversus)
+  - [C. Penetrating hitscan — IEnumerable (ataco.sdoomresurrection)](#c-penetrating-hitscan--ienumerable-atacosdoomresurrection)
+  - [D. Frame-table weapon state machine without an animgraph (ataco.sdoomresurrection)](#d-frame-table-weapon-state-machine-without-an-animgraph-atacosdoomresurrection)
+  - [E. Combo cancel windows from a WeaponDefinition GameResource (aethercore.versus)](#e-combo-cancel-windows-from-a-weapondefinition-gameresource-aethercoreversus)
+  - [F. Floating damage numbers via static pub/sub + PointToScreenPixels (aethercore.versus)](#f-floating-damage-numbers-via-static-pubsub--pointtoscreenpixels-aethercoreversus)
+  - [G. Per-recipient outline via ghost-clone + Rpc.FilterInclude (despawn.murder)](#g-per-recipient-outline-via-ghost-clone--rpcfilterinclude-despawnmurder)
+  - [H. [Rpc.Host] purchase re-validation — price from ConVar, not the item (despawn.murder)](#h-rpchost-purchase-re-validation--price-from-convar-not-the-item-despawnmurder)
+  - [Updated "read these games" pointer](#updated-read-these-games-pointer)
+<!-- reference-toc:end -->
+
 Build weapons, projectiles, explosions, ballistic previews, and cancellable combat actions in s&box using the modern Component + `Scene.Trace` API.
 
 ## Mental model
@@ -30,23 +55,19 @@ The strategy-Component is the modern idiomatic choice when each variant is subst
 
 `TimeUntil` is a struct that counts down in real seconds; assign a float and it's "now + that". Put the check in `Can*Attack`, push it forward after firing (sandbox: `BaseWeapon.cs:21,171`).
 
-```csharp
-protected TimeUntil TimeUntilNextShotAllowed;
-public void AddShootDelay( float seconds ) => TimeUntilNextShotAllowed = seconds;
+```text
+state: time remaining until the next permitted shot
 
-public virtual bool CanPrimaryAttack()
-{
-    if ( HasOwner && !HasAmmo() ) return false;
-    if ( IsReloading() ) return false;
-    if ( TimeUntilNextShotAllowed > 0 ) return false;   // still cooling down
-    return true;
-}
+to add a firing delay, reset that countdown from the requested duration
 
-public override void PrimaryAttack()
-{
-    AddShootDelay( GetPrimaryFireRate() );              // re-arm the gate
-    // ... fire ...
-}
+primary attack is allowed only when:
+  an owned weapon has ammunition
+  no reload is in progress
+  the shot countdown has elapsed
+
+when primary attack begins:
+  reset the countdown from the configured fire interval
+  execute the authoritative firing behavior
 ```
 
 Keep per-weapon tunables (fire rate, aim-cone, spread, recoil) in a `record struct` config so a concrete weapon overrides them trivially.
@@ -55,31 +76,24 @@ Keep per-weapon tunables (fire rate, aim-cone, spread, recoil) in a `record stru
 
 Run the trace authoritatively, apply damage, THEN broadcast cosmetics (sandbox: `BaseBulletWeapon.cs:81`; simple-weapon-base: `BulletInfo.HitScan.cs:11`).
 
-```csharp
-var traceRay = AimRay with { Forward = AimRay.Forward.WithAimCone( spreadX, spreadY ) };
-
-var tr = Scene.Trace.Ray( traceRay, config.Range )
-    .IgnoreGameObjectHierarchy( AimIgnoreRoot )
-    .WithCollisionRules( "bullet" )   // named ruleset → designers retune what bullets hit
-    .WithoutTags( "playercontroller" )
-    .Radius( config.BulletRadius )
-    .UseHitboxes()                    // hits land on skinned hitboxes → headshots work
-    .Run();
-
-// authoritative: resolve the logical entity, not the raw collider GameObject
-tr.GameObject?.Components.GetInAncestorsOrSelf<IDamageable>()
-   ?.OnDamage( DamageInfo.FromBullet( /* attacker, weapon, hitbox, pos, force, dmg... */ ) );
-
-ShootEffects( tr.EndPosition, tr.Hit, tr.Normal, tr.GameObject, tr.Surface );  // cosmetics
+```text
+authoritative hitscan flow:
+  perturb the aim direction by the configured horizontal and vertical spread
+  trace to weapon range while:
+    ignoring the shooter hierarchy
+    using the named bullet collision rules
+    excluding controller-only objects
+    applying bullet radius and hitbox precision
+  resolve IDamageable from the hit object's ancestors
+  if found, deliver bullet damage with attacker, weapon, hitbox, position, force, and damage context
+  broadcast cosmetic shot results using the trace endpoint, hit flag, normal, object, and surface
 ```
 
-```csharp
-[Rpc.Broadcast( NetFlags.Unreliable )]   // cosmetic, lossy-OK → Unreliable
-void ShootEffects( Vector3 end, bool hit, Vector3 normal, GameObject hitObj, Surface surface )
-{
-    if ( Application.IsDedicatedServer ) return;   // headless host has nothing to draw
-    // muzzle flash, tracer, impact decal/sound here
-}
+```text
+unreliable broadcast shot-effects handler:
+  return immediately on a dedicated server
+  render muzzle flash and tracer
+  when a hit occurred, create the appropriate impact decal and sound from surface data
 ```
 
 `WithCollisionRules`+`UseHitboxes` confirmed at sandbox `BaseBulletWeapon.cs:83-86`; the `[Rpc.Broadcast( NetFlags.Unreliable )]` + `Application.IsDedicatedServer` early-out at simple-weapon-base `BulletInfo.HitScan.cs:59-62`.
@@ -88,47 +102,33 @@ void ShootEffects( Vector3 end, bool hit, Vector3 normal, GameObject hitObj, Sur
 
 Spawn a networked GameObject carrying a mover; integrate in **`OnFixedUpdate`** (deterministic, frame-rate-independent) and trace each segment from last position to new (simple-weapon-base: `bullets/PhysicalBullet.Mover.cs:34`). Wrap it behind the same `BulletInfo.Shoot` strategy interface as hitscan so weapon code is identical.
 
-```csharp
-protected override void OnFixedUpdate()
-{
-    if ( IsProxy || HasImpacted || Owner is null ) return;
-
-    BulletVelocity *= 1 - BulletDrag;                          // drag first
-    BulletVelocity += Vector3.Down * BulletGravity * Time.Delta;
-    var step = BulletVelocity * Time.Delta;
-
-    var tr = Weapon.TraceBullet( Owner.GameObject, WorldPosition, WorldPosition + step );
-    if ( tr.Hit ) { HandleImpact( tr ); WorldPosition = tr.HitPosition; HasImpacted = true; return; }
-    WorldPosition += step;                                     // miss → advance
-}
+```text
+on each fixed physics step:
+  stop on proxies, after impact, or without an owner
+  reduce velocity by drag, then add gravity for this step
+  compute the segment from current position through the resulting displacement
+  trace that segment while ignoring the owner
+  if it hits:
+    resolve impact, snap to the hit position, and mark the projectile complete
+  otherwise advance to the segment endpoint
 ```
 
 ### 4. Radial explosion: sphere query → falloff → per-body knockback → networked damage
 
 One helper ties it together: query `Scene.FindInPhysics(new Sphere(...))`, inverse-square falloff, knockback down the **correct path per body type**, damage via `Health.TakeDamage`, world destruction host-only (sbox-grubs: `Code/Helpers/ExplosionHelper.cs:18`).
 
-```csharp
-foreach ( var go in Scene.FindInPhysics( new Sphere( position, radius ) ) )
-{
-    if ( !go.Components.TryGet( out Health health, FindMode.EverythingInSelfAndAncestors ) )
-        continue;   // hit a child collider → resolve to the entity root, else null
+```text
+for each physics object found inside the blast sphere:
+  resolve Health from the object or its ancestors; skip objects without it
+  calculate clamped quadratic distance falloff
+  if the target resolves to a CharacterController:
+    punch it away from the blast and release it from the ground
+  otherwise, if it owns a Rigidbody:
+    apply a mass-scaled impulse at the body position
+  deliver explosion damage scaled by falloff with attacker and origin context
 
-    var dist = Vector3.DistanceBetween( position, go.WorldPosition );
-    var distFactor = 1.0f - MathF.Pow( dist / radius, 2 ).Clamp( 0, 1 );   // inverse-square
-
-    // knockback: kinematic character vs physics prop use DIFFERENT calls
-    if ( go.Components.TryGet( out CharacterController cc, FindMode.EverythingInSelfAndAncestors ) )
-    { cc.Punch( dir * force ); cc.ReleaseFromGround(); }
-    else if ( go.Components.TryGet( out Rigidbody body, FindMode.EverythingInSelf ) )
-        body.ApplyImpulseAt( body.WorldPosition, dir * force * body.PhysicsBody.Mass );
-
-    health.TakeDamage( DamageInfo.FromExplosion( damage * distFactor, /* attacker, pos */ ) );
-}
-
-using ( Rpc.FilterInclude( c => c.IsHost ) )   // SDF terrain carve/scorch: host-only
-{
-    GrubsTerrain.Instance.SubtractCircle( center2d, radius / 2f, 1 );
-}
+under an RPC filter that includes only the host:
+  apply any terrain carve or persistent world scorch
 ```
 
 `CharacterController.Punch` + `ReleaseFromGround` vs `Rigidbody.ApplyImpulseAt` and the `Rpc.FilterInclude(c => c.IsHost)` host-only carve are all at `ExplosionHelper.cs:41-66`.
@@ -140,22 +140,15 @@ Sample the flight path in N segments, `Scene.Trace.Ray` each, stop at first hit,
 - **`RunTo`** — cubic bezier toward a control point: cheap, smooth preview, not physically faithful.
 - **`RunTowards`** — integrates the *real* motion so the preview matches the live projectile.
 
-```csharp
-var velocity = force * -direction;
-var position = startPos;
-for ( var i = 0; i < SegmentCount; i++ )
-{
-    var seg = new ArcSegment { StartPos = position };
-    velocity -= new Vector3( windForceX / 2, 0, 0 );
-    velocity -= scene.PhysicsWorld.Gravity * epsilon;   // SAME gravity the projectile uses
-    position -= velocity;
-    seg.EndPos = position;
-
-    var tr = scene.Trace.Ray( seg.StartPos, seg.EndPos )
-        .IgnoreGameObjectHierarchy( Grub.GameObject ).Radius( 4f ).Run();
-    segments.Add( seg );
-    if ( tr.Hit ) { seg.EndPos = tr.EndPosition; seg.HitNormal = tr.Normal; break; }
-}
+```text
+initialize preview velocity and position from the launch inputs
+repeat up to the configured segment count:
+  remember the current position as the segment start
+  apply the same wind and gravity increments used by the live projectile
+  integrate the next preview position
+  trace between segment endpoints using projectile radius while ignoring the shooter
+  append the segment
+  if the trace hits, clamp the endpoint to the hit, record its normal, and stop
 ```
 
 `RunTowardsWithBounces` reflects off surfaces and damps `activeForce *= 0.66f` per bounce, treating a near-vertical hit (`Vector3.GetAngle(hitNormal, Vector3.Up) < 45`) as a stop (`ArcSegment.cs:114`). **Use the exact same gravity/wind/drag constants as the live projectile or the preview lies.**
@@ -164,32 +157,21 @@ for ( var i = 0; i < SegmentCount; i++ )
 
 Model long interruptible actions as `async`. A new action cancels the old via a stored `CancellationTokenSource`; the critical idiom is to **capture your token at entry and only fire the "finished" callback if you still own it** — otherwise a superseded reload emits a spurious "finished" on the wrong instance (sandbox-plus-plus: `Code/Game/Weapon/BaseWeapon/BaseWeapon.Reloading.cs:95`).
 
-```csharp
-public virtual async void OnReloadStart()
-{
-    if ( !CanReload() ) return;
-    CancelReload();                              // cancel any in-flight reload
-    var cts = new CancellationTokenSource();
-    reloadToken = cts; isReloading = true;
-    try { await ReloadAsync( cts.Token ); }
-    finally { if ( reloadToken == cts ) { isReloading = false; reloadToken = null; } cts.Dispose(); }
-}
+```text
+on reload start:
+  stop unless reload is currently allowed
+  cancel any previous reload
+  create and store a new cancellation source; mark reload active
+  await the reload routine with that source's token
+  during cleanup, clear active state only if the stored source is still this source
+  dispose the local source
 
-protected virtual async Task ReloadAsync( CancellationToken ct )
-{
-    var mySource = reloadToken;                  // capture
-    try
-    {
-        while ( ClipContents < ClipMaxSize && !ct.IsCancellationRequested )
-            await Task.DelaySeconds( ReloadTime, ct );   // cancellation interrupts the wait
-        // ... fill clip ...
-    }
-    finally
-    {
-        if ( reloadToken == mySource )           // compare: am I still the current reload?
-            ViewModel?.RunEvent<ViewModel>( x => x.OnReloadFinish() );
-    }
-}
+reload routine:
+  capture the currently stored source
+  while the clip needs ammunition and cancellation was not requested:
+    await the next reload interval using the cancellation token
+    transfer the appropriate ammunition
+  during cleanup, emit the reload-finished presentation only if the captured source is still current
 ```
 
 `CancelReload()` just guards-and-cancels: `if ( reloadToken?.IsCancellationRequested == false ) reloadToken.Cancel();` (`BaseWeapon.Reloading.cs:46`). Generalizes to any overlapping cancellable action, not just reloads.
@@ -224,23 +206,17 @@ Opening a hit trigger based on elapsed time is fragile — if a flinch or guard-
 
 `versus/Code/WeaponDamage.cs` — `Component.ITriggerListener`; `OnAttackHitStart` enables the collider, `OnAttackHitEnd` disables it. Inside `OnTriggerEnter` it dedupes with a `HashSet<GameObject>` (one hit per target root per swing) and refuses damage if the attacker's state flags are wrong:
 
-```csharp
-// Wire in PlayerAnimator: Model.OnGenericEvent += OnAnimEvent
-void OnAnimEvent( string name ) {
-    if ( name == "hit_start" ) WeaponDamage.StartDamageWindow( damage, shieldDmg, knockbackMult );
-    else if ( name == "hit_end" ) WeaponDamage.EndDamageWindow();
-}
+```text
+subscribe the weapon to generic animation events
+on hit-start, clear the per-swing hit set and enable the damage trigger with current attack values
+on hit-end, disable the damage trigger
 
-// WeaponDamage : Component, Component.ITriggerListener
-HashSet<GameObject> _hitThisSwing = new();
-void OnTriggerEnter( Collider other ) {
-    var root = other.GameObject.Root;
-    if ( _hitThisSwing.Contains( root ) ) return;           // dedupe per swing
-    if ( !inAttack || IsGuardBroken || IsParrying ) return; // re-check — collider may be stale
-    if ( targetFaction == myFaction ) return;               // friendly fire guard
-    _hitThisSwing.Add( root );
-    root.Components.GetInAncestorsOrSelf<IDamageable>()?.OnDamage( ... );
-}
+when another collider enters during the window:
+  resolve its root object
+  reject roots already damaged by this swing
+  re-check that the attack remains valid and is not guard-broken or parrying
+  reject friendly targets
+  record the root and deliver damage through an ancestor IDamageable
 ```
 
 Anti-pattern: using `TimeUntil hitWindowEnd > 0` as the gate — timer doesn't know the swing was interrupted.
@@ -251,20 +227,14 @@ When melee combat depends on non-synced private state (parry window timer, i-fra
 
 `versus/Code/HealthComponent.cs` + `PlayerController.cs`:
 
-```csharp
-public void TakeDamage( DamageInfo info ) {
-    // any machine may call this, but mutate only on owner
-    TakeDamageRpc( info );
-}
+```text
+public damage entry point:
+  forward the damage record to an owner-targeted RPC
 
-[Rpc.Owner]
-void TakeDamageRpc( DamageInfo info ) {
-    // runs on victim's owner — parryWindowTimer is correct here
-    if ( parryWindowTimer > 0 && IsParryAngle( info ) ) { DoParrySuccess( info ); return; }
-    if ( IsGuarding ) { shield.AbsorbDamage( info ); return; }
-    health -= info.Damage;
-    OnDamageReceived( info );
-}
+on the victim owner's machine:
+  if the private parry timer is active and the attack angle is valid, resolve a parry and stop
+  if guarding, let the shield absorb the damage and stop
+  otherwise subtract health and emit the damage-received event
 ```
 
 Anti-pattern: reading `parryWindowTimer` or an i-frame flag on the attacker's machine — proxy values are always 0/stale.
@@ -275,17 +245,14 @@ The standard `.Run()` returns only the first hit. For weapons that pierce multip
 
 `sdoomresurrection/Code/weapon/Weapon.cs`:
 
-```csharp
-var results = Scene.Trace.Ray( ray, range )
-    .WithAnyTags( "monster", "player", "bulletclip", "blocking" )
-    .Size( radius )
-    .RunAll();
+```text
+run an all-results ray trace through weapon range:
+  include damageable and blocking tag classes
+  apply the configured trace radius
 
-foreach ( var tr in results ) {
-    tr.GameObject?.Components.GetAll<IDamageable>( FindMode.EverythingInSelfAndAncestors )
-        .FirstOrDefault()?.TakeDamage( DamageInfo.FromBullet( ... ) );
-    if ( tr.Tags.Has( "blocking" ) ) break;   // stop at solid wall
-}
+visit results in distance order:
+  resolve the first IDamageable from the hit object or its ancestors and apply bullet damage
+  stop traversal when the hit carries the blocking tag
 ```
 
 Spread is applied per-pellet as `Rotation.FromYaw( rand * spread.x ) * Rotation.FromPitch( rand * spread.y )` applied to the base aim ray — cleaner than `WithAimCone` when you need asymmetric X/Y spread.
@@ -294,28 +261,23 @@ Spread is applied per-pellet as `Rotation.FromYaw( rand * spread.x ) * Rotation.
 
 When a weapon must match a sprite-sheet or HUD animation frame-by-frame (retro FPS, 2D sidebar weapon), drive state with a `switch(State)` tic counter instead of an animation graph. Each case sets the sprite, queues the next frame timer, and fires side-effects.
 
-`sdoomresurrection/Code/weapon/DoomShotgun.cs` (condensed):
+`sdoomresurrection/Code/weapon/DoomShotgun.cs` demonstrates the frame-table state machine:
 
-```csharp
-enum WeaponState { Ready, Fire, Flash, Reload, Empty }
-[Sync] WeaponState State;
-TimeUntil NextFrame;
+```text
+synced state: ready, fire, flash, reload, or empty
+state: countdown until the next frame transition
 
-protected override void OnFixedUpdate() {
-    if ( IsProxy || NextFrame > 0 ) return;
-    switch ( State ) {
-        case WeaponState.Fire:
-            SetHudSprite( "SHTGA0" ); MuzzleFlash();
-            FirePellets( 7, spreadX, spreadY );
-            NextFrame = TicsToSeconds( 3 );
-            State = WeaponState.Flash; break;
-        case WeaponState.Flash:
-            SetHudSprite( "SHTGB0" );
-            NextFrame = TicsToSeconds( 7 );
-            State = WeaponState.Reload; break;
-        // ...
-    }
-}
+on each authoritative fixed step after the countdown elapses:
+  choose behavior from the current state
+  for fire:
+    select the firing sprite, emit muzzle presentation, and fire the pellet pattern
+    arm the frame countdown from the state's tic duration
+    advance to flash
+  for flash:
+    select the follow-up sprite
+    arm its tic duration
+    advance to reload
+  define the remaining states with the same explicit transition pattern
 ```
 
 Anti-pattern: using `Task.DelaySeconds` chains for frame pacing — they accumulate uncancellable continuations if the weapon is dropped mid-sequence.
@@ -326,17 +288,15 @@ Hardcoding attack durations makes re-timing animations break the cancel system. 
 
 `versus/Code/Data/WeaponDefinition.cs` (key fields):
 
-```csharp
-[GameResource( "Weapon Definition", "weapon", "Melee weapon data" )]
-public class WeaponDefinition : GameResource {
-    public List<float> AttackDurations { get; set; }        // abs seconds per combo hit
-    public List<float> AttackDamages { get; set; }
-    public List<float> AttackCancelStartsNormalized { get; set; } // 0-1 fraction of clip
-}
+```text
+WeaponDefinition game resource fields:
+  attack duration in seconds for each combo index
+  attack damage for each combo index
+  normalized cancel-window start for each combo index
 
-// At runtime, resolve to absolute cancel time:
-float cancelStart = def.AttackCancelStartsNormalized[comboIndex] * def.AttackDurations[comboIndex];
-// After elapsed >= cancelStart, open the cancel window for input-buffered chain/dodge-cancel
+at runtime:
+  absolute cancel start := normalized start * duration for the active combo index
+  once elapsed attack time reaches that value, allow buffered chain or dodge cancellation
 ```
 
 Input buffering: pressing the next attack during a swing sets `attackBuffer = bufferDuration`; the cancel window polls `attackBuffer > 0` and consumes it. Dodge-cancel has higher priority than combo-chain.
@@ -347,20 +307,16 @@ Decouple floating combat text from any specific HUD component. A static queue ac
 
 `versus/Code/CombatEvents.cs` + `uicodes/PlayerHud.razor`:
 
-```csharp
-// Zero-dependency emitter — any combat code calls this
-public static class CombatEvents {
-    record DamagePopup( Vector3 WorldPos, float Amount, string Type, RealTimeSince Age );
-    static List<DamagePopup> _popups = new();
-    public static void AddPopup( Vector3 pos, float amount, string type )
-        => _popups.Add( new( pos, amount, type, 0 ) );
-}
+```text
+shared combat-event store:
+  each damage popup records world position, amount, category, and real-time age
+  an add operation appends a new record with age zero
 
-// In HUD OnUpdate (Razor panel):
-foreach ( var p in CombatEvents.Popups ) {
-    var screen = Scene.Camera.PointToScreenPixels( p.WorldPos );
-    // render at screen + offset by age, fade alpha by age
-}
+during HUD update:
+  visit the current popup records
+  project each world position through the scene camera into screen pixels
+  offset its screen position and fade its opacity as age increases
+  remove records after the presentation lifetime
 ```
 
 Anti-pattern: passing a UI reference into combat code — creates circular dependencies and breaks when the HUD is rebuilt.
@@ -371,19 +327,13 @@ To show a wallhack/radar outline only to specific players (radar buyer + dead sp
 
 `murder/Code/Systems/EquipmentShop/Items/Radar.cs` (`RadarOutlineFactory`):
 
-```csharp
-void CreateOutlineFor( Connection buyer ) {
-    var ghost = target.SkinnedModelRenderer.GameObject.Clone();
-    ghost.Tags.Add( "outline" );
-    ghost.Components.Create<HighlightOutline>(); // or equivalent tint/postfx
-    ghost.NetworkSpawn();
-    // only buyer + any dead spectators see the ghost
-    using ( Rpc.FilterInclude( c => c == buyer || IsSpectator( c ) ) )
-        ShowOutlineRpc( ghost );
-}
-
-[Rpc.Broadcast]
-void ShowOutlineRpc( GameObject ghost ) { ghost.Enabled = true; }
+```text
+to create a recipient-scoped outline:
+  clone the target renderer object into a separate ghost
+  tag it for cleanup and attach an outline-only presentation component
+  network-spawn the ghost
+  filter the broadcast audience to the buyer and eligible spectators
+  tell only that audience to enable the ghost
 ```
 
 Clean up by tag on radar expiry: `Scene.GetAllObjects().Where(o => o.Tags.Has("outline")).ToList().ForEach(o => o.Destroy())`.
@@ -396,19 +346,15 @@ Never trust the client's claimed item price. Re-validate the full purchase serve
 
 `murder/Code/Systems/EquipmentShop/EquipmentShopManager.cs`:
 
-```csharp
-[Rpc.Host]
-public void PurchaseHost( string itemKey ) {
-    var caller = Rpc.Caller;
-    if ( !_items.TryGetValue( itemKey, out var item ) ) return;
-    if ( !item.IsEnabled ) return;
-    var pawn = GetPawn( caller );
-    if ( pawn is null || !item.CanPurchase( pawn ) ) return;
-    int price = GameConVars.GetPowerupPrice( itemKey, fallback: 3 );  // from ConVar, not item
-    if ( pawn.CluesCollected < price ) return;
-    pawn.CluesCollected -= price;
-    item.OnPurchase( pawn );
-}
+```text
+host RPC purchase flow(item key):
+  identify the RPC caller
+  reject unknown or disabled items
+  resolve the caller's pawn and re-run the item's eligibility check
+  read authoritative price from the server ConVar using a safe fallback
+  reject insufficient currency
+  debit the authoritative balance
+  apply the purchase to the pawn
 ```
 
 Anti-pattern: `price = item.Price` (client-authored field) — a cheater can call the RPC without paying.

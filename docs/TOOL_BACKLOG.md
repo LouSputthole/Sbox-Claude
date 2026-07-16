@@ -1,6 +1,6 @@
-# Bridge Tool Backlog — mined from 51 open-source s&box games (2026-06-09)
+# Bridge Tool Backlog — mined from 51 public-source s&box games (2026-06-09)
 
-The 51-game corpus mining (`sbox-lessons/mining-v2/`) surfaced **352 candidate bridge tools**, **188 flagged "ship-worthy"** by the per-game miners. This is the ranked, de-duplicated roadmap. The single biggest signal: the same **scaffold-a-system** tools were independently requested by many games — those are the highest-confidence additions.
+The 51-game public-source research pass surfaced **352 candidate bridge tools**, **188 flagged "ship-worthy"** by the per-game review. This is the ranked, de-duplicated roadmap. The single biggest signal: the same **scaffold-a-system** tools were independently requested by many games ? those are the highest-confidence additions.
 
 **Folded into v1.10.0:** `create_economy_wallet` (the most-requested gap with no existing scaffold; see below).
 **Built in v1.11.0:** `create_round_phase_machine`, `create_day_night_clock` (with v1.10.0's `create_economy_wallet` these form the "game director" trio). Handler count: 173.
@@ -84,7 +84,7 @@ The 51-game corpus mining (`sbox-lessons/mining-v2/`) surfaced **352 candidate b
 - `EnvShake` / `ShakePhysics` / controller `Rumble` / the `ICameraModifier` extension point -- the rest of the documented camera-effects surface `create_camera_effects` doesn't cover.
 - DTO `outputSchema` pass for hot read tools -- the docs recommend structured returns; folds into the existing typed-DTO roadmap item.
 
-**Queued:** everything else here, grouped by theme. Full raw list: `sbox-lessons/` mining output (local corpus at `D:\sbox-lessons`).
+**Queued:** everything else here, grouped by theme. The raw research notes are intentionally kept outside the distributable repository.
 
 Legend: **(Nx)** = independently proposed by N games · `easy`/`medium` = miner-estimated build risk.
 
@@ -133,4 +133,4 @@ Legend: **(Nx)** = independently proposed by N games · `easy`/`medium` = miner-
 
 ## Notes for whoever builds these
 - Model them on the existing scaffold generators (`create_health_system`, `create_pickup`, `create_objective_system`, `create_npc_brain`) in `sbox-bridge-addon/Editor/ScaffoldHandlers.cs` — separate handler file, register in `MyEditorMenu.cs`, TS tool in `sbox-mcp-server/src/tools/`.
-- **ALWAYS live-compile-verify the generated 
+- **ALWAYS live-compile-verify the generated
