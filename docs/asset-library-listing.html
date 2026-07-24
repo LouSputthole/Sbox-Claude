@@ -24,6 +24,8 @@
   .divider { border: none; border-top: 2px solid #3a3d44; margin: 36px 0; }
   .toolset { color: #b9b6b0; font-size: 14px; margin: 10px 0; }
   .toolset b { color: #7ec8ff; }
+  a { color: #7ec8ff; text-decoration: underline; text-decoration-color: #4a7aa8; }
+  a:hover { color: #ffd94a; }
 </style>
 </head>
 <body>
@@ -37,7 +39,7 @@
 
 <blockquote><strong>But the tools aren't the real story, the bridge ships a 🧠 brain.</strong> The plugins bundle <strong>sbox-cookbook</strong>: a code-grounded knowledge base mined from <strong>51 real, shipped, open-source s&amp;box games</strong>. The AI reaches for proven, shipped patterns, real inventories, economies, save systems, netcode, whole genre playbooks, <em>instead of guessing</em>.</blockquote>
 
-<p>📖 <strong>Docs &amp; changelog:</strong> sboxskins.gg/claudebridge &nbsp;·&nbsp; 📬 <strong>Feedback:</strong> sboxskins@gmail.com or GitHub Issues</p>
+<p>📖 <strong>Docs &amp; changelog:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> &nbsp;·&nbsp; <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a><br>📬 <strong>Feedback:</strong> <a href="mailto:sboxskins@gmail.com">sboxskins@gmail.com</a> or <a href="https://github.com/LouSputthole/Sbox-Claude/issues">GitHub Issues</a></p>
 
 <hr class="divider">
 
@@ -124,7 +126,7 @@ codex plugin add sbox-codex-bridge@sboxskins</pre>
   <li>🚗 Vehicles toolset, real prefabs with GUID remap, dry-run batch ops</li>
 </ul>
 
-<p><em>Earlier: v1.20 "Director's Cut" (+19 tools) · v1.18 (LipSync) · v1.9–1.12 (the cookbook, the lint family, CI gates). Full history: sboxskins.gg/claudebridge/changelog.</em></p>
+<p><em>Earlier: v1.20 "Director's Cut" (+19 tools) · v1.18 (LipSync) · v1.9–1.12 (the cookbook, the lint family, CI gates). Full history: <a href="https://sboxskins.gg/claudebridge/changelog">sboxskins.gg/claudebridge/changelog</a>.</em></p>
 
 <hr class="divider">
 
@@ -220,7 +222,7 @@ codex plugin add sbox-codex-bridge@sboxskins</pre>
 <hr class="divider">
 
 <h2>🩹 Troubleshooting</h2>
-<p><strong>#1 issue:</strong> port 7269 not answering, the editor isn't running, or the MCP server is off (<em>Editor → Preferences → MCP Server</em>; on by default). <strong>#2:</strong> a stale port registration, if the log says <code>[MCP] Couldn't start MCP server</code>, a dying editor instance still holds the port; wait, then restart once. Missing <code>bridge_*</code> tools = the addon isn't in your Libraries/ or didn't compile, exactly what the lifeline's <code>read_log</code> / <code>get_compile_errors</code> are for. Full guide: sboxskins.gg/claudebridge/troubleshooting.</p>
+<p><strong>#1 issue:</strong> port 7269 not answering, the editor isn't running, or the MCP server is off (<em>Editor → Preferences → MCP Server</em>; on by default). <strong>#2:</strong> a stale port registration, if the log says <code>[MCP] Couldn't start MCP server</code>, a dying editor instance still holds the port; wait, then restart once. Missing <code>bridge_*</code> tools = the addon isn't in your Libraries/ or didn't compile, exactly what the lifeline's <code>read_log</code> / <code>get_compile_errors</code> are for. Full guide: <a href="https://sboxskins.gg/claudebridge/troubleshooting">sboxskins.gg/claudebridge/troubleshooting</a>.</p>
 
 <h2>💡 Tips</h2>
 <ul>
@@ -234,7 +236,7 @@ codex plugin add sbox-codex-bridge@sboxskins</pre>
 <p><strong>Source-available (no redistribution)</strong>: the s&amp;box Claude Bridge Source-Available License 1.0. Use it freely to build your games, free or commercial, and modify it locally. No redistributing, mirroring, repackaging, re-hosting, or offering it as a service. <strong>The games you build with it are yours, unrestricted.</strong> Name and branding are trademarks (see NOTICE). Pre-relicense versions remain AGPL-3.0-or-later.</p>
 
 <h2>🔗 Links</h2>
-<p>Docs: <strong>sboxskins.gg/claudebridge</strong> · GitHub: <strong>github.com/LouSputthole/Sbox-Claude</strong> · Issues: <strong>github.com/LouSputthole/Sbox-Claude/issues</strong> · npm (lifeline): <strong>npmjs.com/package/sbox-mcp-server</strong> · Feedback: <strong>sboxskins@gmail.com</strong></p>
+<p>Docs: <a href="https://sboxskins.gg/claudebridge"><strong>sboxskins.gg/claudebridge</strong></a> · GitHub: <a href="https://github.com/LouSputthole/Sbox-Claude"><strong>github.com/LouSputthole/Sbox-Claude</strong></a> · Issues: <a href="https://github.com/LouSputthole/Sbox-Claude/issues"><strong>github.com/LouSputthole/Sbox-Claude/issues</strong></a> · npm (lifeline): <a href="https://www.npmjs.com/package/sbox-mcp-server"><strong>npmjs.com/package/sbox-mcp-server</strong></a> · Feedback: <a href="mailto:sboxskins@gmail.com"><strong>sboxskins@gmail.com</strong></a></p>
 
 <blockquote><strong>One addon, one command, zero ceremony.</strong> 273 native tools · 28 toolsets + a brain trained on real shipped games, for Claude, Codex, or any AI. <em>Describe your game, the AI builds it.</em> 🧀</blockquote>
 
@@ -252,7 +254,7 @@ codex plugin add sbox-codex-bridge@sboxskins</pre>
 
 <p>The bridge has matured a lot since those early days, the native era removed the fragile parts of the old setup entirely (Node processes, file polling, temp-dir mismatches), and the last three releases added the cinematic wave, real multiplayer testing with a second live client, and a Codex distribution. A lot of those fixes came straight from user reports. Thank you to everyone who took the time to tell me what broke instead of silently launching the tomato cannon. 🍅</p>
 
-<p>If you had a bad experience, please reach out: <strong>sboxskins@gmail.com</strong>. I'll move quickly on real issues and keep improving it.</p>
+<p>If you had a bad experience, please reach out: <a href="mailto:sboxskins@gmail.com"><strong>sboxskins@gmail.com</strong></a>. I'll move quickly on real issues and keep improving it.</p>
 
 <p>Thanks to everyone giving it a shot, testing it, breaking it, and helping make it better.</p>
 
