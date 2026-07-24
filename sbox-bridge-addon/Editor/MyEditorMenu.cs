@@ -924,6 +924,11 @@ public static class ClaudeBridge
 
 			case JsonValueKind.String:
 			{
+				// The native MCP ToolRegistry stringifies structured args - recover
+				// {"x":..} / [x,y,z] passed as a JSON string before falling back to
+				// the comma-string digit scan (same contract as ParseRotation).
+				if ( TryUnwrapStructuredJsonString( e, out var structured ) )
+					return ParseVector3Flexible( structured );
 				var f = ExtractFloats( e.GetString() );
 				if ( f.Length == 1 ) return new Vector3( f[0], f[0], f[0] ); // "5" => uniform
 				return new Vector3( f.Length > 0 ? f[0] : 0f, f.Length > 1 ? f[1] : 0f, f.Length > 2 ? f[2] : 0f );

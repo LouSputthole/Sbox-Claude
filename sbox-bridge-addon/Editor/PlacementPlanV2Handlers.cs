@@ -256,6 +256,10 @@ internal static class PlacementPlanV2Helpers
 
 		if ( value.ValueKind == JsonValueKind.String )
 		{
+			// Native MCP gate stringifies structured args - recover {"x":..}/[x,y,z]
+			// passed as a JSON string (same contract as ParseRotation below).
+			if ( ClaudeBridge.TryUnwrapStructuredJsonString( value, out var structuredVec ) )
+				return ParseVector( structuredVec, label, allowUniform );
 			var parts = ( value.GetString() ?? "" ).Split( ',', StringSplitOptions.TrimEntries );
 			if ( parts.Length != 3 ) throw new Exception( $"{label} must be a comma string with exactly three numbers" );
 			return new Vector3( ParseFiniteString( parts[0], label ), ParseFiniteString( parts[1], label ), ParseFiniteString( parts[2], label ) );

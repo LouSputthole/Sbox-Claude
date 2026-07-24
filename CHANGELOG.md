@@ -2,7 +2,7 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
-## Unreleased
+## [Unreleased]
 
 ### Added
 
@@ -48,9 +48,11 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
   client joined, was tracked, and its death was reported honestly).
 - Prefab `[Property]` values documented as authoritative over code defaults; tuning flows
   through project helpers (see sbox-build-feature gotchas).
+- Docs corrected: legacy file-IPC retirement announced for v2.1.0 did NOT happen and is
+  deferred pending a compatibility decision (CLAUDE.md / V2-MIGRATION now say so).
 
 ### Codex
-- First Codex distribution ships alongside this release: `plugins/sbox-codex-bridge`
+- The Codex distribution prepared in 2.1.0 ships publicly with this release: `plugins/sbox-codex-bridge`
   (marketplace, native editor MCP, optional lifeline diagnostics, API brain, cookbook,
   and workflow skills). 286 tools / 278 handlers / zero orphans.
 

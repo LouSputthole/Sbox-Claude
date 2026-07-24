@@ -2,7 +2,7 @@
 
 > Let non-coders build s&box games through conversation with Claude Code.
 
-## Status: v2.1.0 "Action!" + Unreleased
+## Status: v2.2.0
 
 **Current working source: 273 native tools / 28 toolsets / 57 read-only / 7 lifeline /
 286 total / 278 handlers.** Released v2.1.0 added the 30-tool Tier-2 +

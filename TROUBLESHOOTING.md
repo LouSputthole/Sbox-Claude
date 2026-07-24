@@ -87,7 +87,7 @@ screenshot_from   target=<object GUID or position>
 
 Then read the PNG. (`frame_camera` only moves the *editor viewport*, which the screenshot does **not** use — so `frame_camera` alone won't change what `take_screenshot` captures.)
 
-> Screenshots save to `<sbox-install>/screenshots/sbox.<timestamp>.png` regardless of any `path` argument (known quirk). List the newest file there and read it.
+> On v2 the PNG comes back inline in the tool result regardless of any `path` argument (known quirk). There is no file to hunt down on the v2 path.
 
 ---
 

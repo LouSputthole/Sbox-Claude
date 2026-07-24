@@ -431,7 +431,13 @@ internal static class CameraCaptureService
 	internal static Vector3 ParseVector3Element( JsonElement element, string label )
 	{
 		if ( element.ValueKind == JsonValueKind.String )
+		{
+			// Native MCP gate stringifies structured args - recover {"x":..}/[x,y,z]
+			// passed as a JSON string (same contract as OptionalRotation below).
+			if ( ClaudeBridge.TryUnwrapStructuredJsonString( element, out var structuredVec ) )
+				return ParseVector3Element( structuredVec, label );
 			return ParseVector3String( element.GetString(), label );
+		}
 		if ( element.ValueKind == JsonValueKind.Object )
 		{
 			return new Vector3(
