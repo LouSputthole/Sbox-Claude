@@ -1,0 +1,262 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Claude Bridge listing — paste source</title>
+<style>
+  body { max-width: 860px; margin: 40px auto; padding: 0 24px; background: #1b1d21; color: #e8e6e3;
+         font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.55; font-size: 16px; }
+  h1 { font-size: 34px; color: #ffd94a; margin-bottom: 4px; }
+  h2 { font-size: 24px; color: #ffd94a; border-bottom: 1px solid #3a3d44; padding-bottom: 6px; margin-top: 40px; }
+  h3 { font-size: 19px; color: #7ec8ff; margin-top: 28px; }
+  strong { color: #ffffff; }
+  em { color: #ffe89e; }
+  u  { text-decoration-color: #ffd94a; }
+  blockquote { background: #24262c; border-left: 4px solid #ffd94a; margin: 18px 0; padding: 12px 18px;
+               border-radius: 6px; color: #d9d7d2; }
+  blockquote.codex { border-left-color: #7ec8ff; }
+  blockquote.honest { border-left-color: #9ae66e; }
+  pre { background: #111214; border: 1px solid #33363d; border-radius: 6px; padding: 12px 16px;
+        color: #9ae66e; overflow-x: auto; font-size: 14px; }
+  code { background: #111214; padding: 1px 6px; border-radius: 4px; color: #9ae66e; font-size: 14px; }
+  ul { padding-left: 22px; } li { margin: 6px 0; }
+  .counts { font-size: 18px; color: #b9b6b0; }
+  .divider { border: none; border-top: 2px solid #3a3d44; margin: 36px 0; }
+  .toolset { color: #b9b6b0; font-size: 14px; margin: 10px 0; }
+  .toolset b { color: #7ec8ff; }
+</style>
+</head>
+<body>
+
+<h1>🧀 Claude Bridge for s&amp;box — <em>NOW! With Codex</em></h1>
+<p><strong>(Revamped for NATIVE MCP) · MAJOR TOOLSET UPDATE</strong></p>
+
+<p style="font-size:20px;"><strong>Build s&amp;box games by talking to Claude, Codex — or any AI.</strong></p>
+
+<p class="counts"><strong>273 native tools · 28 toolsets</strong>, served by s&amp;box's built-in editor MCP server. An AI working <u>inside your editor</u>: writing scripts, creating GameObjects, wiring components, building whole systems — physics, networking, UI, lighting, characters, terrain, vehicles, cutscenes. You describe it; the AI <strong>builds it, screenshots it, sees the image, and fixes it.</strong></p>
+
+<blockquote><strong>But the tools aren't the real story — the bridge ships a 🧠 brain.</strong> The plugins bundle <strong>sbox-cookbook</strong>: a code-grounded knowledge base mined from <strong>51 real, shipped, open-source s&amp;box games</strong>. The AI reaches for proven, shipped patterns — real inventories, economies, save systems, netcode, whole genre playbooks — <em>instead of guessing</em>.</blockquote>
+
+<p>📖 <strong>Docs &amp; changelog:</strong> sboxskins.gg/claudebridge &nbsp;·&nbsp; 📬 <strong>Feedback:</strong> sboxskins@gmail.com or GitHub Issues</p>
+
+<hr class="divider">
+
+<h2>🆕 NOW with Codex</h2>
+
+<blockquote class="codex"><strong>The s&amp;box Codex Bridge</strong> is a first-party distribution of the whole experience for <strong>OpenAI Codex</strong>: same 273 tools, same cookbook brain, same screenshot-verify workflow — generated from the Claude plugin by the same scripts, so the two <u>can never drift</u>.</blockquote>
+
+<pre>codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.2.0
+codex plugin add sbox-codex-bridge@sboxskins</pre>
+
+<p>And because the <em>editor</em> hosts the MCP server, <strong>any MCP client</strong> connects over local HTTP — no Node.js required.</p>
+
+<h2>⚡ Start here: the one-command plugin</h2>
+
+<pre>/plugin marketplace add LouSputthole/Sbox-Claude
+/plugin install sbox-claude          (then restart Claude Code)</pre>
+
+<p>That single install gives you:</p>
+<ul>
+  <li>🧠 <strong>The brain</strong> — sbox-cookbook, the #1 reason to use this</li>
+  <li>🤖 <strong>A specialist game-dev agent</strong> — knows the workflow, the gotchas, when to reach for the cookbook</li>
+  <li>📸 <strong>The screenshot workflow skill</strong> — build → screenshot → verify → fix, so the AI is never building blind</li>
+  <li>🔌 <strong>Both MCP servers registered</strong> — the native editor endpoint + the optional lifeline, zero version drift</li>
+  <li>👋 <strong>Onboarding</strong> — first connect checks the bridge, detects your libraries, suggests a first move</li>
+</ul>
+<p><em>You still install the s&amp;box addon from this page (see Install below).</em></p>
+
+<hr class="divider">
+
+<h2>🧠 The brain: build like a shipped game, not a guess</h2>
+
+<p>The hardest part of building with an AI isn't typing C# — it's <strong>knowing the right pattern</strong>. Where does the money live so a client can't forge it? How do you sign a save file? Get those wrong and it compiles — then desyncs, dupes currency, or corrupts saves.</p>
+
+<p><strong>sbox-cookbook</strong> answers exactly those questions: <strong>11 engine references, 18 system how-tos, 20 genre playbooks</strong>, all citing real source from 51 shipped games. Ask <em>"how do I build a tycoon / an inventory / a save system?"</em> and it loads the grounded recipe.</p>
+
+<ul>
+  <li>🎮 <strong>Genre playbooks</strong> — tycoon/idle, deathmatch, platformer, survival/horror, card-battler, gacha, social-hub, sandbox, vehicles, roleplay, more — each with the system stack, a build order, and how real games did it</li>
+  <li>⚙️ <strong>Game systems</strong> — inventory, economy, shops, saves, progression, loot tables, leaderboards, crafting, dialogue, round flow, waves, anti-cheat</li>
+  <li>🔩 <strong>Engine fundamentals</strong> — networking &amp; authority, player controllers, Razor UI, physics &amp; traces, lifecycle, world-gen, performance</li>
+</ul>
+
+<blockquote>It also carries the <u>cross-cutting laws</u> that bite every system: authority gating, host-authoritative money/health/score, request → apply → confirm RPCs, sanitize-and-clamp-on-load saves. <em>The kind of thing you only learn by shipping.</em></blockquote>
+
+<h2>💬 How it works</h2>
+
+<blockquote><strong>You:</strong> "Make a player controller with WASD, mouse look, double-jump, and a flashlight."<br>
+<strong>Claude:</strong> writes the script, wires the input, sets up the spotlight — then aims a camera, <em>sees the PNG right in the tool result</em>, and checks its own work.</blockquote>
+
+<blockquote><strong>You:</strong> "Build me an inventory with a hotbar."<br>
+<strong>Claude:</strong> opens the cookbook's inventory recipe, builds it host-authoritative like real games do — then runs <code>networking_lint</code> to confirm it actually replicates.</blockquote>
+
+<blockquote><strong>You:</strong> "Does my game actually work with two players?"<br>
+<strong>Claude:</strong> runs <code>start_multiplayer_test</code> — <strong>a REAL second game client boots, joins a private lobby, and plays in your session.</strong> <em>(New in v2.2.0.)</em></blockquote>
+
+<p>✅ <strong>Great at</strong> — game systems through conversation: controllers, NPCs, networking, UI, prefabs, vehicles, cutscenes, whole genre loops — clean, working s&amp;box C#.</p>
+<p>🟡 <strong>Serviceable at</strong> — map building. It sees its own screenshots now, so it's not blind — but final visual polish still wants your eyes.</p>
+
+<hr class="divider">
+
+<h2>🚀 What's new</h2>
+
+<h3>v2.2.0 — args that just work, multiplayer that tells the truth, and Codex</h3>
+<ul>
+  <li><strong>Rotation &amp; vector args fixed everywhere</strong> — comma strings, arrays, and objects all parse on every creation, transform, camera, and placement path. The #1 paper cut of the native era is gone.</li>
+  <li><strong>Multiplayer test harness is LIVE</strong> — real <code>sbox.exe</code> clients in private hidden lobbies, truthful status tracking (dead clients report dead), full cleanup and rollback.</li>
+  <li><strong>NOW with Codex</strong> — first public s&amp;box Codex Bridge (see top).</li>
+</ul>
+
+<h3>v2.1.0 "Action!" — +30 tools: the cinematic wave</h3>
+<ul>
+  <li>🎬 <strong>Gameplay recording</strong> — capture real play to <code>.movie</code> clips; <code>record_playtest</code> = a scripted test <em>plus</em> replayable footage of the run</li>
+  <li>🎥 <strong>Cutscenes without the dock</strong> — bake a shot list to a .movie in milliseconds; a true rolling-buffer <strong>killcam</strong></li>
+  <li>🗣️ <strong>NPCs that speak</strong> — TTS dialogue with <em>moving mouths</em> driven by the live viseme stream, zero recorded VO</li>
+  <li>💥 <strong>Camera feel</strong> — shake / punch / tilt presets over the engine's new built-ins</li>
+  <li>💰 <strong>Economy &amp; meta depth</strong> — audited ledgers, idle economies, tamper-evident saves, meta-progression, achievements, Elo, speedrun boards, map voting, utility-AI brains, water volumes, day-night sun</li>
+</ul>
+
+<h3>v2.0.0 "Native" — the bridge moved into the editor</h3>
+<ul>
+  <li>Runs on s&amp;box's own MCP server (port 7269, on by default) — <strong>no Node.js on the main path</strong></li>
+  <li>📸 <strong>Inline screenshots</strong> — the PNG arrives inside the tool result</li>
+  <li>🔎 Live tool discovery, permission-free reads (57 read-only tools), real error semantics</li>
+  <li>⏪ <strong>Scene checkpoints</strong> — the agent-side undo: snapshot, batch-edit, hate it, roll back</li>
+  <li>🚗 Vehicles toolset, real prefabs with GUID remap, dry-run batch ops</li>
+</ul>
+
+<p><em>Earlier: v1.20 "Director's Cut" (+19 tools) · v1.18 (LipSync) · v1.9–1.12 (the cookbook, the lint family, CI gates). Full history: sboxskins.gg/claudebridge/changelog.</em></p>
+
+<hr class="divider">
+
+<h2>🛠️ What it can do <span class="counts">(273 native tools · 28 toolsets)</span></h2>
+
+<ul>
+  <li><strong>Scene &amp; GameObjects</strong> — create, clone, transform, parent; hierarchy + selection; find by name/component/tag; one-call scene &amp; project orientation</li>
+  <li><strong>Scene checkpoints</strong> ⏪ — snapshot every root object, roll the whole scene back</li>
+  <li><strong>Batch ops</strong> — set/delete/add/reparent across many objects, each with <code>dryRun: true</code> preview</li>
+  <li><strong>Scripts</strong> — write / edit / hotload C#; one-shot scaffolds for controllers, NPC AI, managers, networked players</li>
+  <li><strong>Components</strong> — add/configure anything; typed properties; models, materials, prefab refs; call methods and editor buttons</li>
+  <li><strong>Multiplayer testing</strong> 🆕 — boot real second clients into private lobbies; truthful status; plus the full networking codegen family (sync, RPCs, lobbies, host-migration)</li>
+  <li><strong>Vehicles</strong> 🚗 — any rigidbody prop → raycast car with driver seat; arcade / drift / offroad / race presets; physgun-lite</li>
+  <li><strong>Physics</strong> — rigidbodies, colliders, joints, raycasts, overlap queries</li>
+  <li><strong>Lighting &amp; atmosphere</strong> — lights, fog, post, skyboxes, probes, day-night sun, render-target cameras (CCTV/mirrors), one-call mood presets</li>
+  <li><strong>Characters</strong> — spawn, dress, pose Citizens; ragdolls; expressions; animgraph; LipSync — and full <strong>TTS dialogue with moving mouths</strong></li>
+  <li><strong>Cinematics &amp; recording</strong> 🎬 — record gameplay to .movie and replay it; bake cutscenes from a shot list; killcams; camera shake presets; combat text, combo meters, nametags</li>
+  <li><strong>Terrain &amp; world-gen</strong> — sculpt brushes, hills/trails/caves, forest painting, prop scatter, water volumes</li>
+  <li><strong>Navigation</strong> — bake navmesh, query paths</li>
+  <li><strong>UI &amp; audio</strong> — Razor panels (screen + world), BuildHash auto-fixer; sound events + in-editor preview</li>
+  <li><strong>Inspection &amp; validation</strong> 🔍 — see what replicates, lint multiplayer footguns, validate scenes, scan broken references, lint C#/Razor before the compiler, diff saves. <em>The AI verifies instead of hoping.</em></li>
+  <li><strong>Prefabs — real ones</strong> — full engine serialization, true re-instantiation with GUID remap</li>
+  <li><strong>Self-verify &amp; diagnostics</strong> — inline screenshots (single, framed, or full orbit); camera bookmarks &amp; visual baselines; console; <code>restart_editor</code>; the lifeline reads logs and compile errors <u>even when the editor has crashed</u></li>
+  <li><strong>Debug &amp; playtest</strong> — debug draw, slow-mo, perf counters; scripted in-frame playtests with pass/fail transcripts</li>
+  <li><strong>Docs &amp; live API search</strong> — live reflection of the real loaded SDK + official docs search. <em>A big reason the generated C# actually compiles.</em></li>
+  <li><strong>Publishing</strong> — validate, configure, thumbnails, package details</li>
+</ul>
+
+<hr class="divider">
+
+<h2>📦 Install</h2>
+
+<p><strong>1. The addon (everyone):</strong> click <strong>Install</strong> on this page. s&amp;box drops it into your project's Libraries/ automatically.</p>
+
+<p><strong>2. Connect your AI — pick one:</strong></p>
+<ul>
+  <li><strong>A — Claude Code plugin (recommended):</strong> the one-command install at the top. Registers both servers + the brain + the agent + the workflow.</li>
+  <li><strong>B — Codex plugin:</strong> the two commands in the Codex section above.</li>
+  <li><strong>C — manual / any MCP client:</strong></li>
+</ul>
+<pre>claude mcp add --transport http sbox http://127.0.0.1:7269/mcp</pre>
+<p>Optional but recommended — the lifeline, for editor-down diagnostics (needs Node.js 18+):</p>
+<pre>claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2 --lifeline</pre>
+<blockquote class="honest">The native server dies with the editor; <strong>the lifeline answers "why did the editor crash" when nothing else can.</strong></blockquote>
+
+<p><strong>3. Verify:</strong> with s&amp;box open, ask your AI to run <code>search_tools</code> or "describe the project". Then try:</p>
+<blockquote>"Create a cube at 0, 0, 100." · "Make me a drivable car." · "Build me a host-authoritative currency system." <em>(watch it reach for the cookbook)</em> · "Test my game with a second player." <em>(watch a real client boot and join)</em></blockquote>
+
+<h2>🔒 Under the hood</h2>
+<ul>
+  <li><strong>Loopback-only, 100% local</strong> — the server binds 127.0.0.1:7269; nothing leaves your machine</li>
+  <li>273 tools are <code>[McpTool]</code> methods the engine auto-discovers; hotload = live re-registration</li>
+  <li><strong>Play-mode-safe &amp; path-safe</strong> — scene edits refused during play; file ops confined to your project</li>
+  <li>Full picture: <strong>286 total tools / 278 handlers</strong> — 273 native + 7 lifeline + 6 served by native built-ins</li>
+</ul>
+
+<hr class="divider">
+
+<h2>🧰 Full tool list</h2>
+<p class="counts">273 native tools · 28 toolsets · 57 read-only. Agents browse these live with <code>list_toolsets</code> / <code>search_tools</code>.</p>
+
+<p class="toolset"><b>bridge_asset (7)</b> — copy_asset_with_dependencies, get_asset_info, inspect_model_geometry, install_asset, list_asset_library, recompile_asset, search_assets</p>
+<p class="toolset"><b>bridge_audio (5)</b> — add_tts_voice, assign_sound, create_sound_event, list_sounds, play_sound_preview</p>
+<p class="toolset"><b>bridge_batch (4)</b> — batch_add_component, batch_delete, batch_reparent, batch_set_property</p>
+<p class="toolset"><b>bridge_character (12)</b> — add_lipsync, add_ragdoll, dress_citizen, equip_model, list_animations, play_animation, pose_citizen, set_animgraph_param, set_bodygroup, set_expression, set_look_at, spawn_citizen</p>
+<p class="toolset"><b>bridge_component (10)</b> — add_component_to_new_object, add_component_with_properties, get_all_properties, get_property, invoke_button, invoke_method, list_available_components, set_component_reference, set_property, list_component_buttons</p>
+<p class="toolset"><b>bridge_debug (11)</b> — console_run, debug_clear, debug_draw_box, debug_draw_line, debug_draw_ray, debug_draw_sphere, frame_camera, get_bridge_status, get_profiler_stats, restart_editor, set_time_scale</p>
+<p class="toolset"><b>bridge_discovery (5)</b> — describe_type, find_in_project, get_method_signature, list_libraries, search_types</p>
+<p class="toolset"><b>bridge_gameobject (27)</b> — align_objects, create_gameobject, delete_gameobject, distribute_objects, duplicate_gameobject, find_objects, focus_object, get_bounds, get_scene_hierarchy, get_selected_objects, get_tags, grid_duplicate, group_objects, measure_distance, plan_placements, commit_placement_plan, discard_placement_plan, randomize_transforms, rename_gameobject, replace_model, scatter_props, select_object, set_enabled, set_parent, set_tags, set_tint, set_transform, snap_to_ground</p>
+<p class="toolset"><b>bridge_material (4)</b> — assign_material, assign_model, create_material, set_material_property</p>
+<p class="toolset"><b>bridge_moviemaker (10)</b> — add_movie_player, author_movie_clip, create_killcam, gameplay_recording_status, list_movies, play_movie, record_gameplay_clip, record_playtest, stop_gameplay_recording, stop_movie</p>
+<p class="toolset"><b>bridge_navigation (2)</b> — bake_navmesh, get_navmesh_path</p>
+<p class="toolset"><b>bridge_networking (17)</b> — add_host_migration_recovery, add_network_helper, add_rpc_method, add_sync_property, add_targeted_rpc, configure_network, create_host_rpc_action, create_lobby_manager, create_local_player_resolver, create_network_events, create_networked_player, get_network_status, multiplayer_test_status, network_spawn, set_ownership, start_multiplayer_test, stop_multiplayer_test</p>
+<p class="toolset"><b>bridge_npc (7)</b> — assign_patrol_route, create_npc_brain, create_npc_schedule_brain, create_npc_spawner, create_utility_ai, place_patrol_route, simulate_npc_perception</p>
+<p class="toolset"><b>bridge_physics (5)</b> — add_collider, add_joint, add_physics, physics_overlap, raycast</p>
+<p class="toolset"><b>bridge_playmode (5)</b> — get_runtime_property, is_playing, set_runtime_property, start_play, stop_play</p>
+<p class="toolset"><b>bridge_playtest (6)</b> — drive_player, drive_player_status, playtest, playtest_abort, playtest_status, simulate_input</p>
+<p class="toolset"><b>bridge_prefab (5)</b> — create_prefab, get_prefab_info, instantiate_prefab, list_prefabs, set_prefab_ref</p>
+<p class="toolset"><b>bridge_project (14)</b> — create_script, delete_script, describe_project, edit_script, ensure_input_action, get_package_details, get_project_config, get_project_info, list_project_files, read_file, set_project_config, set_project_thumbnail, trigger_hotload, write_file</p>
+<p class="toolset"><b>bridge_scaffold_gameplay (41)</b> — add_achievement_trigger, add_interaction_prompt, add_interaction_station, add_leaderboard_stat, add_steam_stat_currency, create_achievement_set, create_carry_system, create_currency_account, create_currency_pickup, create_day_night_clock, create_economy_wallet, create_elo_rating_system, create_event_bus, create_event_director, create_gacha_drop_table, create_game_manager, create_health_system, create_hold_to_confirm, create_idle_economy, create_idle_income, create_interactable, create_inventory, create_leaderboard_panel, create_loot_table_resource, create_meta_progression, create_needs_system, create_npc_controller, create_objective_system, create_offline_progress, create_pickup, create_placement_mode, create_player_controller, create_round_phase_machine, create_round_state_machine, create_save_slots, create_save_system, create_signed_save, create_speedrun_leaderboard, create_stat_modifier_system, create_team_assigner, create_trigger_zone, create_weighted_loot_table, scaffold_map_vote_flow</p>
+<p class="toolset"><b>bridge_scaffold_polish (9)</b> — add_flicker_light, create_camera_shake, create_combo_meter, create_cutscene_director, create_dialogue_system, create_floating_combat_text, create_proxy_nametag, create_round_timer_hud, create_worldpanel_ui</p>
+<p class="toolset"><b>bridge_scene (3)</b> — create_scene, describe_scene, load_scene</p>
+<p class="toolset"><b>bridge_screenshot (7)</b> — take_screenshot, capture_view, screenshot_from, screenshot_orbit, save_camera_bookmark, capture_visual_baseline, compare_visual_baseline — all returning inline PNG images</p>
+<p class="toolset"><b>bridge_ui (4)</b> — add_panel_buildhash, add_screen_panel, add_world_panel, create_razor_ui</p>
+<p class="toolset"><b>bridge_validation (9)</b> — find_broken_references, inspect_networked_object, networking_lint, razor_lint, sandbox_lint, save_inspect, scene_validate, services_query, validate_project</p>
+<p class="toolset"><b>bridge_vehicle (4)</b> — create_physics_grab_tool, create_seat_system, create_vehicle_controller, tune_vehicle</p>
+<p class="toolset"><b>bridge_visuals (15)</b> — add_beam, add_daynight_sun, add_envmap_probe, add_light, add_post_process, add_render_target_camera, add_trail, apply_atmosphere, apply_post_fx_look, bake_reflections, create_camera_effects, create_particle_effect, set_fog, set_skybox, spawn_vpcf</p>
+<p class="toolset"><b>bridge_workflow (3)</b> — checkpoint_scene, list_checkpoints, restore_checkpoint</p>
+<p class="toolset"><b>bridge_world (16)</b> — add_cave_waypoint, add_forest_poi, add_forest_trail, add_terrain_clearing, add_terrain_hill, add_terrain_trail, add_water_body, build_terrain_mesh, clear_cave_path, clear_forest_pois, clear_terrain_features, paint_forest_density, place_along_path, raycast_terrain, sculpt_terrain, set_forest_seed</p>
+
+<p><em>Plus 7 lifeline tools (editor-down diagnostics that answer even after a crash) and 6 names served by the engine's own built-ins — and the native server's freebies: scene_tree, get/set_game_object, the asset_* family, read_console, compile_status.</em></p>
+
+<hr class="divider">
+
+<h2>🩹 Troubleshooting</h2>
+<p><strong>#1 issue:</strong> port 7269 not answering — the editor isn't running, or the MCP server is off (<em>Editor → Preferences → MCP Server</em>; on by default). <strong>#2:</strong> a stale port registration — if the log says <code>[MCP] Couldn't start MCP server</code>, a dying editor instance still holds the port; wait, then restart once. Missing <code>bridge_*</code> tools = the addon isn't in your Libraries/ or didn't compile — exactly what the lifeline's <code>read_log</code> / <code>get_compile_errors</code> are for. Full guide: sboxskins.gg/claudebridge/troubleshooting.</p>
+
+<h2>💡 Tips</h2>
+<ul>
+  <li><strong>Use the plugin.</strong> The brain + agent + screenshot skill is most of the value — one command.</li>
+  <li><strong>checkpoint_scene before big batches</strong> — roll back if you hate it. Keep .scene files in Git.</li>
+  <li><strong>Ask for systems by name</strong> — "build me an inventory / a save system / an economy" routes to a proven recipe.</li>
+  <li><strong>Test multiplayer early</strong> — "boot a test client and check my sync" is one sentence now.</li>
+</ul>
+
+<h2>📜 License</h2>
+<p><strong>Source-available (no redistribution)</strong> — the s&amp;box Claude Bridge Source-Available License 1.0. Use it freely to build your games — free or commercial — and modify it locally. No redistributing, mirroring, repackaging, re-hosting, or offering it as a service. <strong>The games you build with it are yours, unrestricted.</strong> Name and branding are trademarks (see NOTICE). Pre-relicense versions remain AGPL-3.0-or-later.</p>
+
+<h2>🔗 Links</h2>
+<p>Docs: <strong>sboxskins.gg/claudebridge</strong> · GitHub: <strong>github.com/LouSputthole/Sbox-Claude</strong> · Issues: <strong>github.com/LouSputthole/Sbox-Claude/issues</strong> · npm (lifeline): <strong>npmjs.com/package/sbox-mcp-server</strong> · Feedback: <strong>sboxskins@gmail.com</strong></p>
+
+<blockquote><strong>One addon, one command, zero ceremony.</strong> 273 native tools · 28 toolsets + a brain trained on real shipped games — for Claude, Codex, or any AI. <em>Describe your game — the AI builds it.</em> 🧀</blockquote>
+
+<hr class="divider">
+
+<h2>💬 A note on the (early) reviews</h2>
+
+<p>I've seen the thumbs-down reviews from early in the Claude Bridge release, and I want to address them directly.</p>
+
+<p>I'm quite certain it shipped in a rough, broken state for the first week or two — my apologies for that. Every review since has been positive, so I'm glad it's resolved. Either way, <strong>I want the feedback.</strong></p>
+
+<p>I built this tool for people who have game ideas but don't necessarily know how to code. The goal isn't to replace creativity. It's to give more people a way to build their dream game by letting an AI act like a coding assistant inside the editor.</p>
+
+<p>That said — if the tool didn't work for you, that matters. A bad install, a broken tool call, a confusing setup step, or missing docs is <u>on me to fix</u>.</p>
+
+<p>The bridge has matured a lot since those early days — the native era removed the fragile parts of the old setup entirely (Node processes, file polling, temp-dir mismatches), and the last three releases added the cinematic wave, real multiplayer testing with a second live client, and a Codex distribution. A lot of those fixes came straight from user reports. Thank you to everyone who took the time to tell me what broke instead of silently launching the tomato cannon. 🍅</p>
+
+<p>If you had a bad experience, please reach out: <strong>sboxskins@gmail.com</strong>. I'll move quickly on real issues and keep improving it.</p>
+
+<p>Thanks to everyone giving it a shot, testing it, breaking it, and helping make it better.</p>
+
+<p><em>Built by <strong>sboxskins.gg</strong>, the s&amp;box community marketplace.</em></p>
+
+</body>
+</html>
