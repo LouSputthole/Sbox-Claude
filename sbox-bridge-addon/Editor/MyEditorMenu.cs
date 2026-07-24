@@ -273,7 +273,7 @@ public static class ClaudeBridge
 		Register( "rename_gameobject",   () => new RenameGameObjectHandler() );
 		Register( "set_parent",          () => new SetParentHandler() );
 		Register( "set_enabled",         () => new SetEnabledHandler() );
-		Register( "set_transform",       () => new SetTransformHandler() );
+		Register( "set_transform",       () => new SetTransformV2Handler() );
 		Register( "get_scene_hierarchy", () => new GetSceneHierarchyHandler() );
 		Register( "get_selected_objects",() => new GetSelectedObjectsHandler() );
 		Register( "select_object",       () => new SelectObjectHandler() );
@@ -310,6 +310,7 @@ public static class ClaudeBridge
 		// ── Batch 6: Assets ──────────────────────────────────────────────
 		Register( "search_assets",       () => new SearchAssetsHandler() );
 		Register( "get_asset_info",      () => new GetAssetInfoHandler() );
+		Register( "inspect_model_geometry", () => new InspectModelGeometryHandler() );
 		Register( "assign_model",        () => new AssignModelHandler() );
 		Register( "create_material",     () => new CreateMaterialHandler() );
 		Register( "assign_material",     () => new AssignMaterialHandler() );
@@ -359,6 +360,9 @@ public static class ClaudeBridge
 		Register( "create_networked_player",  () => new CreateNetworkedPlayerHandler() );
 		Register( "create_lobby_manager",     () => new CreateLobbyManagerHandler() );
 		Register( "create_network_events",    () => new CreateNetworkEventsHandler() );
+		Register( "start_multiplayer_test",   () => new StartMultiplayerTestHandler() );
+		Register( "multiplayer_test_status",  () => new MultiplayerTestStatusHandler() );
+		Register( "stop_multiplayer_test",    () => new StopMultiplayerTestHandler() );
 
 		// ── Batch 13: Publishing / config ────────────────────────────────
 		Register( "get_project_config",  () => new GetProjectConfigHandler() );
@@ -392,7 +396,8 @@ public static class ClaudeBridge
 		Register( "clear_forest_pois",        () => new ClearForestPOIsHandler() );
 		Register( "sculpt_terrain",           () => new SculptTerrainHandler() );
 		Register( "paint_forest_density",     () => new PaintForestDensityHandler() );
-		Register( "place_along_path",         () => new PlaceAlongPathHandler() );
+		Register( "place_along_path",         () => new PlaceAlongPathV2Handler() );
+		Register( "commit_placement_plan",   () => new CommitPlacementPlanHandler() );
 
 		// ── Batch 16: Coding / type discovery ───────────────────────────
 		Register( "describe_type",            () => new DescribeTypeHandler() );
@@ -432,16 +437,17 @@ public static class ClaudeBridge
 		Register( "snap_to_ground",           () => new SnapToGroundHandler() );
 		Register( "align_objects",            () => new AlignObjectsHandler() );
 		Register( "distribute_objects",       () => new DistributeObjectsHandler() );
-		Register( "grid_duplicate",           () => new GridDuplicateHandler() );
+		Register( "grid_duplicate",           () => new GridDuplicateV2Handler() );
 		Register( "measure_distance",         () => new MeasureDistanceHandler() );
 
 		// ── Batch 22: Environment & props ───────────────────────────────
-		Register( "scatter_props",            () => new ScatterPropsHandler() );
+		Register( "scatter_props",            () => new ScatterPropsV2Handler() );
 		Register( "randomize_transforms",     () => new RandomizeTransformsHandler() );
 		Register( "group_objects",            () => new GroupObjectsHandler() );
 
 		// ── Batch 23: Object utilities & queries ────────────────────────
 		Register( "find_objects",             () => new FindObjectsHandler() );
+		Register( "find_objects_near",        () => new FindObjectsNearHandler() );
 		Register( "set_tint",                 () => new SetTintHandler() );
 		Register( "replace_model",            () => new ReplaceModelHandler() );
 		Register( "set_tags",                 () => new SetTagsHandler() );
@@ -450,7 +456,7 @@ public static class ClaudeBridge
 		Register( "frame_camera",             () => new FrameCameraHandler() );
 
 		// ── Batch 25: screenshot aiming + component/tag gaps ────────────
-		Register( "screenshot_from",          () => new ScreenshotFromHandler() );
+		Register( "screenshot_from",          () => new CaptureViewHandler() );
 		Register( "remove_component",         () => new RemoveComponentHandler() );
 		Register( "get_tags",                 () => new GetTagsHandler() );
 
@@ -481,10 +487,15 @@ public static class ClaudeBridge
 		Register( "list_animations",          () => new ListAnimationsHandler() );
 		Register( "play_animation",           () => new PlayAnimationHandler() );
 		Register( "set_animgraph_param",      () => new SetAnimgraphParamHandler() );
-		Register( "get_bounds",               () => new GetBoundsHandler() );
+		Register( "get_bounds",               () => new GetBoundsV2Handler() );
 
 		// ── Batch 34: play-mode eyes ────────────────────────────────────
 		Register( "capture_view",             () => new CaptureViewHandler() );
+		Register( "save_camera_bookmark",     () => new SaveCameraBookmarkHandler() );
+		Register( "list_camera_bookmarks",    () => new ListCameraBookmarksHandler() );
+		Register( "delete_camera_bookmark",   () => new DeleteCameraBookmarkHandler() );
+		Register( "capture_camera_set",       () => new CaptureCameraSetHandler() );
+		Register( "capture_topdown",          () => new CaptureTopdownHandler() );
 
 		// ── Batch 35: playable game scaffolds (Phase 1) ─────────────────
 		Register( "set_component_reference",     () => new SetComponentReferenceHandler() );
@@ -613,7 +624,7 @@ public static class ClaudeBridge
 		"clear_terrain_features", "sculpt_terrain",
 		"add_cave_waypoint", "clear_cave_path",
 		"add_forest_poi", "add_forest_trail", "set_forest_seed", "clear_forest_pois",
-		"paint_forest_density", "place_along_path",
+		"paint_forest_density", "place_along_path", "commit_placement_plan",
 		"undo", "redo",
 		"set_project_config", "set_project_thumbnail",
 		"ensure_input_action",
@@ -995,8 +1006,50 @@ public static class ClaudeBridge
 		return sb.ToString();
 	}
 
+	/// <summary>
+	/// Recover a structured value that the native MCP ToolRegistry converted into a string
+	/// because the wrapper keeps the historical string parameter contract.
+	/// </summary>
+	internal static bool TryUnwrapStructuredJsonString( JsonElement value, out JsonElement structured )
+	{
+		structured = default;
+		if ( value.ValueKind != JsonValueKind.String ) return false;
+
+		var text = value.GetString()?.Trim();
+		if ( string.IsNullOrEmpty( text ) || (text[0] != '{' && text[0] != '[') )
+			return false;
+
+		try
+		{
+			using var document = JsonDocument.Parse( text );
+			if ( document.RootElement.ValueKind != JsonValueKind.Object
+				&& document.RootElement.ValueKind != JsonValueKind.Array )
+				return false;
+			structured = document.RootElement.Clone();
+			return true;
+		}
+		catch ( JsonException )
+		{
+			return false;
+		}
+	}
+
 	internal static Rotation ParseRotation( JsonElement e )
 	{
+		if ( TryUnwrapStructuredJsonString( e, out var structured ) )
+			return ParseRotation( structured );
+
+		if ( e.ValueKind == JsonValueKind.String || e.ValueKind == JsonValueKind.Array )
+		{
+			var values = ExtractFloats( e.ValueKind == JsonValueKind.String ? e.GetString() : e.GetRawText() );
+			if ( values.Length != 3 )
+				throw new FormatException( "Rotation must contain exactly pitch,yaw,roll." );
+			return Rotation.From( values[0], values[1], values[2] );
+		}
+
+		if ( e.ValueKind != JsonValueKind.Object )
+			throw new FormatException( "Rotation must be an object, array, or pitch,yaw,roll string." );
+
 		float pitch = e.TryGetProperty( "pitch", out var ep ) ? ep.GetSingle() : 0f;
 		float yaw   = e.TryGetProperty( "yaw",   out var ey ) ? ey.GetSingle() : 0f;
 		float roll  = e.TryGetProperty( "roll",  out var er ) ? er.GetSingle() : 0f;
@@ -1788,49 +1841,6 @@ public class SetEnabledHandler : IBridgeHandler
 		var enabled = p.GetProperty( "enabled" ).GetBoolean();
 		go.Enabled = enabled;
 		return Task.FromResult<object>( new { id, enabled } );
-	}
-}
-
-public class SetTransformHandler : IBridgeHandler
-{
-	public Task<object> Execute( JsonElement p )
-	{
-		var scene = SceneEditorSession.Active?.Scene;
-		if ( scene == null )
-			return Task.FromResult<object>( new { error = "No active scene" } );
-
-		var id = p.GetProperty( "id" ).GetString();
-		if ( !Guid.TryParse( id, out var guid ) )
-			return Task.FromResult<object>( new { error = "Invalid GUID" } );
-
-		var go = scene.Directory.FindByGuid( guid );
-		if ( go == null )
-			return Task.FromResult<object>( new { error = $"GameObject not found: {id}" } );
-
-		var local = p.TryGetProperty( "local", out var lc ) && lc.GetBoolean();
-
-		if ( p.TryGetProperty( "position", out var pos ) )
-		{
-			if ( local ) go.LocalPosition = ClaudeBridge.ParseVector3( pos );
-			else         go.WorldPosition = ClaudeBridge.ParseVector3( pos );
-		}
-
-		if ( p.TryGetProperty( "rotation", out var rot ) )
-		{
-			if ( local ) go.LocalRotation = ClaudeBridge.ParseRotation( rot );
-			else         go.WorldRotation = ClaudeBridge.ParseRotation( rot );
-		}
-
-		if ( p.TryGetProperty( "scale", out var scl ) )
-		{
-			// Scale accepts an object {x,y,z}, a comma string "x,y,z", an array, OR a single
-			// number (uniform). The old ParseVector3 only read object keys, so a bare number
-			// or a "1,1,1" string silently became (0,0,0) and collapsed the object. (Fix 1/7)
-			if ( local ) go.LocalScale = ClaudeBridge.ParseVector3Flexible( scl );
-			else         go.WorldScale  = ClaudeBridge.ParseVector3Flexible( scl );
-		}
-
-		return Task.FromResult<object>( new { transformed = true, gameObject = ClaudeBridge.SerializeGo( go ) } );
 	}
 }
 
@@ -4816,10 +4826,10 @@ public class RazorLintHandler : IBridgeHandler
 
 // ═════════════════════════════════════════════════════════════════════
 //  Batch 34 — PLAY-MODE EYES (v1.7.0)
-//  capture_view renders a CameraComponent's view to a PNG via
-//  CameraComponent.RenderToBitmap + Bitmap.ToPng. Unlike take_screenshot /
-//  screenshot_from (EditorScene, EDIT-only), this renders a camera's view of
-//  the ACTIVE scene — so during PLAY it captures the RUNNING game (incl. HUD
+//  capture_view (and its historical screenshot_from alias) renders a
+//  CameraComponent's view via RenderToBitmap + Bitmap.ToPng. Unlike
+//  take_screenshot's EditorScene path, this renders the ACTIVE scene — so
+//  during PLAY it captures the RUNNING game (incl. HUD
 //  when renderUI=true). No pose  -> the live main camera (player POV).
 //  position/id -> a temp camera (created + destroyed in one frame, never
 //  disturbs the game's own camera). Saves a uniquely-named PNG to TEMP and
@@ -4844,39 +4854,73 @@ public class CaptureViewHandler : IBridgeHandler
 		{
 			CameraComponent cam;
 			string framed;
-			bool hasId = p.TryGetProperty( "id", out var idEl ) && Guid.TryParse( idEl.GetString(), out _ );
-			bool hasPos = p.TryGetProperty( "position", out var posEl );
+			bool hasId = p.TryGetProperty( "id", out var idEl )
+				&& idEl.ValueKind != JsonValueKind.Null
+				&& idEl.ValueKind != JsonValueKind.Undefined;
+			bool hasPos = p.TryGetProperty( "position", out var posEl )
+				&& posEl.ValueKind != JsonValueKind.Null
+				&& posEl.ValueKind != JsonValueKind.Undefined;
+			if ( hasId && hasPos )
+				return Task.FromResult<object>( new { error = "Pass id OR position, not both." } );
 
 			if ( hasId || hasPos )
 			{
-				Vector3 camPos; Rotation camRot;
+				Vector3 camPos;
+				Rotation camRot;
+				float? farPlane = null;
 				if ( hasId )
 				{
-					Guid.TryParse( idEl.GetString(), out var guid );
-					var t = scene.Directory.FindByGuid( guid );
+					if ( idEl.ValueKind != JsonValueKind.String
+						|| !Guid.TryParse( idEl.GetString(), out _ ) )
+						return Task.FromResult<object>( new { error = "id must be a GameObject GUID" } );
+					var t = ClaudeBridge.ResolveGameObject( scene, idEl.GetString() );
 					if ( t == null ) return Task.FromResult<object>( new { error = $"GameObject not found: {idEl.GetString()}" } );
-					var box = t.GetBounds(); var c = box.Center; float sz = box.Size.Length; if ( sz < 1f ) sz = 128f;
+					var box = t.GetBounds();
+					var c = box.Center;
+					if ( !BoundsInspection.IsFinite( c ) || !BoundsInspection.IsFinite( box.Size ) )
+						return Task.FromResult<object>( new { error = $"GameObject has non-finite bounds: {idEl.GetString()}" } );
+					float sz = box.Size.Length; if ( sz < 1f ) sz = 128f;
 					float dist = sz * 1.4f; if ( dist < 150f ) dist = 150f;
 					camPos = c + new Vector3( -1f, -0.6f, 0.7f ).Normal * dist;
-					camRot = Rotation.LookAt( ( c - camPos ).Normal, Vector3.Up );
+					camRot = CameraCaptureService.LookAtRotation( camPos, c );
+					farPlane = CameraCaptureService.FramingFarPlane( dist, sz * 0.5f );
 					framed = t.Name;
 				}
 				else
 				{
-					camPos = ClaudeBridge.ParseVector3( posEl );
-					if ( p.TryGetProperty( "lookAt", out var laEl ) )
-						camRot = Rotation.LookAt( ( ClaudeBridge.ParseVector3( laEl ) - camPos ).Normal, Vector3.Up );
-					else if ( p.TryGetProperty( "rotation", out var rotEl ) )
+					camPos = CameraCaptureService.ParseVector3Element( posEl, "position" );
+					bool hasLookAt = p.TryGetProperty( "lookAt", out var laEl )
+						&& laEl.ValueKind != JsonValueKind.Null
+						&& laEl.ValueKind != JsonValueKind.Undefined;
+					bool hasRotation = p.TryGetProperty( "rotation", out var rotEl )
+						&& rotEl.ValueKind != JsonValueKind.Null
+						&& rotEl.ValueKind != JsonValueKind.Undefined;
+					if ( hasLookAt && hasRotation )
+						return Task.FromResult<object>( new { error = "Pass lookAt OR rotation, not both." } );
+					if ( hasLookAt )
+					{
+						var lookAt = CameraCaptureService.ParseVector3Element( laEl, "lookAt" );
+						camRot = CameraCaptureService.LookAtRotation( camPos, lookAt );
+						farPlane = CameraCaptureService.FramingFarPlane(
+							Vector3.DistanceBetween( camPos, lookAt ),
+							0f );
+					}
+					else if ( hasRotation )
 						camRot = CharacterHelpers.ParseRotation( rotEl );
 					else camRot = Rotation.Identity;
 					framed = $"({camPos.x:0.#},{camPos.y:0.#},{camPos.z:0.#})";
 				}
-				tempCam = scene.CreateObject( true );
+				tempCam = scene.CreateObject( false );
 				tempCam.Name = "__bridge_capture_cam";
 				tempCam.WorldPosition = camPos;
 				tempCam.WorldRotation = camRot;
 				cam = tempCam.AddComponent<CameraComponent>();
-				if ( p.TryGetProperty( "fov", out var fovEl ) ) cam.FieldOfView = fovEl.GetSingle();
+				cam.IsMainCamera = false;
+				cam.Priority = -100;
+				if ( p.TryGetProperty( "fov", out var fovEl ) )
+					cam.FieldOfView = CameraCaptureService.ClampFov( fovEl.GetSingle() );
+				if ( farPlane.HasValue ) cam.ZFar = farPlane.Value;
+				tempCam.Enabled = true;
 			}
 			else
 			{
@@ -4885,7 +4929,7 @@ public class CaptureViewHandler : IBridgeHandler
 				framed = playing ? "live main camera (player view)" : "main camera";
 			}
 
-			var bmp = new Bitmap( w, h );
+			using var bmp = new Bitmap( w, h );
 			cam.RenderToBitmap( bmp, renderUI );
 			byte[] png = bmp.ToPng();
 			string path = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"bridge_capture_{System.Guid.NewGuid():N}.png" );
@@ -6092,6 +6136,13 @@ public class PlaceAlongPathHandler : IBridgeHandler
 		var jitter = p.TryGetProperty( "jitter", out var jp ) ? jp.GetSingle() : 0f;
 		var minScale = p.TryGetProperty( "min_scale", out var mnp ) ? mnp.GetSingle() : 1f;
 		var maxScale = p.TryGetProperty( "max_scale", out var mxp ) ? mxp.GetSingle() : 1f;
+		if ( !float.IsFinite( spacing ) || spacing <= 0f )
+			return Task.FromResult<object>( new { error = "spacing must be a finite number greater than zero" } );
+		if ( !float.IsFinite( jitter ) || jitter < 0f )
+			return Task.FromResult<object>( new { error = "jitter must be a finite non-negative number" } );
+		if ( !float.IsFinite( minScale ) || !float.IsFinite( maxScale )
+			|| minScale <= 0f || maxScale <= 0f || minScale > maxScale )
+			return Task.FromResult<object>( new { error = "min_scale/max_scale must be finite positive numbers with min_scale <= max_scale" } );
 		var seed = p.TryGetProperty( "seed", out var sdp ) ? sdp.GetInt32() : 42;
 		var name = p.TryGetProperty( "name", out var np ) ? np.GetString() : "PathItem";
 
@@ -6107,18 +6158,43 @@ public class PlaceAlongPathHandler : IBridgeHandler
 			return Task.FromResult<object>( new { error = "points must be an array of {x,y,z}" } );
 
 		var points = new List<Vector3>();
-		foreach ( var pt in pointsEl.EnumerateArray() )
+		try
 		{
-			points.Add( new Vector3(
-				pt.TryGetProperty( "x", out var px ) ? px.GetSingle() : 0f,
-				pt.TryGetProperty( "y", out var py ) ? py.GetSingle() : 0f,
-				pt.TryGetProperty( "z", out var pz ) ? pz.GetSingle() : 0f ) );
+			foreach ( var point in pointsEl.EnumerateArray() )
+				points.Add( PlacementPlanV2Helpers.ParseVector(
+					point,
+					$"points[{points.Count}]" ) );
+		}
+		catch ( Exception ex )
+		{
+			return Task.FromResult<object>( new { error = $"Invalid path point: {ex.Message}" } );
 		}
 		if ( points.Count < 2 ) return Task.FromResult<object>( new { error = "need at least 2 points" } );
 
 		Model model;
 		try { model = Model.Load( modelPath ); }
 		catch ( Exception ex ) { return Task.FromResult<object>( new { error = $"Could not load model '{modelPath}': {ex.Message}" } ); }
+		if ( model == null || model.IsError )
+			return Task.FromResult<object>( new { error = $"Model not found or failed to compile: {modelPath}" } );
+
+		int planned = 0;
+		for ( int i = 0; i < points.Count - 1; i++ )
+		{
+			float length = (points[i + 1] - points[i]).Length;
+			if ( length < 0.01f ) continue;
+			double segmentSteps = Math.Max( 1d, Math.Truncate( (double)length / spacing ) );
+			double segmentPlacements = segmentSteps + 1d;
+			if ( segmentPlacements > PlacementPlanV2Store.MaxPlacementsPerPlan - planned )
+			{
+				return Task.FromResult<object>( new
+				{
+					error = $"Path would create more than {PlacementPlanV2Store.MaxPlacementsPerPlan} objects; increase spacing, shorten the path, or preview smaller sections with dryRun:true."
+				} );
+			}
+			planned += (int)segmentPlacements;
+		}
+		if ( planned == 0 )
+			return Task.FromResult<object>( new { error = "path produced no placements; provide at least one non-zero segment" } );
 
 		var rng = new Random( seed );
 		var folder = scene.CreateObject( true );
@@ -6148,7 +6224,7 @@ public class PlaceAlongPathHandler : IBridgeHandler
 				go.WorldPosition = pos;
 				// Deterministic by default; only spin the yaw when explicitly asked. (Fix 4)
 				if ( align )
-					go.WorldRotation = Rotation.LookAt( dir, Vector3.Up );
+					go.WorldRotation = PlacementPlanV2Helpers.AlignRotation( dir );
 				else if ( randomizeYaw )
 					go.WorldRotation = Rotation.FromYaw( (float)(rng.NextDouble() * 360.0) );
 				else
@@ -7071,14 +7147,9 @@ public class CreateParticleEffectHandler : IBridgeHandler
 
 public static class CharacterHelpers
 {
-	/// <summary>Parse {pitch,yaw,roll} → Rotation (identity if absent).</summary>
+	/// <summary>Parse object, array, comma string, or native-stringified JSON into a Rotation.</summary>
 	public static Rotation ParseRotation( JsonElement e )
-	{
-		float pitch = e.TryGetProperty( "pitch", out var p ) ? p.GetSingle() : 0f;
-		float yaw   = e.TryGetProperty( "yaw",   out var y ) ? y.GetSingle() : 0f;
-		float roll  = e.TryGetProperty( "roll",  out var r ) ? r.GetSingle() : 0f;
-		return Rotation.From( pitch, yaw, roll );
-	}
+		=> ClaudeBridge.ParseRotation( e );
 
 	/// <summary>Apply position/rotation/scale params to a GameObject.</summary>
 	public static void ApplyTransform( GameObject go, JsonElement p )
@@ -7688,7 +7759,7 @@ public class ScatterPropsHandler : IBridgeHandler
 			return Task.FromResult<object>( new { error = "model (path) is required" } );
 		Model model = null;
 		try { model = Model.Load( modelPath ); } catch { }
-		if ( model == null ) return Task.FromResult<object>( new { error = $"Model not found: {modelPath}" } );
+		if ( model == null || model.IsError ) return Task.FromResult<object>( new { error = $"Model not found or failed to compile: {modelPath}" } );
 
 		var center   = p.TryGetProperty( "center", out var c ) ? ClaudeBridge.ParseVector3( c ) : Vector3.Zero;
 		float radius = p.TryGetProperty( "radius", out var r ) ? r.GetSingle() : 256f;
@@ -7698,6 +7769,10 @@ public class ScatterPropsHandler : IBridgeHandler
 		bool snap      = !p.TryGetProperty( "snapToGround", out var sg ) || sg.GetBoolean();
 		float scaleMin = p.TryGetProperty( "scaleMin", out var smn ) ? smn.GetSingle() : 1f;
 		float scaleMax = p.TryGetProperty( "scaleMax", out var smx ) ? smx.GetSingle() : 1f;
+		if ( !float.IsFinite( radius ) || radius < 0f )
+			return Task.FromResult<object>( new { error = "radius must be a finite non-negative number" } );
+		if ( !float.IsFinite( scaleMin ) || !float.IsFinite( scaleMax ) || scaleMin <= 0f || scaleMax <= 0f || scaleMin > scaleMax )
+			return Task.FromResult<object>( new { error = "scaleMin/scaleMax must be finite positive numbers with scaleMin <= scaleMax" } );
 		uint seed      = p.TryGetProperty( "seed", out var sd ) ? (uint)sd.GetInt32() : 1u;
 		var rng = new Lcg( seed );
 		string name = p.TryGetProperty( "name", out var nm ) ? nm.GetString() : "Prop";
@@ -7716,12 +7791,18 @@ public class ScatterPropsHandler : IBridgeHandler
 		{
 			var dir = Rotation.FromYaw( rng.Range( 0f, 360f ) ).Forward; // unit direction, no trig
 			var pos = center + dir * ( radius * rng.Float01() );
+			var rotation = randomYaw ? Rotation.FromYaw( rng.Range( 0f, 360f ) ) : Rotation.Identity;
+			float uniformScale = scaleMax > scaleMin ? rng.Range( scaleMin, scaleMax ) : scaleMin;
 			if ( snap )
 			{
 				try
 				{
 					var tr = scene.Trace.Ray( pos + Vector3.Up * 2000f, pos + Vector3.Down * 20000f ).Run();
-					if ( tr.Hit ) pos = new Vector3( pos.x, pos.y, tr.HitPosition.z );
+					if ( tr.Hit )
+					{
+						float groundingOffsetZ = -model.Bounds.Mins.z * uniformScale;
+						pos = new Vector3( pos.x, pos.y, tr.EndPosition.z + groundingOffsetZ );
+					}
 				}
 				catch { }
 			}
@@ -7729,8 +7810,8 @@ public class ScatterPropsHandler : IBridgeHandler
 			var prop = scene.CreateObject( true );
 			prop.Name = $"{name} {i + 1}";
 			prop.WorldPosition = pos;
-			if ( randomYaw ) prop.WorldRotation = Rotation.FromYaw( rng.Range( 0f, 360f ) );
-			if ( scaleMax > scaleMin ) { float s = rng.Range( scaleMin, scaleMax ); prop.WorldScale = new Vector3( s, s, s ); }
+			prop.WorldRotation = rotation;
+			prop.WorldScale = new Vector3( uniformScale );
 			var mr = prop.AddComponent<ModelRenderer>();
 			mr.Model = model;
 			if ( tinted ) mr.Tint = VisualHelpers.ParseColorElement( tEl, Color.White );
@@ -7963,61 +8044,6 @@ public class FrameCameraHandler : IBridgeHandler
 // ═════════════════════════════════════════════════════════════════════
 //  Batch 25 — screenshot aiming + component/tag gaps
 // ═════════════════════════════════════════════════════════════════════
-
-// ───────── screenshot_from (THE fix: aim Claude's screenshots) ─────────
-//  take_screenshot renders from the scene's MAIN CAMERA (not the viewport).
-//  This saves the main camera's transform, moves it to frame a target,
-//  captures, and restores it — so screenshots can finally be aimed.
-public class ScreenshotFromHandler : IBridgeHandler
-{
-	public Task<object> Execute( JsonElement p )
-	{
-		var scene = SceneEditorSession.Active?.Scene;
-		if ( scene == null ) return Task.FromResult<object>( new { error = "No active scene" } );
-
-		var cam = VisualHelpers.FindMainCamera( scene );
-		if ( cam == null ) return Task.FromResult<object>( new { error = "No main camera found (take_screenshot renders from the scene's main camera)." } );
-		var go = cam.GameObject;
-		var savedPos = go.WorldPosition;
-		var savedRot = go.WorldRotation;
-
-		Vector3 camPos; Rotation camRot; string framed;
-		if ( p.TryGetProperty( "id", out var idEl ) && Guid.TryParse( idEl.GetString(), out var guid ) )
-		{
-			var t = scene.Directory.FindByGuid( guid );
-			if ( t == null ) return Task.FromResult<object>( new { error = $"GameObject not found: {idEl.GetString()}" } );
-			var box = t.GetBounds();
-			var c = box.Center;
-			float sz = box.Size.Length; if ( sz < 1f ) sz = 128f;
-			float dist = sz * 1.4f; if ( dist < 150f ) dist = 150f;
-			camPos = c + new Vector3( -1f, -0.6f, 0.7f ).Normal * dist; // 3/4 elevated view
-			camRot = Rotation.LookAt( ( c - camPos ).Normal, Vector3.Up );
-			framed = t.Name;
-		}
-		else if ( p.TryGetProperty( "position", out var posEl ) )
-		{
-			camPos = ClaudeBridge.ParseVector3( posEl );
-			if ( p.TryGetProperty( "lookAt", out var laEl ) )
-				camRot = Rotation.LookAt( ( ClaudeBridge.ParseVector3( laEl ) - camPos ).Normal, Vector3.Up );
-			else if ( p.TryGetProperty( "rotation", out var rotEl ) )
-				camRot = CharacterHelpers.ParseRotation( rotEl );
-			else camRot = savedRot;
-			framed = $"({camPos.x:0.#},{camPos.y:0.#},{camPos.z:0.#})";
-		}
-		else return Task.FromResult<object>( new { error = "provide id (object to frame) or position {x,y,z} (+ optional lookAt or rotation)" } );
-
-		int w = p.TryGetProperty( "width", out var wEl ) ? wEl.GetInt32() : 1920;
-		int h = p.TryGetProperty( "height", out var hEl ) ? hEl.GetInt32() : 1080;
-
-		go.WorldPosition = camPos;
-		go.WorldRotation = camRot;
-		EditorScene.TakeHighResScreenshot( w, h );
-		go.WorldPosition = savedPos; // restore (assumes synchronous capture; verify on first use)
-		go.WorldRotation = savedRot;
-
-		return Task.FromResult<object>( new { captured = true, framed, note = "Main camera framed, captured, and restored — read the newest screenshot." } );
-	}
-}
 
 // ───────── remove_component (remove a component by type from a GO) ──────
 public class RemoveComponentHandler : IBridgeHandler
@@ -8568,38 +8594,6 @@ public class RecompileAssetHandler : IBridgeHandler
 //  • get_bounds returns world bounds/center/size (used standalone + by the
 //    TS-side screenshot_orbit verification tool)
 // ═════════════════════════════════════════════════════════════════════
-
-public class GetBoundsHandler : IBridgeHandler
-{
-	public Task<object> Execute( JsonElement p )
-	{
-		var scene = SceneEditorSession.Active?.Scene;
-		if ( scene == null ) return Task.FromResult<object>( new { error = "No active scene" } );
-		if ( !p.TryGetProperty( "id", out var idEl ) || !Guid.TryParse( idEl.GetString(), out var guid ) )
-			return Task.FromResult<object>( new { error = "id (GameObject GUID) is required" } );
-		var go = scene.Directory.FindByGuid( guid );
-		if ( go == null ) return Task.FromResult<object>( new { error = $"GameObject not found: {idEl.GetString()}" } );
-
-		var box = go.GetBounds();
-		var c = box.Center; var s = box.Size; var e = box.Extents;
-		var mins = c - e; var maxs = c + e;
-		bool empty = s.Length < 0.01f;
-		return Task.FromResult<object>( new
-		{
-			id = idEl.GetString(),
-			name = go.Name,
-			center   = new { c.x, c.y, c.z },
-			size     = new { s.x, s.y, s.z },
-			extents  = new { e.x, e.y, e.z },
-			mins     = new { mins.x, mins.y, mins.z },
-			maxs     = new { maxs.x, maxs.y, maxs.z },
-			radius   = s.Length * 0.5f,
-			position = new { go.WorldPosition.x, go.WorldPosition.y, go.WorldPosition.z },
-			empty,
-			note = empty ? "Zero/near-zero bounds (no renderer) — using world position; orbit will frame a default radius." : null
-		} );
-	}
-}
 
 public class PlayAnimationHandler : IBridgeHandler
 {

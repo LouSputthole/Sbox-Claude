@@ -5,7 +5,8 @@ import { BridgeClient } from "../transport/bridge-client.js";
 /**
  * Networking tools: add_network_helper, configure_network, get_network_status,
  * network_spawn, set_ownership, add_sync_property, add_rpc_method,
- * create_networked_player, create_lobby_manager, create_network_events.
+ * create_networked_player, create_lobby_manager, create_network_events, and the
+ * start/status/stop local multiplayer test harness.
  *
  * Manages s&box multiplayer: lobby creation, networked objects, RPCs, sync properties.
  */
@@ -294,6 +295,82 @@ export function registerNetworkingTools(
     },
     async (params) => {
       const res = await bridge.send("create_network_events", params);
+      if (!res.success) {
+        return { content: [{ type: "text", text: `Error: ${res.error}` }] };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }],
+      };
+    }
+  );
+  // ── multiplayer test harness ─────────────────────────────────────
+  server.tool(
+    "start_multiplayer_test",
+    "Start a real local multiplayer test from PLAY MODE. Creates an explicitly private, hidden lobby when needed, validates capacity, launches 1-2 sbox.exe clients with -joinlocal, and tracks joins from the pre-spawn host-side connection baseline. Overlapping tracked runs are rejected so unrelated connections cannot falsely satisfy a join wait. Each client can use about 4.5 GB RAM and take about 80 seconds to join. Returns spawned PIDs, baseline/expected connection counts, and an optional join-wait job; poll multiplayer_test_status and always finish with stop_multiplayer_test.",
+    {
+      clients: z
+        .number()
+        .int()
+        .min(1)
+        .max(2)
+        .optional()
+        .describe("Real client processes to launch (default 1; hard cap 2 per run; stop an existing tracked run first)"),
+      maxPlayers: z
+        .number()
+        .int()
+        .min(2)
+        .max(64)
+        .optional()
+        .describe("Lobby capacity when this call creates it (default 4; must fit the host plus all requested clients). Existing lobby capacity is validated instead"),
+      waitForJoinSeconds: z
+        .number()
+        .int()
+        .min(0)
+        .max(600)
+        .optional()
+        .describe("Host-side join-wait timeout (default 120; 0 returns immediately after launch)"),
+    },
+    async (params) => {
+      const res = await bridge.send("start_multiplayer_test", params);
+      if (!res.success) {
+        return { content: [{ type: "text", text: `Error: ${res.error}` }] };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "multiplayer_test_status",
+    "Read the host-side state of the local multiplayer test harness without changing it: play/network state, connection roster, tracked client PIDs and uptime, and join-wait progress. The bridge cannot inspect or drive the separate client windows; use host-side replication inspectors for assertions.",
+    {},
+    async (params) => {
+      const res = await bridge.send("multiplayer_test_status", params);
+      if (!res.success) {
+        return { content: [{ type: "text", text: `Error: ${res.error}` }] };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "stop_multiplayer_test",
+    "Stop every client process launched by start_multiplayer_test; exited clients are cleared while failed live kills remain tracked for retry. Optionally disconnect the host lobby. alsoStrays is an explicit recovery switch that kills every sbox.exe game client, including clients not launched by this harness; it never targets the sbox-dev editor process. Returns truthful stopped/remainingPids, per-process cleanup results, and disconnect status.",
+    {
+      disconnect: z
+        .boolean()
+        .optional()
+        .describe("Also disconnect the running host from its networking session (default false)"),
+      alsoStrays: z
+        .boolean()
+        .optional()
+        .describe("Also kill untracked sbox.exe game clients (default false; use only for explicit cleanup)"),
+    },
+    async (params) => {
+      const res = await bridge.send("stop_multiplayer_test", params);
       if (!res.success) {
         return { content: [{ type: "text", text: `Error: ${res.error}` }] };
       }

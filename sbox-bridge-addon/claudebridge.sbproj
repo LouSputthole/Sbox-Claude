@@ -4,7 +4,7 @@
   "Org": "sboxskinsgg",
   "Ident": "claudebridge",
   "Schema": 1,
-  "Description": "Build s&box games by talking to Claude. 150+ tools to drive the s&box editor through conversation — GameObjects, scripts, scenes, components, physics, networking, UI, world-gen, lighting & atmosphere, characters, scene layout, navmesh & spatial queries, particles, scatter & object utilities, type discovery. v1.5.0 adds 16 tools (self-diagnosis read_log/get_compile_errors, aimed screenshot_from, bake_navmesh/get_navmesh_path, physics_overlap, bake_reflections, spawn_vpcf, console_run/execute_csharp, search_docs) plus a security & correctness hardening pass (handler errors now report success=false, path-traversal safety on all file handlers, atomic IPC). If you use Claude Code, install the companion plugin: `/plugin marketplace add LouSputthole/Sbox-Claude` then `/plugin install sbox-claude` — it bundles the MCP server registration plus an `sbox-build-feature` skill that codifies the screenshot-driven iteration workflow. See TROUBLESHOOTING.md if anything misbehaves.",
+  "Description": "Build s&box games by talking to Claude or any MCP client. 273 native editor tools across 28 discoverable toolsets cover GameObjects, scripts, scenes, components, physics, networking, UI, world generation, lighting, characters, placement, model geometry, camera verification, local multiplayer testing, diagnostics, and complete game-system scaffolds. The bridge runs on s&box's built-in local MCP server; the companion Codex/Claude plugin adds onboarding, workflow skills, the code-grounded cookbook, and optional editor-down lifeline diagnostics.",
   "IncludeSourceFiles": true,
   "Resources": null,
   "PackageReferences": [],
@@ -12,7 +12,7 @@
   "Mounts": null,
   "IsStandaloneOnly": false,
   "Metadata": {
-    "Summary": "Claude builds s&box game systems for you — 150+ tools (v1.6.0 adds character animation, multi-angle screenshots & object bounds), stable across SDK updates",
+    "Summary": "Claude builds s&box game systems through 273 native editor tools, visual verification workflows, and code-grounded recipes",
     "Public": true,
     "Tags": "ai,claude,mcp,tool,editor,bridge,automation,code-generation,terrain,worldgen,stable",
     "Compiler": {

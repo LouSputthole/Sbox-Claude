@@ -2,6 +2,34 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## Unreleased
+
+### Added
+
+- Deterministic `dryRun:true` placement plans for `place_along_path`, `grid_duplicate`, and `scatter_props`, plus `commit_placement_plan` for exact, rollback-protected creation with slot-to-GUID receipts.
+- `inspect_model_geometry` for model-local render/physics bounds, footprint, height, and pivot-to-ground offsets before placement.
+- Provenance-rich `get_bounds` aggregates for render, all physics, and non-trigger physics, plus play-aware `find_objects_near`.
+- Session camera bookmarks, ordered multi-view captures with previous-capture RGBA metrics and occlusion diagnostics, and deterministic orthographic `capture_topdown`.
+- `start_multiplayer_test`, `multiplayer_test_status`, and `stop_multiplayer_test` for a bounded local multi-instance harness: create a private, hidden host lobby in play mode, launch up to two real `sbox.exe -joinlocal` clients, inspect host-side joins, and clean up tracked processes.
+
+### Changed
+
+- `set_transform` now pre-parses every supplied value, supports explicit world/local space, returns before/after receipts, and rolls back if apply or receipt construction fails.
+- `batch_set_property` dry runs now perform the same coercion/reference resolution as apply, distinguish changes from no-ops, and avoid needless setters.
+- Scatter placement now rejects error models and invalid ranges, preserves fixed non-unit scale, and grounds model bottoms using traced end positions plus model-local pivot offsets.
+- Path placement now rejects invalid models/ranges, preflights a 2,048-object safety cap before immediate creation, and uses a stable fallback up vector for vertical aligned segments.
+- Camera captures now use strict pose parsing, runtime-safe GameObject resolution, disabled non-main temporary cameras, dynamic far planes, deterministic cleanup, transactional comparison baselines, and a bounded 64 MiB session cache.
+- Nearby searches now require exactly one finite center source, exclude the Scene root, and report radius clamping explicitly.
+- Parity auditing now discovers every concrete `IBridgeHandler` class recursively and fails when a handler is omitted from `RegisterHandlers`.
+- Bridge feature guidance now treats saved scene/prefab `[Property]` values as authoritative and directs project-specific tuning through project-owned helpers rather than code initializers.
+
+### Fixed
+
+- Rotation arguments now semantically unwrap native-stringified JSON objects/arrays before parsing, preserving `pitch`/`yaw`/`roll` keys regardless of property order across shared, strict `set_transform`, camera-bookmark, character/equipment, capture, and `drive_player` paths.
+- The proven multiplayer-test handlers from the installed library are now present in canonical source, registered, exposed through TypeScript/native MCP wrappers, and covered by discovery/status smoke checks. Starts now reject overlap, validate host-plus-client capacity, count joins from a pre-spawn connection baseline, create private/hidden lobbies, and roll back newly created lobbies when every spawn fails; failed client kills remain tracked for truthful retryable cleanup.
+
+> Source and offline gates are verified; live editor smoke coverage remains pending and is tracked in `TESTING.md`.
+
 ## Codex distribution [2.1.0] -- 2026-07-16
 
 - Prepared the first Codex distribution: the GitHub-backed marketplace, s&box Codex Bridge plugin 2.1.0, native editor MCP, optional lifeline diagnostics, API brain, cookbook, and workflow skills.

@@ -79,7 +79,7 @@ Both run MCP-server-side, so they work even if the editor is in a broken state. 
 
 **Cause:** `take_screenshot` always renders from the scene's **Main Camera** — one fixed angle. If the Main Camera isn't pointed at the object you changed, you won't see it. This is the #1 reason "I can't verify the visual change."
 
-**Fix:** Use **`screenshot_from`** instead. It moves the Main Camera to frame a target object or world point, captures, and restores the camera:
+**Fix:** Use **`screenshot_from`** instead. It uses a temporary non-main camera to frame a target object or world point, returns an inline PNG, and leaves the real camera unchanged:
 
 ```
 screenshot_from   target=<object GUID or position>

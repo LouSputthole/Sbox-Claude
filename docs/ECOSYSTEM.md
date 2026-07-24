@@ -6,7 +6,7 @@ companion: what each toolset is *for*, when you'd reach for it, and how the grou
 together. If a capability here contradicts TOOLSETS.md, TOOLSETS.md wins (it's generated;
 this is written).
 
-The surface: **262 native tools across 28 `bridge_*` toolsets** (53 read-only), plus the
+The surface: **273 native tools across 28 `bridge_*` toolsets** (57 read-only), plus the
 **7 lifeline tools** for editor-down diagnostics. Agents browse with `list_toolsets` /
 `describe_toolset` and find individual tools with `search_tools`; see the
 [Agent Guide](AGENT-GUIDE.md) for the working loop.
@@ -20,13 +20,14 @@ scene-mutating tools refuse during play mode.
 ## Scene & object foundation
 
 ### `bridge_gameobject` — GameObjects, transforms, layout
-*25 tools (6 read-only).* The core of scene work: create / delete / duplicate / rename /
+*27 tools (7 read-only).* The core of scene work: create / delete / duplicate / rename /
 reparent GameObjects, set transforms and tags, select and query, and **bulk layout**
 (align, distribute, scatter, grid-duplicate, snap-to-ground, group, randomize).
 
 - Place a row of pillars, then `align_objects` / `distribute_objects` to space them cleanly.
 - `scatter_props` for instant foliage/rocks/debris; `randomize_transforms` to break up repetition.
-- `find_objects` by name / component / tag to get the GUIDs everything else consumes.
+- `find_objects` by name/component/tag, or `find_objects_near` for nearest-first pivot-distance queries.
+- Preview path/grid/scatter layouts with `dryRun:true`, then commit exact transforms with `commit_placement_plan`.
 
 *Prompt:* "Scatter 30 rocks around the campfire and randomize their rotation and scale."
 
@@ -177,11 +178,11 @@ clickable world UI the scene also needs a `Sandbox.WorldInput` (see `create_worl
 `bridge_validation` (`razor_lint`).
 
 ### `bridge_networking` — multiplayer setup & codegen
-*14 tools (1 read-only).* Everything multiplayer: `add_network_helper`, `create_lobby_manager`,
+*17 tools (2 read-only).* Everything multiplayer: `add_network_helper`, `create_lobby_manager`,
 `create_networked_player`, `add_sync_property`, RPC generators (`add_rpc_method`,
 `create_host_rpc_action`, `add_targeted_rpc`, `create_network_events`), `network_spawn`,
 `set_ownership`, `create_local_player_resolver`, `add_host_migration_recovery`, and
-`configure_network` / `get_network_status`.
+`configure_network` / `get_network_status`, plus the bounded local-client harness: `start_multiplayer_test`, `multiplayer_test_status`, and `stop_multiplayer_test`.
 
 - `create_host_rpc_action` for the SAFE "client asks host to DO something" skeleton (caller re-resolved, per-SteamId cooldown) — the answer to the #1 exploit class.
 - `create_local_player_resolver` to stop running local-player logic against a proxy.
@@ -189,8 +190,8 @@ clickable world UI the scene also needs a `Sandbox.WorldInput` (see `create_worl
 
 *Prompt:* "Wire up a lobby and a networked player, and make the buy action host-authoritative."
 
-*Safety:* Mutating (except `get_network_status`, read-only). Codegen tools write files
-(hotload after). Several patterns only fire with a real session/host migration.
+*Safety:* Mutating except `get_network_status` and `multiplayer_test_status` (read-only). Codegen tools write files
+(hotload after). The local harness launches real game processes (about 4.5 GB RAM each), is capped at two clients, and must always be closed with `stop_multiplayer_test`.
 
 *Related:* `bridge_validation` (`networking_lint`, `inspect_networked_object`), `bridge_scaffold_gameplay`, `bridge_prefab`.
 
@@ -468,8 +469,8 @@ action to take effect in play mode.
 *Related:* `bridge_discovery`, `bridge_scaffold_gameplay`, `bridge_validation`.
 
 ### `bridge_asset` — asset library & packages
-*6 tools (3 read-only).* `search_assets`, `list_asset_library`, `get_asset_info`,
-`install_asset` (pull a community package by ident), `copy_asset_with_dependencies` (copy a
+*7 tools (4 read-only).* `search_assets`, `list_asset_library`, `get_asset_info`,
+`inspect_model_geometry` (placement bounds/grounding before spawning), `install_asset` (pull a community package by ident), `copy_asset_with_dependencies` (copy a
 model + its full dependency closure), and `recompile_asset`.
 
 - `search_assets` / `list_asset_library` to find a model path to `spawn_model` (native built-in).
@@ -537,13 +538,14 @@ recording requires it. The recorder auto-advances with game time — the bridge 
 alternative), `bridge_playtest` (`record_playtest` composes its step schema).
 
 ### `bridge_screenshot` — inline PNG capture
-*4 tools (1 read-only).* Hand-written. Every capture returns the **PNG inline as an image
+*9 tools (2 read-only).* Hand-written. Every capture returns the **PNG inline as an image
 block** — no temp-file path to read back. `take_screenshot` (main camera / player view in play
 mode), `capture_view` (auto-frame an object or a free position+lookAt camera), `screenshot_from`
-(historical alias of `capture_view`), and `screenshot_orbit` (N angles in one call).
+(historical alias of `capture_view`), `screenshot_orbit` (N angles in one call), session camera bookmarks/ordered comparison sets, and deterministic `capture_topdown`.
 
 - `capture_view {id}` to aim a shot at exactly what you just built.
 - `screenshot_orbit` to see all sides of a model in one response.
+- Save repeatable camera bookmarks, compare ordered captures, and use `capture_topdown` for map-scale inspection.
 
 *Prompt:* "Screenshot the car from the front and read the result."
 

@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v2.1.0</strong> · <strong>262 native tools</strong> · <strong>275 total tools / 267 handlers</strong> · <strong>28 toolsets</strong> (+ 7 lifeline tools) · Source-available (no independent redistribution; official channels authorized) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v2.1.0</strong> · <strong>273 native tools</strong> · <strong>286 total tools / 278 handlers</strong> · <strong>28 toolsets</strong> (+ 7 lifeline tools) · Source-available (no independent redistribution; official channels authorized) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -56,7 +56,7 @@ Upgrading from v1.x? **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)** is the mig
 | Piece | What it is | Where it lives |
 |---|---|---|
 | **Native MCP server** | Facepunch's editor-hosted MCP server — streamable HTTP, loopback-only, on by default (**Editor → Preferences → MCP Server**, port 7269) | ships with s&box |
-| **Editor addon** | The bridge: a C# editor library whose 262 tools are `[McpTool]` methods the engine auto-discovers, each dispatching into the bridge's handler layer on the main editor thread | installed via the s&box **Asset Library / Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
+| **Editor addon** | The bridge: a C# editor library whose 273 tools are `[McpTool]` methods the engine auto-discovers, each dispatching into the bridge's handler layer on the main editor thread | installed via the s&box **Asset Library / Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
 | **Lifeline server** *(optional)* | A slim stdio server for editor-down diagnostics — the native server dies with the editor; the lifeline doesn't | npm package `sbox-mcp-server@2`, run with `--lifeline` |
 
 **Invocation pattern.** The native server exposes a handful of entry points — `search_tools`, `call_tool`, `call_tools`, `list_toolsets`, `describe_toolset` — and discovers everything else live from the addon:
@@ -104,7 +104,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 
 ## Tools & features
 
-**262 native tools across 28 `bridge_*` toolsets**, plus the **7 lifeline tools**. The full generated inventory — every tool, its toolset, and its read-only status — is **[docs/TOOLSETS.md](docs/TOOLSETS.md)**. Upgraders: **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)**.
+**273 native tools across 28 `bridge_*` toolsets**, plus the **7 lifeline tools**. The full generated inventory — every tool, its toolset, and its read-only status — is **[docs/TOOLSETS.md](docs/TOOLSETS.md)**. Upgraders: **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)**.
 
 | Toolset | What it covers |
 |---|---|
@@ -119,7 +119,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 | `bridge_material` | Models, `.vmat` authoring, material assignment and properties |
 | `bridge_moviemaker` | `Sandbox.MovieMaker` playback *and recording* — `.movie` clips, `MoviePlayer` wiring, record live gameplay to a replayable clip (`record_gameplay_clip`) |
 | `bridge_navigation` | Navmesh baking + walkable-path queries |
-| `bridge_networking` | Multiplayer setup + codegen — `[Sync]`, RPCs (broadcast/host/targeted), ownership, host migration |
+| `bridge_networking` | Multiplayer setup + codegen — `[Sync]`, RPCs (broadcast/host/targeted), ownership, host migration, bounded local multi-instance tests |
 | `bridge_npc` | NPC brains, spawners, patrol routes, perception simulation, utility AI, daily schedule brains |
 | `bridge_physics` | Rigidbodies, colliders, joints, raycasts, overlap queries |
 | `bridge_playmode` | Enter/exit play mode, play state, runtime property read/write |

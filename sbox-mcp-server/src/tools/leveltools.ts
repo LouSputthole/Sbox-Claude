@@ -104,13 +104,14 @@ export function registerLevelTools(
   // ── grid_duplicate ─────────────────────────────────────────────────
   server.tool(
     "grid_duplicate",
-    "Clone a GameObject into an X/Y/Z grid with fixed spacing (the original stays in place). Each count is clamped to 50 and total clones to 500. Great for fences, crates, pillars, foliage rows.",
+    "Clone a GameObject into an X/Y/Z grid. Existing calls mutate immediately and keep the legacy result. Use dryRun:true to preview exact capped transforms and receive a planId; commit_placement_plan then clones atomically and rejects the commit if the source transform or parent changed after preview.",
     {
       id: z.string().describe("GUID of the GameObject to clone"),
       countX: z.number().int().optional().describe("Copies along X (default 1)"),
       countY: z.number().int().optional().describe("Copies along Y (default 1)"),
       countZ: z.number().int().optional().describe("Copies along Z (default 1)"),
       spacing: Vector3Schema.optional().describe("Spacing between copies per axis (default 100,100,100)"),
+      dryRun: z.boolean().optional().describe("Preview only: return deterministic transforms and planId without cloning"),
     },
     async (params) => {
       const res = await bridge.send("grid_duplicate", params);
@@ -123,6 +124,23 @@ export function registerLevelTools(
     }
   );
 
+  // ── commit_placement_plan ────────────────────────────────────────
+  server.tool(
+    "commit_placement_plan",
+    "Commit a dry-run plan returned by place_along_path, grid_duplicate, or scatter_props. Plans are scene-scoped, capped, and expire after 10 minutes. Success consumes the plan; a complete rollback restores it for retry. The stored transforms are applied without rerolling randomness or repeating ground traces. Creation rolls back on failure; grid commits reject a changed/missing source before creating anything. Returns slot-to-GUID receipts.",
+    {
+      planId: z.string().describe("Plan id returned by a placement tool with dryRun:true"),
+    },
+    async (params) => {
+      const res = await bridge.send("commit_placement_plan", params);
+      if (!res.success) {
+        return { content: [{ type: "text", text: `Error: ${res.error}` }] };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }],
+      };
+    }
+  );
   // ── measure_distance ───────────────────────────────────────────────
   server.tool(
     "measure_distance",
@@ -147,7 +165,7 @@ export function registerLevelTools(
   // ── scatter_props ──────────────────────────────────────────────────
   server.tool(
     "scatter_props",
-    "Scatter N copies of a model randomly within a radius around a center point — instant foliage, rocks, debris. Each copy gets a random yaw and (by default) is snapped to the ground. Seeded for reproducibility; copies are grouped under one parent by default. Count capped at 300. Returns { scattered, groupId, seed } — individual prop GUIDs are not returned, so use groupId with get_scene_hierarchy (rootId) to enumerate them, or with set_transform/delete_gameobject to move/remove the whole batch.",
+    "Scatter seeded model copies inside a radius. Existing calls mutate immediately and keep the legacy { scattered, groupId, seed } result. Use dryRun:true to resolve random transforms and ground traces once, returning per-slot transforms, ground status, warnings, model bounds, and planId; commit_placement_plan creates exactly that preview with rollback on failure.",
     {
       model: z.string().describe("Model path to scatter, e.g. 'models/dev/box.vmdl'"),
       center: Vector3Schema.optional().describe("Centre of the scatter area (default origin)"),
@@ -163,6 +181,7 @@ export function registerLevelTools(
       seed: z.number().int().optional().describe("PRNG seed for a reproducible layout (default 1)"),
       group: z.boolean().optional().describe("Parent all copies under one group object (default true)"),
       name: z.string().optional().describe("Base name for the props/group (default 'Prop')"),
+      dryRun: z.boolean().optional().describe("Preview only: return deterministic transforms and planId without creating props"),
     },
     async (params) => {
       const res = await bridge.send("scatter_props", params);

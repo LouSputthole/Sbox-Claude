@@ -129,9 +129,9 @@ The addon's `[McpTool]` wrappers are discovered by the engine automatically once
 
 ---
 
-## Legacy fallback — file IPC (v2.0.x only)
+## Legacy fallback — file IPC (compatibility)
 
-The v1.x file-IPC transport and the full stdio TS server remain **compiled-in and functional through v2.0.x** as a fallback for older engine builds that don't ship the native MCP server. They are not registered by default and **retire in v2.1.0**.
+The v1.x file-IPC transport and the full stdio TS server remain **compiled-in and functional** as a compatibility fallback for older engine builds that don't ship the native MCP server. They are not registered by default. Any future retirement requires a separate compatibility decision.
 
 If you must use the fallback:
 

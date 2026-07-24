@@ -206,22 +206,27 @@ public static class BridgeWorldTools
 		=> McpGate.Run( "paint_forest_density", McpGate.Args( ( "x", x ), ( "y", y ), ( "radius", radius ), ( "density", density ), ( "rebuild", rebuild ), ( "id", id ), ( "component", component ) ) );
 
 	/// <summary>
-	/// Drop instances of a model along a path (list of points). Useful for fences, lampposts, road
-	/// markers, lined-up rocks. Returns `placed` (instance count) and `folder` — the GUID of the new
-	/// parent GameObject grouping the instances; pass `folder` to delete_gameobject to remove the whole
-	/// run, or to set_parent/set_transform to move it.
+	/// Place up to 2,048 model instances along a waypoint path. Existing calls mutate immediately and
+	/// keep the legacy { placed, folder } result, but reject larger paths before creating anything. Use
+	/// dryRun:true for a deterministic, non-mutating preview with exact transforms, model-local bounds,
+	/// warnings, and a 10-minute planId; then call commit_placement_plan to create those exact
+	/// placements atomically with slot-to-GUID receipts. align follows path direction; randomizeYaw is
+	/// used only when align is false.
 	/// </summary>
 	/// <param name="model">Model path (e.g. 'models/dev/box.vmdl' or installed-asset path).</param>
 	/// <param name="points">Path waypoints (at least 2). JSON array.</param>
-	/// <param name="spacing">Distance between placements (world units).</param>
-	/// <param name="jitter">Max random offset perpendicular to path.</param>
-	/// <param name="min_scale">Minimum uniform scale per instance (random between min and max). Default 1.</param>
-	/// <param name="max_scale">Maximum uniform scale per instance. Default 1.</param>
+	/// <param name="spacing">Distance between placements (world units; must be &gt; 0).</param>
+	/// <param name="jitter">Max random XY offset (must be &gt;= 0).</param>
+	/// <param name="min_scale">Minimum positive uniform scale per instance. Default 1.</param>
+	/// <param name="max_scale">Maximum positive uniform scale per instance; must be &gt;= min_scale. Default 1.</param>
 	/// <param name="seed">Random seed for jitter and scale — same seed reproduces the same placement. Default 42.</param>
 	/// <param name="name">Base name for placed objects. Default: "PathItem".</param>
+	/// <param name="align">Face each instance along its path segment (default false).</param>
+	/// <param name="randomizeYaw">Randomize yaw when align is false (default false).</param>
+	/// <param name="dryRun">Preview only: return deterministic transforms and planId without creating objects.</param>
 	[McpTool( "place_along_path" )]
-	public static Task<object> PlaceAlongPath( string model, JsonNode points, double spacing = 200, double jitter = 0, double min_scale = 1, double max_scale = 1, int seed = 42, string name = "PathItem" )
-		=> McpGate.Run( "place_along_path", McpGate.Args( ( "model", model ), ( "points", points ), ( "spacing", spacing ), ( "jitter", jitter ), ( "min_scale", min_scale ), ( "max_scale", max_scale ), ( "seed", seed ), ( "name", name ) ) );
+	public static Task<object> PlaceAlongPath( string model, JsonNode points, double spacing = 200, double jitter = 0, double min_scale = 1, double max_scale = 1, int seed = 42, string name = "PathItem", bool? align = null, bool? randomizeYaw = null, bool? dryRun = null )
+		=> McpGate.Run( "place_along_path", McpGate.Args( ( "model", model ), ( "points", points ), ( "spacing", spacing ), ( "jitter", jitter ), ( "min_scale", min_scale ), ( "max_scale", max_scale ), ( "seed", seed ), ( "name", name ), ( "align", align ), ( "randomizeYaw", randomizeYaw ), ( "dryRun", dryRun ) ) );
 
 	/// <summary>
 	/// Sample MapBuilder terrain height at world (x, y). Returns z (the surface height). Use to place

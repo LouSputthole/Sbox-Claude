@@ -365,7 +365,7 @@ internal static class PlaytestRunner
 				j.Transcript.Add( new { step = j.Index, kind = "capture", ok = false, label = s.CaptureLabel, error = "no main camera in the running scene" } );
 				return;
 			}
-			var bmp = new Bitmap( 1280, 720 );
+			using var bmp = new Bitmap( 1280, 720 );
 			cam.RenderToBitmap( bmp, true );   // renderUI=true → the running game incl. HUD
 			string path = System.IO.Path.Combine( System.IO.Path.GetTempPath(), $"bridge_playtest_{System.Guid.NewGuid():N}.png" );
 			System.IO.File.WriteAllBytes( path, bmp.ToPng() );

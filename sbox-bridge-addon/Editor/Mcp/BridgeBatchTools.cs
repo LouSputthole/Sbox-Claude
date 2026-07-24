@@ -57,13 +57,11 @@ public static class BridgeBatchTools
 		=> McpGate.Run( "batch_reparent", McpGate.Args( ( "ids", ids ), ( "parent", parent ), ( "keepWorldPosition", keepWorldPosition ), ( "dryRun", dryRun ) ) );
 
 	/// <summary>
-	/// Set ONE component property to the same value across MANY GameObjects in a single call (e.g. Tint
-	/// on 40 props, Enabled on every light). Pass dryRun:true first to validate — it reports each
-	/// object's current value and what would change WITHOUT applying anything. Returns { total,
-	/// succeeded, failed, dryRun, results } with per-object ok/error and the previous value on success.
-	/// Get ids from find_objects or get_selected_objects. Scene-mutating: refused during play mode.
-	/// Value coercion matches set_property (numbers, bools, enums, 'x,y,z' vectors, colors, asset
-	/// paths).
+	/// Set ONE component property to the same value across MANY GameObjects in a single call. Pass
+	/// dryRun:true first: it performs the same type coercion and reference resolution as apply, reports
+	/// current/proposed values, and sets wouldChange:false when they already match. Apply skips no-op
+	/// setters. Returns { total, succeeded, failed, dryRun, changed, unchanged, results }.
+	/// Scene-mutating: refused during play mode. Value coercion matches set_property.
 	/// </summary>
 	/// <param name="ids">GUIDs of the GameObjects to modify (from find_objects, get_scene_hierarchy, or get_selected_objects).</param>
 	/// <param name="component">Component type name present on each object, e.g. 'ModelRenderer', 'PointLight'.</param>

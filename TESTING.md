@@ -2,8 +2,8 @@
 
 The test plan for the s&box Claude Bridge on the **native editor MCP server**
 (`http://127.0.0.1:7269/mcp`). Automated gates first, then a short manual smoke path —
-not an exhaustive pass over every tool. The surface under test: **232 native tools /
-28 `bridge_*` toolsets / 53 read-only / 7 lifeline / 245 total / 237 handlers**
+not an exhaustive pass over every tool. The surface under test: **273 native tools /
+28 `bridge_*` toolsets / 57 read-only / 7 lifeline / 286 total / 278 handlers**
 (`get_bridge_status.handlerCount` is the live assembly fingerprint).
 
 > **Use a test project, not a production one.** The live gate and the self-test create and
@@ -12,8 +12,8 @@ not an exhaustive pass over every tool. The surface under test: **232 native too
 > where a stray object wouldn't matter.
 >
 > Looking for the v1 file-IPC test plan (console fingerprint checks, the per-phase tool
-> tables)? It shipped with v1.x and retired with the v2.0.0 relaunch — the legacy transport
-> is a fallback only (gone in v2.1.0), covered by root `TROUBLESHOOTING.md`.
+> tables)? That exhaustive matrix retired with the v2.0.0 relaunch; the legacy transport itself
+> remains a compatibility fallback in current source and is covered by root `TROUBLESHOOTING.md`.
 
 ---
 
@@ -23,7 +23,7 @@ not an exhaustive pass over every tool. The surface under test: **232 native too
 |---|------|---------|---------------|----------------|
 | 1 | Node tests | `cd sbox-mcp-server && npm test` | no | 12 tests over the transport client: heartbeat-staleness classification, timeout diagnostics (which side stalled), `SBOX_BRIDGE_IPC_DIR` override, `isConnected` false-positive regression |
 | 2 | Quality gate | `node scripts/audit-mcp-quality.mjs` | no | no tool-name collisions with native built-ins (collisions are SILENT tool loss — hard fail) + description quality (5-point summary, param docs) |
-| 3 | Parity gate | `node scripts/audit-parity.mjs` | no | TS tools ↔ C# handlers parity + 4-way version lock (retires with the legacy path in v2.1.0) |
+| 3 | Parity gate | `node scripts/audit-parity.mjs` | no | TS tools ↔ C# handlers parity, every concrete `IBridgeHandler` has a registration factory, and the 4-way version lock holds while the compatibility fallback ships |
 | 4 | Codegen freshness | `node scripts/extract-manifest.mjs && node scripts/emit-mcp-wrappers.mjs && git diff --exit-code -- scripts/tools-manifest.json sbox-bridge-addon/Editor/Mcp docs/TOOLSETS.md` | no | nobody edited a zod schema without regenerating, or hand-edited a generated file |
 | 5 | **Live gate** | `node scripts/verify-native-mcp.mjs [--port 7269]` | **yes** | the whole native surface, end to end (below) |
 
@@ -37,13 +37,16 @@ an open editor — it is the release gate.
 
 - **Handshake + inventory** — `initialize`, `list_toolsets` reports the expected `bridge_*`
   toolsets.
-- **Discovery** — `search_tools "create gameobject"` finds `create_gameobject`.
+- **Discovery** — `search_tools "create gameobject"` finds `create_gameobject`; `search_tools
+  "multiplayer test"` finds the start/status/stop harness.
 - **Read-only spot-runs** — one tool per family (`get_bridge_status`, `get_project_info`,
-  `is_playing`, `get_scene_hierarchy`, `list_prefabs`, `describe_type`, `validate_project`,
+  `is_playing`, `multiplayer_test_status`, `get_scene_hierarchy`, `list_prefabs`, `describe_type`, `validate_project`,
   `describe_project`, `describe_scene`, `find_broken_references`).
 - **Nullable binding** — `find_objects` with its `int?` limit both passed and omitted.
 - **Mutating GUID round-trip** — `create_gameobject` returns a GUID → `delete_gameobject`.
-- **Inline image** — `take_screenshot` returns an inline PNG content block (not a file path).
+- **Inline image + rotation binding** — `take_screenshot` returns an inline PNG content block
+  (not a file path); out-of-order `{yaw,roll,pitch}` objects round-trip to an exact yaw through
+  `set_transform` and `save_camera_bookmark`, while `capture_view` accepts the same native-stringified contract.
 - **Throw semantics** — a bad GUID produces a real, readable thrown tool error, not an
   `{ error }` payload inside a success.
 - **Wave regression chains** — batch tools (`dryRun: true` → apply → verify), full prefab
@@ -80,10 +83,16 @@ Run after any addon change reaches the live project (sync with absolute paths �
 | # | Step | Expected | Status |
 |---|------|----------|--------|
 | 1 | Launch the editor with the bridge project | native server up on port 7269 (Editor → Preferences → MCP Server) | [ ] |
-| 2 | `get_bridge_status` | `connected: true`, `versionsAligned: true`, `handlerCount` = **237** (a lower number = partial compile / failed registrations — check `get_compile_errors`) | [ ] |
+| 2 | `get_bridge_status` | `connected: true`, `versionsAligned: true`, `handlerCount` = **278** (a lower number = partial compile / failed registrations — check `get_compile_errors`) | [ ] |
 | 3 | `run_self_test` | `HEALTHY — 8/8`: connectivity → create temp object → add component → assign model → non-empty bounds → `capture_view` PNG → recompile temp `.vmat` → remove component; then cleans up after itself. Refuses in play mode | [ ] |
 | 4 | Native round-trip: `list_toolsets` → `search_tools "flicker light"` → `call_tool add_flicker_light` (or any found tool) | toolsets listed, tool found by natural language, call executes with a real result | [ ] |
 | 5 | `take_screenshot` | returns an **inline PNG** image block in the tool result — look at it; if you got a file path back, you're on the legacy surface | [ ] |
+| 6 | `inspect_model_geometry` on a known prop, then `scatter_props` with `dryRun:true` | geometry includes model-local provenance and grounding offset; preview returns exact placements + `planId`; scene hierarchy is unchanged | [ ] |
+| 7 | `commit_placement_plan` for that preview, inspect receipts, then delete its returned group/objects | exact slot count and GUID receipts; grounded bottoms visually sit on the surface; cleanup leaves no test props | [ ] |
+| 8 | `set_transform` with explicit `space:"world"` and `space:"local"`; repeat the same value | before/after receipts use the requested space; repeat reports `noOp:true`; a malformed multi-field request changes nothing | [ ] |
+| 9 | `get_bounds` and `find_objects_near` around the test prop | aggregate/render/physics/solidPhysics provenance is explicit; nearby results are nearest-first pivot distances | [ ] |
+| 10 | Save two camera bookmarks, run `capture_camera_set` twice with `comparePrevious:true`, call `capture_topdown`, then delete the bookmarks | ordered inline PNGs + labeled manifests; second set has comparable RGBA metrics; top-down scale metadata is present; deletion removes baselines | [ ] |
+| 11 | Pass out-of-order `rotation:{yaw:90,roll:0,pitch:0}` objects through `set_transform`, `save_camera_bookmark`, and `capture_view`; also smoke `spawn_citizen`/`equip_model` with a comma string; clean up all artifacts | returned receipts preserve yaw=90 regardless of JSON property order; captures and character/equipment calls avoid string-conversion errors | [ ] |
 
 ---
 
@@ -98,7 +107,9 @@ Still-valid checks carried over from the v1 plan, retargeted to the v2 surface:
 | P3 | In-game capture | during play, `capture_view` | inline PNG of the running game's POV | [ ] |
 | P4 | Scripted gameplay loop | `playtest` with steps: `move` → assert `Displacement` > 0 → `jump` → assert `IsAirborne` next frame → land → assert `IsOnGround` | verdict PASS; assertions evaluate **in-frame** (transient states are catchable) | [ ] |
 | P5 | Harness status/abort | `playtest_status` mid-run; `playtest_abort` on a stuck run | live progress, then the full per-step transcript; abort stops the job (`"aborted": false` when nothing runs) | [ ] |
-| P6 | Aimed verification | `screenshot_from` at a known object | Main Camera frames the target, captures, restores — the tool for "did my visual change land" | [ ] |
+| P6 | Aimed verification | `screenshot_from` at a known object | a temporary non-main camera frames the target and returns an inline PNG; the real camera remains unchanged | [ ] |
+| P7 | Local multiplayer harness | `start_multiplayer_test clients:1` → poll `multiplayer_test_status` until `connectionCount` reaches returned `expectedConnections` → `stop_multiplayer_test disconnect:true` | one real `sbox.exe -joinlocal` client appears and joins above the returned pre-spawn `baselineConnections`; a newly created lobby is private/hidden; stop returns `stopped:true` with empty `remainingPids`. Allow about 80 seconds and roughly 4.5 GB RAM | [ ] |
+| P8 | Multiplayer guardrails | while disconnected call `start_multiplayer_test clients:2 maxPlayers:2`; after P7 has started, call `start_multiplayer_test clients:1` again | first call rejects host-plus-client capacity without creating a lobby/process; second rejects an overlapping tracked run without launching another client | [ ] |
 
 **Honest limit:** the harness proves controls *fire* and state transitions happen; it is
 not a substitute for a human playtest of **feel** (no analog input synthesis — see
@@ -128,5 +139,6 @@ verification after changes near file/path code:
   fingerprint with `handlerCount`, don't trust silence.
 - Screenshots on the native surface are **inline**; only the legacy path writes
   `<sbox>/screenshots/*.png` files.
-- Networking scaffolds verify as code generation + compile; a running lobby is needed to
-  verify actual replication.
+- Networking scaffolds verify as code generation + compile. The local multiplayer harness can
+  create a real host/client session for host-side replication assertions, but it cannot inspect
+  or drive the separate client window.

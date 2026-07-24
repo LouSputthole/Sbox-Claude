@@ -107,11 +107,22 @@ try {
   const stText = (st.content ?? []).map((c) => c.text).join("\n");
   check("search_tools finds create_gameobject", stText.includes("create_gameobject"));
 
+  const mt = await rpc("tools/call", {
+    name: "search_tools",
+    arguments: { query: "multiplayer test" },
+  });
+  const mtText = (mt.content ?? []).map((c) => c.text).join("\n");
+  const multiplayerTools = ["start_multiplayer_test", "multiplayer_test_status", "stop_multiplayer_test"];
+  const missingMultiplayer = multiplayerTools.filter((name) => !mtText.includes(name));
+  check("search_tools finds multiplayer harness", missingMultiplayer.length === 0,
+    missingMultiplayer.length ? `missing: ${missingMultiplayer.join(", ")}` : multiplayerTools.join(", "));
+
   // 4. read-only spot-runs
   const spots = [
     ["get_bridge_status", {}],
     ["get_project_info", {}],
     ["is_playing", {}],
+    ["multiplayer_test_status", {}],
     ["get_scene_hierarchy", { maxDepth: 1 }],
     ["list_prefabs", {}],
     ["describe_type", { name: "ModelRenderer" }],
@@ -136,7 +147,8 @@ try {
     check("find_objects nullable binding", false, e.message.slice(0, 160));
   }
 
-  // 5. mutating round-trip
+  // 5. mutating round-trip + exact stringified-object rotation receipt
+  let verifyObjectId = null;
   try {
     const created = await callTool("create_gameobject", {
       name: "__mcp_verify", position: "0,0,5000",
@@ -144,11 +156,32 @@ try {
     const idMatch = created.text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
     check("create_gameobject returns GUID", !!idMatch, idMatch?.[0] ?? created.text.slice(0, 80));
     if (idMatch) {
-      const del = await callTool("delete_gameobject", { id: idMatch[0] });
+      verifyObjectId = idMatch[0];
+      try {
+        const transformed = await callTool("set_transform", {
+          id: verifyObjectId,
+          // Deliberately out of schema order: semantic key parsing must survive ToolRegistry stringification.
+          rotation: { yaw: 90, roll: 0, pitch: 0 },
+        });
+        const receipt = JSON.parse(transformed.text);
+        const yaw = receipt.after?.world?.rotation?.yaw;
+        check("set_transform preserves stringified rotation keys",
+          Number.isFinite(yaw) && Math.abs(yaw - 90) < 0.1,
+          `reported yaw=${JSON.stringify(yaw)}`);
+      } catch (e) {
+        check("set_transform stringified rotation", false, e.message.slice(0, 160));
+      }
+
+      const del = await callTool("delete_gameobject", { id: verifyObjectId });
+      verifyObjectId = null;
       check("delete_gameobject round-trip", true, del.text.slice(0, 60).replace(/\n/g, " "));
     }
   } catch (e) {
     check("mutating round-trip", false, e.message.slice(0, 160));
+  } finally {
+    if (verifyObjectId) {
+      try { await callTool("delete_gameobject", { id: verifyObjectId }); } catch { }
+    }
   }
 
   // 6. inline image
@@ -160,6 +193,42 @@ try {
     check("take_screenshot inline image", false, e.message.slice(0, 160));
   }
 
+  // 6b. Rotation binding regression: capture_view's native wrapper receives an object,
+  // ToolRegistry stringifies it for the historical string contract, and the shared parser
+  // must still recover pitch/yaw/roll instead of calling TryGetProperty on a JSON string.
+  try {
+    const rotated = await callTool("capture_view", {
+      position: "0,0,5000",
+      rotation: { roll: 0, yaw: 90, pitch: 0 },
+      width: 320,
+      height: 180,
+      renderUI: false,
+    });
+    check("capture_view accepts stringified rotation object", rotated.images.length > 0,
+      rotated.images.length ? `${rotated.images[0].data.length} b64 chars` : rotated.text.slice(0, 120));
+  } catch (e) {
+    check("capture_view rotation binding", false, e.message.slice(0, 160));
+  }
+
+  // 6c. The strict camera-bookmark parser must also unwrap a stringified rotation object
+  // semantically, then return the resolved pose. Always remove the session bookmark.
+  const rotationBookmark = "__mcp_rotation_verify";
+  try {
+    const saved = await callTool("save_camera_bookmark", {
+      name: rotationBookmark,
+      position: "0,0,5000",
+      rotation: { roll: 0, yaw: 90, pitch: 0 },
+    });
+    const receipt = JSON.parse(saved.text);
+    const yaw = receipt.bookmark?.rotation?.yaw;
+    check("save_camera_bookmark preserves stringified rotation keys",
+      Number.isFinite(yaw) && Math.abs(yaw - 90) < 0.1,
+      `reported yaw=${JSON.stringify(yaw)}`);
+  } catch (e) {
+    check("save_camera_bookmark stringified rotation", false, e.message.slice(0, 160));
+  } finally {
+    try { await callTool("delete_camera_bookmark", { name: rotationBookmark }); } catch { }
+  }
   // 7. error semantics: unknown GUID should be a readable tool error
   try {
     await callTool("delete_gameobject", { id: "00000000-0000-0000-0000-000000000000" });

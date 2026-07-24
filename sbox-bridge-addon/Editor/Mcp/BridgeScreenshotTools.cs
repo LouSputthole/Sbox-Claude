@@ -1,4 +1,5 @@
 using System;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Editor;
@@ -10,7 +11,7 @@ using Sandbox;
 /// Hand-written — unlike the generated wrappers these convert the bridge's PNG-file
 /// results into McpResult.Image so the agent sees the picture directly.
 /// </summary>
-[McpToolset( "bridge_screenshot", "Capture the scene as inline PNG images: the main camera view, a framed shot of any GameObject, a free camera position, or a multi-angle orbit around an object. Works in edit and play mode (play mode captures the running game, HUD included)." )]
+[McpToolset( "bridge_screenshot", "Capture inline PNG images from the main camera, framed/free viewpoints, object orbits, saved session camera bookmarks, ordered comparison sets, or a deterministic orthographic top-down view. Works in edit and play mode; temporary cameras are removed after every capture." )]
 public static class BridgeScreenshotTools
 {
 	/// <summary>
@@ -83,14 +84,21 @@ public static class BridgeScreenshotTools
 			throw new Exception( "No active scene" );
 		if ( !Guid.TryParse( id, out var guid ) )
 			throw new Exception( $"id must be a GameObject GUID, got: {id}" );
-		var go = scene.Directory.FindByGuid( guid )
+		var go = ClaudeBridge.ResolveGameObject( scene, id )
 			?? throw new Exception( $"GameObject not found: {id}" );
 
+		if ( !double.IsFinite( elevation ) )
+			throw new Exception( "elevation must be finite" );
+		if ( distance.HasValue && (!double.IsFinite( distance.Value )
+			|| distance.Value <= 0.0 || distance.Value > float.MaxValue) )
+			throw new Exception( "distance must be a finite number greater than zero" );
 		shots = Math.Clamp( shots, 2, 8 );
 		var box = go.GetBounds();
 		var center = box.Center;
 		float size = box.Size.Length; if ( size < 1f ) size = 128f;
 		float dist = (float)( distance ?? Math.Max( size * 1.6f, 150f ) );
+		if ( !float.IsFinite( dist ) || dist <= 0f )
+			throw new Exception( "Resolved camera distance must fit in a positive finite float" );
 		float elev = (float)Math.Clamp( elevation, 0.0, 1.0 );
 
 		var result = McpResult.Text( $"Orbit of '{go.Name}' — {shots} angles, distance {dist:0}, elevation {elev:0.##}. Angles are evenly spaced yaw steps starting at 0°." );
@@ -108,6 +116,114 @@ public static class BridgeScreenshotTools
 		return result;
 	}
 
+	/// <summary>
+	/// Save or replace a named camera bookmark in editor-session memory. Pass targetId to save the
+	/// bridge's deterministic framed view of a GameObject, position plus lookAt/rotation for an
+	/// explicit pose, or omit both to snapshot the current main camera. Returns the resolved pose.
+	/// Bookmarks reset on addon hotload or editor restart; list them with list_camera_bookmarks and
+	/// capture an ordered group with capture_camera_set.
+	/// </summary>
+	/// <param name="name">Bookmark name (case-insensitive, 1-64 characters).</param>
+	/// <param name="targetId">GameObject GUID to resolve into a deterministic framed pose.</param>
+	/// <param name="position">Explicit camera position as "x,y,z".</param>
+	/// <param name="lookAt">World point to aim at as "x,y,z"; pair with position.</param>
+	/// <param name="rotation">Explicit camera rotation as "pitch,yaw,roll"; alternative to lookAt.</param>
+	/// <param name="fov">Field of view in degrees (clamped 1-179). Defaults to 80, or the main camera FOV when snapshotting it.</param>
+	[McpTool( "save_camera_bookmark" )]
+	public static Task<object> SaveCameraBookmark( string name, string targetId = null,
+		string position = null, string lookAt = null, string rotation = null, double? fov = null )
+		=> McpGate.Run( "save_camera_bookmark", McpGate.Args(
+			("name", name), ("targetId", targetId), ("position", position), ("lookAt", lookAt),
+			("rotation", rotation), ("fov", fov) ) );
+
+	/// <summary>
+	/// List all session-scoped camera bookmarks in stable name order. Returns each resolved position,
+	/// rotation, optional lookAt/target, FOV, and save time. Read-only; bookmarks reset on addon
+	/// hotload or editor restart. Feed names into capture_camera_set.
+	/// </summary>
+	[McpTool.ReadOnly( "list_camera_bookmarks" )]
+	public static Task<object> ListCameraBookmarks()
+		=> McpGate.Run( "list_camera_bookmarks", McpGate.Args() );
+
+	/// <summary>
+	/// Delete one session-scoped camera bookmark and its comparison baselines. Returns deleted=false
+	/// when the name was already absent. Use list_camera_bookmarks to inspect what remains.
+	/// </summary>
+	/// <param name="name">Bookmark name to delete (case-insensitive).</param>
+	[McpTool( "delete_camera_bookmark" )]
+	public static Task<object> DeleteCameraBookmark( string name )
+		=> McpGate.Run( "delete_camera_bookmark", McpGate.Args( ("name", name) ) );
+
+	/// <summary>
+	/// Capture 1-8 saved camera bookmarks in the exact requested order and return a labeled JSON
+	/// manifest followed by one inline PNG per bookmark. Captures are capped at 1600x1200 and eight
+	/// million aggregate pixels. Every run becomes the session baseline for the same bookmark and
+	/// settings; comparePrevious uses SkiaSharp RGBA metrics against that prior capture. renderUI
+	/// defaults false for stable comparisons. Occlusion checks use physics traces and are diagnostic:
+	/// they never move the saved camera.
+	/// </summary>
+	/// <param name="names">Saved bookmark names in desired output order (1-8, no duplicates).</param>
+	/// <param name="comparePrevious">Compare each image with the previous session capture using the same name, dimensions, and renderUI setting.</param>
+	/// <param name="diffThreshold">Per-channel threshold (0-255) used for changedPixelPercent. Default 8.</param>
+	/// <param name="width">Image width in pixels (16-1600). Default 960.</param>
+	/// <param name="height">Image height in pixels (16-1200). Default 540.</param>
+	/// <param name="renderUI">Include screen-space UI. Defaults false for deterministic visual comparisons.</param>
+	/// <param name="checkOcclusion">Trace from camera to lookAt and report blocking physics geometry. Default true.</param>
+	[McpTool( "capture_camera_set" )]
+	public static Task<object> CaptureCameraSet( string[] names, bool comparePrevious = false,
+		int diffThreshold = 8, int width = 960, int height = 540, bool renderUI = false,
+		bool checkOcclusion = true )
+	{
+		var captures = CameraCaptureService.CaptureSet(
+			names,
+			width,
+			height,
+			renderUI,
+			comparePrevious,
+			diffThreshold,
+			checkOcclusion );
+		var result = McpResult.Text( JsonSerializer.Serialize(
+			CameraCaptureService.CaptureManifest( captures ),
+			new JsonSerializerOptions { WriteIndented = true } ) );
+		foreach ( var capture in captures.Captures )
+			result = result.WithImage( capture.Png, "image/png" );
+		return Task.FromResult<object>( result );
+	}
+
+	/// <summary>
+	/// Capture a deterministic orthographic top-down PNG over a GameObject or explicit world center.
+	/// Returns a JSON manifest followed by the inline image. The manifest records the fixed camera
+	/// pose, ground-plane bounds, screen axes, and world-units-per-pixel so agents can place or
+	/// measure objects from the image. renderUI defaults false; dimensions are capped at 1600x1200.
+	/// </summary>
+	/// <param name="targetId">GameObject GUID whose bounds determine center, ground Z, and default worldHeight.</param>
+	/// <param name="center">Explicit top-down center as "x,y,z"; use instead of targetId.</param>
+	/// <param name="worldHeight">Vertical ground-plane span in world units (screen-up/world +X). Defaults to aspect-aware target bounds + 25%, or 1024 for explicit center.</param>
+	/// <param name="cameraHeight">Camera height above center. Does not change orthographic scale. Defaults to worldHeight*2 with additional clearance above tall targets.</param>
+	/// <param name="width">Image width in pixels (16-1600). Default 1024.</param>
+	/// <param name="height">Image height in pixels (16-1200). Default 1024.</param>
+	/// <param name="renderUI">Include screen-space UI. Default false.</param>
+	[McpTool( "capture_topdown" )]
+	public static Task<object> CaptureTopdown( string targetId = null, string center = null,
+		double? worldHeight = null, double? cameraHeight = null, int width = 1024,
+		int height = 1024, bool renderUI = false )
+	{
+		Vector3? parsedCenter = string.IsNullOrWhiteSpace( center )
+			? null
+			: CameraCaptureService.ParseVector3String( center, "center" );
+		var capture = CameraCaptureService.CaptureTopdown(
+			targetId,
+			parsedCenter,
+			worldHeight.HasValue ? (float?)worldHeight.Value : null,
+			cameraHeight.HasValue ? (float?)cameraHeight.Value : null,
+			width,
+			height,
+			renderUI );
+		var result = McpResult.Text( JsonSerializer.Serialize(
+			CameraCaptureService.TopdownManifest( capture ),
+			new JsonSerializerOptions { WriteIndented = true } ) );
+		return Task.FromResult<object>( result.WithImage( capture.Png, "image/png" ) );
+	}
 	// ── shared capture plumbing ─────────────────────────────────────
 
 	/// <summary>Run the capture_view handler and convert its PNG-file result to an inline image.</summary>
@@ -124,8 +240,13 @@ public static class BridgeScreenshotTools
 		var path = result?.GetType().GetProperty( "path" )?.GetValue( result ) as string;
 		if ( string.IsNullOrEmpty( path ) || !System.IO.File.Exists( path ) )
 			throw new Exception( "Capture produced no PNG file" );
-		var bytes = System.IO.File.ReadAllBytes( path );
-		try { System.IO.File.Delete( path ); } catch { /* temp file, best-effort */ }
-		return bytes;
+		try
+		{
+			return System.IO.File.ReadAllBytes( path );
+		}
+		finally
+		{
+			try { System.IO.File.Delete( path ); } catch { /* temp file, best-effort */ }
+		}
 	}
 }

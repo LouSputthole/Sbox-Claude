@@ -2,7 +2,7 @@
 
 v2.0.0 moves the bridge onto **s&box's built-in editor MCP server** (shipped in the editor
 since July 2026, on by default at `http://127.0.0.1:7269/mcp`). The file-IPC transport and
-the big stdio tool server are replaced by `[McpTool]` methods the engine discovers itself.
+the big stdio tool server are replaced on the primary path by `[McpTool]` methods the engine discovers itself; the old path remains compiled as a compatibility fallback.
 
 > For the big picture — why the rebuild, what creators can now do, the roadmap — see the
 > **[relaunch overview](RELAUNCH.md)**. This page is the practical upgrade guide.
@@ -52,7 +52,8 @@ dropped ours — the built-ins are 1:1 equivalents):
 | `remove_component` | `remove_component` (built-in) |
 
 Same names, same semantics — your workflows keep working; the calls are just served by
-Facepunch's implementations. All six still exist over file IPC until v2.1.0.
+Facepunch's implementations. All six also remain available over the retained file-IPC
+compatibility fallback.
 
 **Invocation pattern.** The native server exposes a few entry points (`search_tools`,
 `call_tool`, `call_tools`, `list_toolsets`, `describe_toolset`) and discovers everything
@@ -95,7 +96,7 @@ UI, world & render (water volumes, render-target cameras, day-night sun), AI & s
 (utility AI, schedule brains, needs, event buses, TTS), **gameplay recording** to
 `.movie` clips, and the **cinematic wave** (lipsync dialogue, built-in camera effects,
 shot-list cutscene authoring, recorded playtests, killcams) — bringing the surface to
-**262 native tools / 275 total / 267 handlers**.
+**273 native tools / 286 total / 278 handlers**.
 The full record is the CHANGELOG's `[Unreleased]` section.
 
 Browse them all in the generated [TOOLSETS.md](TOOLSETS.md); the plain-English tour is
@@ -111,6 +112,6 @@ Browse them all in the generated [TOOLSETS.md](TOOLSETS.md); the plain-English t
 
 ## Timeline
 
-- **v2.0.x** — native surface is primary; file IPC + full stdio server still compiled in
-  and functional (fallback for older engine builds).
-- **v2.1.0** — file IPC, the TS tool layer (except lifeline), and the parity CI retire.
+- **v2.0.0 onward** — the native surface is primary; file IPC + the full stdio server remain compiled
+  and functional as a compatibility fallback for older engine builds.
+- **Future** — retirement of file IPC, the TS tool layer (except lifeline), and parity CI requires a separate compatibility decision; it did not occur in v2.1.0.

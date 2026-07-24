@@ -32,12 +32,12 @@ addon exposes shows up through the server's search.
 
 | | Count |
 |---|---|
-| Tools on the native surface | **262** |
+| Tools on the native surface | **273** |
 | Toolsets (`bridge_*`) | **28** |
-| Read-only tools (no permission prompt) | **53** |
+| Read-only tools (no permission prompt) | **57** |
 | Lifeline tools (editor-down diagnostics) | **7** |
 | Handed to native built-ins (same names) | **6** |
-| **Total tools** | **275** (262 native + 7 lifeline + 6 built-in-served) / **267 handlers** |
+| **Total tools** | **286** (273 native + 7 lifeline + 6 built-in-served) / **278 handlers** |
 
 The generated **[TOOLSETS.md](TOOLSETS.md)** is the authoritative inventory — read it,
 don't memorize it. Agents browse it live with `list_toolsets` / `describe_toolset` and
@@ -176,21 +176,17 @@ guessing about visual outcomes and starts correcting them.
 Tracked in **[TOOL_BACKLOG.md](TOOL_BACKLOG.md)**. Labeled **planned** on purpose — none of
 this is in v2.0.0:
 
-- **v2.1.0 retirement of the legacy path.** The v1.x file-IPC transport and the full stdio
-  TS tool layer (everything except the lifeline) are compiled-in and functional through
-  v2.0.x as a fallback for older engine builds, and **retire in v2.1.0** once the native
-  path proves out across the Asset Library user base.
+- **Legacy retirement is deferred.** The v1.x file-IPC transport and full stdio TS tool layer (everything except the lifeline) remain compiled and functional as a compatibility fallback. Removing them requires a separate migration decision; it did not happen in v2.1.0.
 - **Remaining Tier-2 scaffolds** — ✅ **largely done**: the v2.1.0 waves
   (2026-07-12/13) complete the Tier-2 backlog by theme — economy & saves, stats &
   achievements, round-flow & UI, world & render, AI & systems, plus the cinematic wave
   (lipsync dialogue, camera effects, clip authoring, recorded playtests, killcams) — with
   the few leftovers deliberately skipped for verified reasons (see TOOL_BACKLOG.md).
-- **Multiplayer test harness** — spawn N local clients, drive each via `playtest`, assert
-  sync. **Likely unblocked** (docs-audit finding 2026-07-13): the official
-  testing-multiplayer docs now describe "Join via new instance" plus `connect local` /
-  `reconnect` console commands, so the engine's local test path appears to have shipped —
-  one live verification session away; the top next-wave candidate (see TOOL_BACKLOG.md).
-- **Typed DTO returns** for hot read tools (`get_scene_hierarchy`, `find_objects`,
+- **Multiplayer test harness** — ✅ **upstreamed in `[Unreleased]`**: launch up to two real
+  `sbox.exe -joinlocal` clients, poll the host-side roster, compose with replication
+  inspection/playtest tools, and clean up tracked processes. The engine path was live-proven;
+  the canonical registration/wrapper patch has passed source and offline gates, with release
+  smoke still tracked in TESTING.md (see TOOL_BACKLOG.md).- **Typed DTO returns** for hot read tools (`get_scene_hierarchy`, `find_objects`,
   `get_bridge_status`) → `outputSchema` + `structuredContent`, so agents plan around
   fields instead of parsing text.
 - **`MovieRecorder`** — ✅ **shipped in v2.1.0**: the engine's

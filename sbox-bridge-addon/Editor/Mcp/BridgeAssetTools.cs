@@ -37,6 +37,18 @@ public static class BridgeAssetTools
 		=> McpGate.Run( "get_asset_info", McpGate.Args( ( "path", path ) ) );
 
 	/// <summary>
+	/// Inspect a mounted model before placement without creating a GameObject. Returns
+	/// model-local/default-pose aggregate, render, and physics bounds with provenance; footprint,
+	/// height, pivot-to-bottom grounding offset; and capped model metadata. Rejects missing/error
+	/// models. Use placement.groundingOffsetZ for an unrotated scale-1 ground offset, then verify the
+	/// placed object with get_bounds.
+	/// </summary>
+	/// <param name="path">Mounted model path, e.g. 'models/dev/box.vmdl'.</param>
+	[McpTool.ReadOnly( "inspect_model_geometry" )]
+	public static Task<object> InspectModelGeometry( string path )
+		=> McpGate.Run( "inspect_model_geometry", McpGate.Args( ( "path", path ) ) );
+
+	/// <summary>
 	/// Install a community asset package into the project by its ident (e.g. 'facepunch.flatgrass').
 	/// Adds it as a project dependency. Returns { installed, ident, name, path, relativePath,
 	/// restartRecommended, note } — pass the returned path to spawn_model / assign_model. CAUTION: if

@@ -20,11 +20,12 @@ Claude Code → (streamable HTTP) → s&box native MCP server → [McpTool] meth
   `sbox-bridge-addon/Editor/MyEditorMenu.cs` are unchanged from v1; the `[McpTool]` methods
   delegate to them through `McpGate` (play-mode guard, handler lookup, error-object → thrown
   tool error).
-- **The TypeScript server survives in two shrinking roles.** As the **lifeline**
+- **The TypeScript server survives in two compatibility roles.** As the **lifeline**
   (`npx -y sbox-mcp-server@2 --lifeline`): 7 editor-down diagnostics tools that keep working
   when the editor — and the native server with it — is dead. And as the **legacy file-IPC
-  fallback** (`%TEMP%/sbox-bridge-ipc/`, 50 ms polling) for older engine builds, which
-  **retires in v2.1.0**. Root `TROUBLESHOOTING.md` covers the legacy transport;
+  fallback** (`%TEMP%/sbox-bridge-ipc/`, 50 ms polling) for older engine builds. It remains
+  available but is not the default; retirement requires a separate compatibility decision.
+  Root `TROUBLESHOOTING.md` covers the legacy transport;
   `docs/TROUBLESHOOTING.md` covers the native one.
 - **Six tool names are deliberately absent** from our surface — the native built-ins own
   them 1:1: `spawn_model`, `list_scenes`, `save_scene`, `undo`, `redo`, `remove_component`.
@@ -51,7 +52,7 @@ Two kinds, per ADDING-A-TOOL:
 | Kind | Where the change goes |
 |---|---|
 | New native tool (all new tools from v2.0 on) | hand-written `[McpTool]` method in `Editor/Mcp/` or next to its handler family |
-| Change to an existing **wrapped** tool | edit the TS zod schema, re-run the codegen (below) — the TS schemas remain the source for the generated wrapper layer through v2.0.x |
+| Change to an existing **wrapped** tool | edit the TS zod schema, re-run the codegen (below) — the TS schemas remain the source for the current generated wrapper layer |
 
 ## Development setup
 
@@ -120,7 +121,7 @@ every release; a code review has not.
 | Gate | What it catches |
 |---|---|
 | `npm ci && npm run build` | the TS server must compile |
-| `node scripts/audit-parity.mjs` | TS tools ↔ C# handlers parity + 4-way version lock (retires with the legacy path in v2.1.0) |
+| `node scripts/audit-parity.mjs` | TS tools ↔ C# handlers parity + 4-way version lock (kept in lockstep while the compatibility fallback ships) |
 | `npm test` | transport-client regressions (heartbeat staleness, timeout diagnostics, IPC-dir override) |
 | Codegen freshness | re-runs `extract-manifest` + `emit-mcp-wrappers`, then `git diff --exit-code` on `scripts/tools-manifest.json`, `sbox-bridge-addon/Editor/Mcp`, `docs/TOOLSETS.md` — a dirty tree means someone edited schemas without regenerating (or hand-edited a generated file) |
 | `node scripts/audit-mcp-quality.mjs` | tool-name collisions (hard fail — collisions are silent tool loss) + description quality warnings |

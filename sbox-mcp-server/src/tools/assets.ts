@@ -110,6 +110,23 @@ export function registerAssetTools(
     }
   );
 
+  // ── inspect_model_geometry ───────────────────────────────────────
+  server.tool(
+    "inspect_model_geometry",
+    "Inspect a mounted model before placement without creating a GameObject. Returns model-local/default-pose aggregate, render, and physics bounds with provenance; footprint, height, pivot-to-bottom grounding offset; and capped model metadata. Rejects missing/error models. Use placement.groundingOffsetZ for an unrotated scale-1 ground offset, then verify the placed object with get_bounds.",
+    {
+      path: z.string().describe("Mounted model path, e.g. 'models/dev/box.vmdl'"),
+    },
+    async (params) => {
+      const res = await bridge.send("inspect_model_geometry", params);
+      if (!res.success) {
+        return { content: [{ type: "text", text: `Error: ${res.error}` }] };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }],
+      };
+    }
+  );
   // ── copy_asset_with_dependencies ─────────────────────────────────
   server.tool(
     "copy_asset_with_dependencies",

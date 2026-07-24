@@ -28,6 +28,18 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "align_objects", McpGate.Args( ( "ids", ids ), ( "axis", axis ), ( "mode", mode ) ) );
 
 	/// <summary>
+	/// Commit a dry-run plan returned by place_along_path, grid_duplicate, or scatter_props. Plans are
+	/// scene-scoped, capped, and expire after 10 minutes. Success consumes the plan; a complete
+	/// rollback restores it for retry. The stored transforms are applied without rerolling randomness
+	/// or repeating ground traces. Creation rolls back on failure; grid commits reject a
+	/// changed/missing source before creating anything. Returns slot-to-GUID receipts.
+	/// </summary>
+	/// <param name="planId">Plan id returned by a placement tool with dryRun:true.</param>
+	[McpTool( "commit_placement_plan" )]
+	public static Task<object> CommitPlacementPlan( string planId )
+		=> McpGate.Run( "commit_placement_plan", McpGate.Args( ( "planId", planId ) ) );
+
+	/// <summary>
 	/// Create a new GameObject in the active scene. Returns its GUID for future reference.
 	/// </summary>
 	/// <param name="name">Display name (e.g. 'Player', 'Enemy Spawn Point'). Defaults to 'New Object'.</param>
@@ -85,6 +97,25 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "find_objects", McpGate.Args( ( "name", name ), ( "component", component ), ( "tag", tag ), ( "limit", limit ) ) );
 
 	/// <summary>
+	/// Find GameObjects within a world-space radius of exactly one explicit position or originId,
+	/// sorted nearest first. Optional name/component/tag filters are applied before the capped result,
+	/// and the Scene root is excluded. Returns pivot-distance results plus
+	/// requestedRadius/radiusClamped and total/showing/truncated/scanned; it deliberately does not
+	/// pretend render or collider overlap is pivot distance. Read-only and play-aware.
+	/// </summary>
+	/// <param name="position">World-space search center; use instead of originId. As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="originId">GameObject GUID whose world position is the center.</param>
+	/// <param name="radius">Search radius in world units (default 256, max 1,000,000).</param>
+	/// <param name="limit">Maximum results (default 50).</param>
+	/// <param name="name">Case-insensitive GameObject name substring.</param>
+	/// <param name="component">Required component type name.</param>
+	/// <param name="tag">Required GameObject tag.</param>
+	/// <param name="includeOrigin">Include originId itself (default false).</param>
+	[McpTool.ReadOnly( "find_objects_near" )]
+	public static Task<object> FindObjectsNear( string position = null, string originId = null, double? radius = null, int? limit = null, string name = null, string component = null, string tag = null, bool? includeOrigin = null )
+		=> McpGate.Run( "find_objects_near", McpGate.Args( ( "position", position ), ( "originId", originId ), ( "radius", radius ), ( "limit", limit ), ( "name", name ), ( "component", component ), ( "tag", tag ), ( "includeOrigin", includeOrigin ) ) );
+
+	/// <summary>
 	/// Highlight a GameObject by selecting it in the editor. NOTE: s&amp;box exposes no dedicated focus
 	/// API, so this only sets the selection — it does NOT move any camera (returns { focused, id, note
 	/// } saying so). To actually point the viewport at an object use frame_camera; to aim a screenshot
@@ -96,11 +127,11 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "focus_object", McpGate.Args( ( "id", id ) ) );
 
 	/// <summary>
-	/// Get a GameObject's world-space bounding box. Returns { id, name, center, size, extents, mins,
-	/// maxs, radius, position, empty } — objects with no renderer report empty:true (bounds collapse to
-	/// the world position) plus an explanatory note. Feed center/radius into screenshot_from or
-	/// frame_camera to frame the object, or use mins/maxs for placement math (screenshot_orbit calls
-	/// this internally).
+	/// Get provenance-rich world bounds for a GameObject. Preserves legacy top-level
+	/// center/size/extents/mins/maxs/radius/position/empty for compatibility, and adds render plus
+	/// independent physics and solidPhysics aggregates. Collider outputs include trigger policy, capped
+	/// contributor GameObject IDs and component type names, unsupported counts, and the exact API
+	/// source. Read-only and play-aware.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to measure.</param>
 	[McpTool.ReadOnly( "get_bounds" )]
@@ -138,17 +169,20 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "get_tags", McpGate.Args( ( "id", id ) ) );
 
 	/// <summary>
-	/// Clone a GameObject into an X/Y/Z grid with fixed spacing (the original stays in place). Each
-	/// count is clamped to 50 and total clones to 500. Great for fences, crates, pillars, foliage rows.
+	/// Clone a GameObject into an X/Y/Z grid. Existing calls mutate immediately and keep the legacy
+	/// result. Use dryRun:true to preview exact capped transforms and receive a planId;
+	/// commit_placement_plan then clones atomically and rejects the commit if the source transform or
+	/// parent changed after preview.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to clone.</param>
 	/// <param name="countX">Copies along X (default 1).</param>
 	/// <param name="countY">Copies along Y (default 1).</param>
 	/// <param name="countZ">Copies along Z (default 1).</param>
 	/// <param name="spacing">Spacing between copies per axis (default 100,100,100). As "x,y,z" (or JSON {x,y,z}).</param>
+	/// <param name="dryRun">Preview only: return deterministic transforms and planId without cloning.</param>
 	[McpTool( "grid_duplicate" )]
-	public static Task<object> GridDuplicate( string id, int? countX = null, int? countY = null, int? countZ = null, string spacing = null )
-		=> McpGate.Run( "grid_duplicate", McpGate.Args( ( "id", id ), ( "countX", countX ), ( "countY", countY ), ( "countZ", countZ ), ( "spacing", spacing ) ) );
+	public static Task<object> GridDuplicate( string id, int? countX = null, int? countY = null, int? countZ = null, string spacing = null, bool? dryRun = null )
+		=> McpGate.Run( "grid_duplicate", McpGate.Args( ( "id", id ), ( "countX", countX ), ( "countY", countY ), ( "countZ", countZ ), ( "spacing", spacing ), ( "dryRun", dryRun ) ) );
 
 	/// <summary>
 	/// Parent a set of GameObjects under a new empty group object (placed at their centroid) — tidies
@@ -210,12 +244,10 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "replace_model", McpGate.Args( ( "model", model ), ( "id", id ), ( "ids", ids ) ) );
 
 	/// <summary>
-	/// Scatter N copies of a model randomly within a radius around a center point — instant foliage,
-	/// rocks, debris. Each copy gets a random yaw and (by default) is snapped to the ground. Seeded for
-	/// reproducibility; copies are grouped under one parent by default. Count capped at 300. Returns {
-	/// scattered, groupId, seed } — individual prop GUIDs are not returned, so use groupId with
-	/// get_scene_hierarchy (rootId) to enumerate them, or with set_transform/delete_gameobject to
-	/// move/remove the whole batch.
+	/// Scatter seeded model copies inside a radius. Existing calls mutate immediately and keep the
+	/// legacy { scattered, groupId, seed } result. Use dryRun:true to resolve random transforms and
+	/// ground traces once, returning per-slot transforms, ground status, warnings, model bounds, and
+	/// planId; commit_placement_plan creates exactly that preview with rollback on failure.
 	/// </summary>
 	/// <param name="model">Model path to scatter, e.g. 'models/dev/box.vmdl'.</param>
 	/// <param name="center">Centre of the scatter area (default origin). As "x,y,z" (or JSON {x,y,z}).</param>
@@ -229,9 +261,10 @@ public static class BridgeGameObjectTools
 	/// <param name="seed">PRNG seed for a reproducible layout (default 1).</param>
 	/// <param name="group">Parent all copies under one group object (default true).</param>
 	/// <param name="name">Base name for the props/group (default 'Prop').</param>
+	/// <param name="dryRun">Preview only: return deterministic transforms and planId without creating props.</param>
 	[McpTool( "scatter_props" )]
-	public static Task<object> ScatterProps( string model, string center = null, double? radius = null, int? count = null, bool? randomYaw = null, bool? snapToGround = null, double? scaleMin = null, double? scaleMax = null, string tint = null, int? seed = null, bool? group = null, string name = null )
-		=> McpGate.Run( "scatter_props", McpGate.Args( ( "model", model ), ( "center", center ), ( "radius", radius ), ( "count", count ), ( "randomYaw", randomYaw ), ( "snapToGround", snapToGround ), ( "scaleMin", scaleMin ), ( "scaleMax", scaleMax ), ( "tint", tint ), ( "seed", seed ), ( "group", group ), ( "name", name ) ) );
+	public static Task<object> ScatterProps( string model, string center = null, double? radius = null, int? count = null, bool? randomYaw = null, bool? snapToGround = null, double? scaleMin = null, double? scaleMax = null, string tint = null, int? seed = null, bool? group = null, string name = null, bool? dryRun = null )
+		=> McpGate.Run( "scatter_props", McpGate.Args( ( "model", model ), ( "center", center ), ( "radius", radius ), ( "count", count ), ( "randomYaw", randomYaw ), ( "snapToGround", snapToGround ), ( "scaleMin", scaleMin ), ( "scaleMax", scaleMax ), ( "tint", tint ), ( "seed", seed ), ( "group", group ), ( "name", name ), ( "dryRun", dryRun ) ) );
 
 	/// <summary>
 	/// Select a GameObject in the editor (highlights it in the hierarchy and scene view). Replaces the
@@ -290,19 +323,20 @@ public static class BridgeGameObjectTools
 		=> McpGate.Run( "set_tint", McpGate.Args( ( "id", id ), ( "ids", ids ), ( "tint", tint ), ( "color", color ) ) );
 
 	/// <summary>
-	/// Set position, rotation, and/or scale on a GameObject. Only provided values are changed; values
-	/// apply in world space unless local=true. Returns { transformed, gameObject } with the full
-	/// serialized object (id, name, position, rotation, scale, components) so you can verify what
-	/// actually applied.
+	/// Atomically set position, rotation, and/or scale on a GameObject. All supplied values are parsed
+	/// before mutation; values apply in world space by default. Prefer space='local' or space='world';
+	/// local remains a legacy alias. Returns legacy { transformed, gameObject } plus before/after
+	/// transform and bounds receipts.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject.</param>
 	/// <param name="position">New position. As "x,y,z" (or JSON {x,y,z}).</param>
 	/// <param name="rotation">New rotation. As "pitch,yaw,roll" degrees.</param>
 	/// <param name="scale">New scale — uniform number, per-axis object {x,y,z}, or comma string "x,y,z". As "x,y,z" (or JSON {x,y,z}).</param>
-	/// <param name="local">If true, values are in local space. Default is world space.</param>
+	/// <param name="local">Legacy alias: true selects local space and false selects world space.</param>
+	/// <param name="space">Explicit transform space. If supplied with local, both values must agree. One of: world | local.</param>
 	[McpTool( "set_transform" )]
-	public static Task<object> SetTransform( string id, string position = null, string rotation = null, string scale = null, bool? local = null )
-		=> McpGate.Run( "set_transform", McpGate.Args( ( "id", id ), ( "position", position ), ( "rotation", rotation ), ( "scale", scale ), ( "local", local ) ) );
+	public static Task<object> SetTransform( string id, string position = null, string rotation = null, string scale = null, bool? local = null, string space = null )
+		=> McpGate.Run( "set_transform", McpGate.Args( ( "id", id ), ( "position", position ), ( "rotation", rotation ), ( "scale", scale ), ( "local", local ), ( "space", space ) ) );
 
 	/// <summary>
 	/// Drop a GameObject straight down onto the surface below it (physics raycast). Works best on

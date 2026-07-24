@@ -9,7 +9,7 @@ results still win when an SDK or wrapper has changed.
 | Which math is sandbox-safe is NOT "MathX only" | `MathX` is always safe but small: it has `Clamp`/`Lerp`/`LerpInverse`/`Remap`/`Floor`/`FloorToInt`/`ExponentialDecay`, but no `Abs`/`Min`/`Max`/`Sin`/`Cos`/`Atan2`/`Sqrt`/`Pow`/`PI`. Many projects also whitelist `System.Math` and `System.MathF`. Prefer `MathX` for what it has; use `System.Math`/`MathF` only after reflection or a compile check confirms the project allows them. |
 | Cloud-only assets such as `Cloud.Model("foo")` do not persist across project restarts | Use local files or core engine assets. |
 | s&box does not support `.mp3` | Convert it to `.wav`. |
-| A saved `[Property]` value is deserialized over the field initializer | Treat field initializers as defaults that the inspector may override. |
+| A saved scene/prefab `[Property]` value is authoritative over the field initializer | Treat field initializers only as fallbacks when no serialized value exists (for example, a newly added component or property). Tune existing instances through the project-owned helper named by its instructions (for example `python tools/tune_player.py Prop=Value`) or a targeted property tool; never regenerate or re-save a prefab merely to synchronize it with code defaults, and read back only the properties you intended to change. |
 | `TimeSince` fields start at zero, so cooldowns may fire immediately on spawn | Initialize cooldown timers high, for example `private TimeSince _sinceX = 100f;`. |
 | Hotload can become stale after repeated iterations | Touch and hotload again; if that fails, restart the project. |
 | `Cloud.Model(variable)` fails | The source generator requires a string literal; inline the asset identifier. |

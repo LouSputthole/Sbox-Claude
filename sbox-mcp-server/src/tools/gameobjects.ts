@@ -31,12 +31,15 @@ const Vector3Schema = z
   .describe('3D vector — object {x,y,z} OR comma string "x,y,z"');
 
 const RotationSchema = z
-  .object({
-    pitch: z.number().describe("Pitch angle in degrees"),
-    yaw: z.number().describe("Yaw angle in degrees"),
-    roll: z.number().describe("Roll angle in degrees"),
-  })
-  .describe("Euler rotation with pitch, yaw, roll in degrees");
+  .union([
+    z.object({
+      pitch: z.number().describe("Pitch angle in degrees"),
+      yaw: z.number().describe("Yaw angle in degrees"),
+      roll: z.number().describe("Roll angle in degrees"),
+    }),
+    z.string().describe('Comma string "pitch,yaw,roll", e.g. "0,90,0"'),
+  ])
+  .describe('Euler rotation: object {pitch,yaw,roll} OR comma string "pitch,yaw,roll"');
 
 export function registerGameObjectTools(
   server: McpServer,
@@ -177,7 +180,7 @@ export function registerGameObjectTools(
   // ── set_transform ────────────────────────────────────────────────
   server.tool(
     "set_transform",
-    "Set position, rotation, and/or scale on a GameObject. Only provided values are changed; values apply in world space unless local=true. Returns { transformed, gameObject } with the full serialized object (id, name, position, rotation, scale, components) so you can verify what actually applied.",
+    "Atomically set position, rotation, and/or scale on a GameObject. All supplied values are parsed before mutation; values apply in world space by default. Prefer space='local' or space='world'; local remains a legacy alias. Returns legacy { transformed, gameObject } plus before/after transform and bounds receipts.",
     {
       id: z.string().describe("GUID of the GameObject"),
       position: Vector3Schema.optional().describe("New position"),
@@ -189,7 +192,11 @@ export function registerGameObjectTools(
       local: z
         .boolean()
         .optional()
-        .describe("If true, values are in local space. Default is world space"),
+        .describe("Legacy alias: true selects local space and false selects world space"),
+      space: z
+        .enum(["world", "local"])
+        .optional()
+        .describe("Explicit transform space. If supplied with local, both values must agree"),
     },
     async (params) => {
       const res = await bridge.send("set_transform", params);

@@ -14,7 +14,7 @@ surfaces directly.
 
 ## 1. Discovery — find the tool, then call it
 
-The native server does **not** hand you a flat list of 262 tools. It gives you a few entry
+The native server does **not** hand you a flat list of 273 tools. It gives you a few entry
 points and lets you search:
 
 | Entry point | Use it to |
@@ -77,6 +77,10 @@ Catch the silent breakage before you screenshot:
   **They return the PNG inline as an image block — look at it.** There is no file path to read
   back. Guessing about a visual outcome from code alone is the #1 source of long iteration
   loops; seeing it ends them.
+- **Local multiplayer** — in play mode, `start_multiplayer_test` launches up to two real
+  `sbox.exe -joinlocal` clients; poll `multiplayer_test_status`, assert replication host-side,
+  and always call `stop_multiplayer_test`. Budget about 80 seconds and 4.5 GB RAM per client;
+  the bridge cannot inspect or drive the separate client windows.
 
 ### Summarize
 Report what changed, what you verified, and — honestly — what still needs a human (feel,

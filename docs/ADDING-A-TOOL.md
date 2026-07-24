@@ -9,7 +9,7 @@ Two kinds of tools:
 
 | Kind | Where | When |
 |---|---|---|
-| **Wrapper over an existing bridge handler** | generated — edit the TS zod schema, re-run codegen | while the TS server still exists (v2.0.x) |
+| **Wrapper over an existing bridge handler** | generated — edit the TS zod schema, re-run codegen | current generated-wrapper workflow while the compatibility fallback ships |
 | **New native tool** | hand-written `[McpTool]` method in `Editor/Mcp/` or next to its handler family | all new tools from v2.0 on |
 
 ## The template

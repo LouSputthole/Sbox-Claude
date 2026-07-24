@@ -7,10 +7,11 @@ using System.Threading.Tasks;
 using Editor.Mcp;
 
 /// <summary>
-/// Multiplayer setup and codegen: network helpers, lobby managers, networked players, [Sync]
-/// properties, RPCs (broadcast/host/targeted), ownership, spawning, and host-migration recovery.
+/// Multiplayer setup, local multi-instance testing, and codegen: network helpers, lobby managers,
+/// networked players, [Sync] properties, RPCs (broadcast/host/targeted), ownership, spawning, and
+/// host-migration recovery.
 /// </summary>
-[McpToolset( "bridge_networking", "Multiplayer setup and codegen: network helpers, lobby managers, networked players, [Sync] properties, RPCs (broadcast/host/targeted), ownership, spawning, and host-migration recovery." )]
+[McpToolset( "bridge_networking", "Multiplayer setup, local multi-instance testing, and codegen: network helpers, lobby managers, networked players, [Sync] properties, RPCs (broadcast/host/targeted), ownership, spawning, and host-migration recovery." )]
 public static class BridgeNetworkingTools
 {
 	/// <summary>
@@ -223,6 +224,16 @@ public static class BridgeNetworkingTools
 		=> McpGate.Run( "get_network_status", McpGate.Args() );
 
 	/// <summary>
+	/// Read the host-side state of the local multiplayer test harness without changing it: play/network
+	/// state, connection roster, tracked client PIDs and uptime, and join-wait progress. The bridge
+	/// cannot inspect or drive the separate client windows; use host-side replication inspectors for
+	/// assertions.
+	/// </summary>
+	[McpTool.ReadOnly( "multiplayer_test_status" )]
+	public static Task<object> MultiplayerTestStatus()
+		=> McpGate.Run( "multiplayer_test_status", McpGate.Args() );
+
+	/// <summary>
 	/// Network-enable a GameObject so it is synchronized across all connected clients. Calls
 	/// NetworkSpawn(). Returns { spawned, id } on success — follow with inspect_networked_object to
 	/// confirm the Network state, or set_ownership to hand it to a connection.
@@ -244,4 +255,33 @@ public static class BridgeNetworkingTools
 	[McpTool( "set_ownership" )]
 	public static Task<object> SetOwnership( string id, string connectionId = null )
 		=> McpGate.Run( "set_ownership", McpGate.Args( ( "id", id ), ( "connectionId", connectionId ) ) );
+
+	/// <summary>
+	/// Start a real local multiplayer test from PLAY MODE. Creates an explicitly private, hidden lobby
+	/// when needed, validates capacity, launches 1-2 sbox.exe clients with -joinlocal, and tracks joins
+	/// from the pre-spawn host-side connection baseline. Overlapping tracked runs are rejected so
+	/// unrelated connections cannot falsely satisfy a join wait. Each client can use about 4.5 GB RAM
+	/// and take about 80 seconds to join. Returns spawned PIDs, baseline/expected connection counts,
+	/// and an optional join-wait job; poll multiplayer_test_status and always finish with
+	/// stop_multiplayer_test.
+	/// </summary>
+	/// <param name="clients">Real client processes to launch (default 1; hard cap 2 per run; stop an existing tracked run first).</param>
+	/// <param name="maxPlayers">Lobby capacity when this call creates it (default 4; must fit the host plus all requested clients). Existing lobby capacity is validated instead.</param>
+	/// <param name="waitForJoinSeconds">Host-side join-wait timeout (default 120; 0 returns immediately after launch).</param>
+	[McpTool( "start_multiplayer_test" )]
+	public static Task<object> StartMultiplayerTest( int? clients = null, int? maxPlayers = null, int? waitForJoinSeconds = null )
+		=> McpGate.Run( "start_multiplayer_test", McpGate.Args( ( "clients", clients ), ( "maxPlayers", maxPlayers ), ( "waitForJoinSeconds", waitForJoinSeconds ) ) );
+
+	/// <summary>
+	/// Stop every client process launched by start_multiplayer_test; exited clients are cleared while
+	/// failed live kills remain tracked for retry. Optionally disconnect the host lobby. alsoStrays is
+	/// an explicit recovery switch that kills every sbox.exe game client, including clients not
+	/// launched by this harness; it never targets the sbox-dev editor process. Returns truthful
+	/// stopped/remainingPids, per-process cleanup results, and disconnect status.
+	/// </summary>
+	/// <param name="disconnect">Also disconnect the running host from its networking session (default false).</param>
+	/// <param name="alsoStrays">Also kill untracked sbox.exe game clients (default false; use only for explicit cleanup).</param>
+	[McpTool( "stop_multiplayer_test" )]
+	public static Task<object> StopMultiplayerTest( bool? disconnect = null, bool? alsoStrays = null )
+		=> McpGate.Run( "stop_multiplayer_test", McpGate.Args( ( "disconnect", disconnect ), ( "alsoStrays", alsoStrays ) ) );
 }

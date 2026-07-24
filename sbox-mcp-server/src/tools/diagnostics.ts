@@ -1,8 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
-import { existsSync, readFileSync, statSync, readdirSync } from "fs";
-import { join, dirname } from "path";
+import { existsSync, readFileSync, statSync } from "fs";
+import { join } from "path";
+import { inlineCaptureReply } from "./camera.js";
 
 /**
  * Diagnostic tools (Batch 24 — "let Claude see its own errors"): read s&box's
@@ -65,36 +66,6 @@ function locateSboxLog(): { path: string | null; tried: string[] } {
   return { path: null, tried };
 }
 
-/**
- * Derive the editor's screenshots folder from the located log path
- * (<sbox>/logs/sbox-dev.log → <sbox>/screenshots). SBOX_SCREENSHOTS_DIR overrides.
- */
-function locateScreenshotsDir(): string | null {
-  if (process.env.SBOX_SCREENSHOTS_DIR) return process.env.SBOX_SCREENSHOTS_DIR;
-  const { path } = locateSboxLog();
-  if (!path) return null;
-  return join(dirname(dirname(path)), "screenshots");
-}
-
-/** Newest .png in a dir with mtime strictly greater than afterMs, or null. */
-function newestPng(
-  dir: string,
-  afterMs: number
-): { path: string; mtimeMs: number } | null {
-  try {
-    let best: { path: string; mtimeMs: number } | null = null;
-    for (const f of readdirSync(dir)) {
-      if (!f.toLowerCase().endsWith(".png")) continue;
-      const fp = join(dir, f);
-      const m = statSync(fp).mtimeMs;
-      if (m > afterMs && (!best || m > best.mtimeMs)) best = { path: fp, mtimeMs: m };
-    }
-    return best;
-  } catch {
-    return null;
-  }
-}
-
 function tailLines(text: string, n: number): string[] {
   const lines = text.split(/\r?\n/);
   return lines.slice(Math.max(0, lines.length - n));
@@ -106,10 +77,29 @@ function tailLines(text: string, n: number): string[] {
 const Vector3Schema = z
   .union([
     z.object({ x: z.number(), y: z.number(), z: z.number() }),
-    z.string().describe('Comma string "x,y,z", e.g. "0,0,200"'),
+    z
+      .string()
+      .refine((value) => {
+        const number = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+        const parts = value.split(",").map((part) => part.trim());
+        return (
+          parts.length === 3 &&
+          parts.every(
+            (part) => number.test(part) && Number.isFinite(Number(part))
+          )
+        );
+      }, 'Must contain exactly three finite comma-separated numbers, e.g. "0,0,200"')
+      .describe('Exact comma string "x,y,z", e.g. "0,0,200"'),
   ])
   .describe('World point — object {x,y,z} OR comma string "x,y,z"');
 
+const RotationSchema = z
+  .object({
+    pitch: z.number().finite(),
+    yaw: z.number().finite(),
+    roll: z.number().finite(),
+  })
+  .strict();
 export function registerDiagnosticTools(
   server: McpServer,
   bridge: BridgeClient
@@ -289,36 +279,27 @@ export function registerDiagnosticTools(
     }
   );
 
-  // ── screenshot_from ──────────────────────────────────────────────── (bridge)
+  // -- screenshot_from -------------------------------------------------- (bridge alias)
   server.tool(
     "screenshot_from",
-    "Take a screenshot from a chosen angle. take_screenshot is locked to the scene's main camera; this temporarily moves that camera to frame your target, captures, then restores it — so Claude can finally AIM its own screenshots. Pass id (frame an object) OR position {x,y,z} with optional lookAt {x,y,z} or rotation {pitch,yaw,roll}. After it returns, read the newest PNG in the editor's screenshots folder.",
+    "Historical alias of capture_view. Frame a GameObject or use an explicit position with optional lookAt/rotation, then return a labeled inline PNG. Uses a temporary non-main camera, works in edit or play mode, and never moves the scene's real camera.",
     {
       id: z.string().optional().describe("GUID of a GameObject to frame"),
       position: Vector3Schema
         .optional()
-        .describe('Camera world position (use instead of id) — object {x,y,z} or comma string "x,y,z"'),
+        .describe('Camera world position (use instead of id) — object {x,y,z} or exact comma string "x,y,z"'),
       lookAt: Vector3Schema
         .optional()
-        .describe('World point to look at (pair with position) — object {x,y,z} or comma string "x,y,z"'),
-      rotation: z
-        .object({ pitch: z.number(), yaw: z.number(), roll: z.number() })
+        .describe('World point to look at (pair with position) — object {x,y,z} or exact comma string "x,y,z"'),
+      rotation: RotationSchema
         .optional()
-        .describe("Explicit camera rotation (pair with position)"),
-      width: z.number().int().optional().describe("Screenshot width (default 1920)"),
-      height: z.number().int().optional().describe("Screenshot height (default 1080)"),
+        .describe("Explicit finite camera rotation (pair with position; alternative to lookAt)"),
+      width: z.number().int().min(16).max(3840).optional().describe("Screenshot width (default 1280)"),
+      height: z.number().int().min(16).max(2160).optional().describe("Screenshot height (default 720)"),
     },
-    async (params) => {
-      const res = await bridge.send("screenshot_from", params);
-      if (!res.success) {
-        return { content: [{ type: "text", text: `Error: ${res.error}` }] };
-      }
-      return {
-        content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }],
-      };
-    }
+    async (params) =>
+      inlineCaptureReply(await bridge.send("screenshot_from", params), false)
   );
-
   // ── console_run ──────────────────────────────────────────────────── (bridge)
   server.tool(
     "console_run",
@@ -444,7 +425,7 @@ export function registerDiagnosticTools(
   // ── get_bounds ─────────────────────────────────────────────────────── (bridge, Batch 33)
   server.tool(
     "get_bounds",
-    "Get a GameObject's world-space bounding box. Returns { id, name, center, size, extents, mins, maxs, radius, position, empty } — objects with no renderer report empty:true (bounds collapse to the world position) plus an explanatory note. Feed center/radius into screenshot_from or frame_camera to frame the object, or use mins/maxs for placement math (screenshot_orbit calls this internally).",
+    "Get provenance-rich world bounds for a GameObject. Preserves legacy top-level center/size/extents/mins/maxs/radius/position/empty for compatibility, and adds render plus independent physics and solidPhysics aggregates. Collider outputs include trigger policy, capped contributor GameObject IDs and component type names, unsupported counts, and the exact API source. Read-only and play-aware.",
     {
       id: z.string().describe("GUID of the GameObject to measure"),
     },
@@ -457,111 +438,103 @@ export function registerDiagnosticTools(
     }
   );
 
-  // ── screenshot_orbit ──────────────────────────────────────────────── (orchestrated, Batch 33)
+  // ── find_objects_near ───────────────────────────────────────────
   server.tool(
-    "screenshot_orbit",
-    "Capture a GameObject from several angles in ONE call — orbits the scene's main camera around the object and screenshots each angle, so Claude can verify 3D work from multiple sides instead of guessing from one. Drives get_bounds (framing) + screenshot_from per angle (each its own frame, the reliable capture path). Returns the saved PNG paths in order — READ them to inspect.",
+    "find_objects_near",
+    "Find GameObjects within a world-space radius of exactly one explicit position or originId, sorted nearest first. Optional name/component/tag filters are applied before the capped result, and the Scene root is excluded. Returns pivot-distance results plus requestedRadius/radiusClamped and total/showing/truncated/scanned; it deliberately does not pretend render or collider overlap is pivot distance. Read-only and play-aware.",
     {
-      id: z.string().describe("GUID of the GameObject to orbit"),
-      shots: z
-        .number()
-        .int()
-        .optional()
-        .describe("Number of angles around the object (default 4, clamped 2-8)"),
-      elevation: z
-        .number()
-        .optional()
-        .describe("Camera height factor: 0 = level, 1 = high (default 0.4)"),
-      distance: z
-        .number()
-        .optional()
-        .describe("Camera distance in units (default: auto from bounds)"),
-      width: z.number().int().optional().describe("Screenshot width (default 1280)"),
-      height: z.number().int().optional().describe("Screenshot height (default 720)"),
+      position: Vector3Schema.optional().describe("World-space search center; use instead of originId"),
+      originId: z.string().optional().describe("GameObject GUID whose world position is the center"),
+      radius: z.number().positive().max(1_000_000).optional().describe("Search radius in world units (default 256, max 1,000,000)"),
+      limit: z.number().int().min(1).max(500).optional().describe("Maximum results (default 50)"),
+      name: z.string().optional().describe("Case-insensitive GameObject name substring"),
+      component: z.string().optional().describe("Required component type name"),
+      tag: z.string().optional().describe("Required GameObject tag"),
+      includeOrigin: z.boolean().optional().describe("Include originId itself (default false)"),
     },
     async (params) => {
-      const b = await bridge.send("get_bounds", { id: params.id });
-      if (!b.success) {
-        return { content: [{ type: "text", text: `Error (get_bounds): ${b.error}` }] };
+      const res = await bridge.send("find_objects_near", params);
+      if (!res.success) {
+        return { content: [{ type: "text", text: `Error: ${res.error}` }] };
       }
-      const data = b.data as any;
-      const c = data.center as { x: number; y: number; z: number };
-      const sizeLen = Math.hypot(data.size.x, data.size.y, data.size.z);
-      const dist = params.distance ?? Math.max(sizeLen * 1.6, 150);
-      let shots = params.shots ?? 4;
-      shots = Math.max(2, Math.min(8, shots));
-      const elev = params.elevation ?? 0.4;
-      const w = params.width ?? 1280;
-      const h = params.height ?? 720;
-
-      const ssDir = locateScreenshotsDir();
-      let lastMtime = 0;
-      if (ssDir) {
-        const n = newestPng(ssDir, 0);
-        if (n) lastMtime = n.mtimeMs;
-      }
-
-      const results: Array<Record<string, unknown>> = [];
-      for (let i = 0; i < shots; i++) {
-        // s&box names screenshots at 1-second granularity, so two shots in the
-        // same wall-clock second overwrite each other. Space them out.
-        if (i > 0) await new Promise((res) => setTimeout(res, 1100));
-        const ang = (2 * Math.PI * i) / shots;
-        const dx = Math.cos(ang);
-        const dy = Math.sin(ang);
-        const len = Math.hypot(dx, dy, elev) || 1;
-        const camPos = {
-          x: c.x + (dx / len) * dist,
-          y: c.y + (dy / len) * dist,
-          z: c.z + (elev / len) * dist,
-        };
-        const deg = Math.round((ang * 180) / Math.PI);
-        const r = await bridge.send("screenshot_from", {
-          position: camPos,
-          lookAt: c,
-          width: w,
-          height: h,
-        });
-        if (!r.success) {
-          results.push({ angle: deg, error: r.error });
-          continue;
-        }
-        let file: string | null = null;
-        if (ssDir) {
-          const started = Date.now();
-          while (Date.now() - started < 4000) {
-            const n = newestPng(ssDir, lastMtime);
-            if (n) {
-              file = n.path;
-              lastMtime = n.mtimeMs;
-              break;
-            }
-            await new Promise((res) => setTimeout(res, 200));
-          }
-        }
-        results.push({ angle: deg, position: camPos, file });
-      }
-
-      const files = results
-        .filter((s) => typeof s.file === "string")
-        .map((s) => s.file as string);
-      const summary = {
-        orbited: data.name ?? params.id,
-        center: c,
-        distance: Math.round(dist),
-        shots: results,
-        note: ssDir
-          ? `Captured ${files.length}/${shots} angle(s). READ these PNGs to inspect the object from each side:\n${files.join("\n")}`
-          : `Captured ${shots} angle(s), but couldn't locate the screenshots folder (set SBOX_LOG_PATH or SBOX_SCREENSHOTS_DIR). Read the newest PNGs in <sbox>/screenshots/.`,
-      };
-      return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+      return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
     }
   );
+  // -- screenshot_orbit ------------------------------------------------ (orchestrated, Batch 33)
+  server.tool(
+    "screenshot_orbit",
+    "Capture a GameObject from several angles in one call without moving the real camera. Uses get_bounds for framing and capture_view temporary cameras for each angle, returning a labeled manifest followed by ordered inline PNG image blocks.",
+    {
+      id: z.string().describe("GUID of the GameObject to orbit"),
+      shots: z.number().int().min(2).max(8).optional().describe("Number of angles (default 4)"),
+      elevation: z.number().finite().min(0).max(1).optional().describe("Camera height factor from 0 to 1 (default 0.4)"),
+      distance: z.number().finite().positive().optional().describe("Positive camera distance in units (default: auto from bounds)"),
+      width: z.number().int().min(16).max(3840).optional().describe("Screenshot width (default 1280)"),
+      height: z.number().int().min(16).max(2160).optional().describe("Screenshot height (default 720)"),
+    },
+    async (params) => {
+      const boundsResponse = await bridge.send("get_bounds", { id: params.id });
+      if (!boundsResponse.success) {
+        return { content: [{ type: "text" as const, text: `Error (get_bounds): ${boundsResponse.error}` }] };
+      }
+      const data = boundsResponse.data as any;
+      const center = data.center as { x: number; y: number; z: number };
+      const sizeLength = Math.hypot(data.size.x, data.size.y, data.size.z);
+      const distance = params.distance ?? Math.max(sizeLength * 1.6, 150);
+      const shots = params.shots ?? 4;
+      const elevation = params.elevation ?? 0.4;
+      const width = params.width ?? 1280;
+      const height = params.height ?? 720;
+      const results: Array<Record<string, unknown>> = [];
+      const captures: Array<{ path: string }> = [];
 
+      for (let i = 0; i < shots; i++) {
+        const angle = (2 * Math.PI * i) / shots;
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        const length = Math.hypot(dx, dy, elevation) || 1;
+        const cameraPosition = {
+          x: center.x + (dx / length) * distance,
+          y: center.y + (dy / length) * distance,
+          z: center.z + (elevation / length) * distance,
+        };
+        const degrees = Math.round((angle * 180) / Math.PI);
+        const capture = await bridge.send("screenshot_from", {
+          position: cameraPosition,
+          lookAt: center,
+          width,
+          height,
+        });
+        if (!capture.success) {
+          results.push({ angle: degrees, error: capture.error });
+          continue;
+        }
+        const pngPath = (capture.data as any)?.path;
+        if (typeof pngPath !== "string" || pngPath.length === 0) {
+          results.push({ angle: degrees, position: cameraPosition, error: "capture_view returned no PNG path" });
+          continue;
+        }
+        captures.push({ path: pngPath });
+        results.push({ angle: degrees, position: cameraPosition, captured: true });
+      }
+
+      const manifest = {
+        orbited: data.name ?? params.id,
+        center,
+        distance: Math.round(distance),
+        shots: results,
+        note: `Captured ${captures.length}/${shots} angle(s); successful shots follow as ordered inline PNG image blocks.`,
+      };
+      return inlineCaptureReply(
+        { success: true, data: { manifest, captures } },
+        true
+      );
+    }
+  );
   // ── capture_view ──────────────────────────────────────────────────── (bridge, Batch 34)
   server.tool(
     "capture_view",
-    "Capture a PNG of the scene from a camera — and crucially this WORKS IN PLAY MODE, capturing the RUNNING game (via CameraComponent.RenderToBitmap, unlike take_screenshot/screenshot_from which are edit-only). With no args it renders the live main camera = the player's POV (incl. HUD). Pass position {x,y,z} (+ lookAt or rotation) or id (a GameObject to frame) to capture from a temporary camera that never disturbs the game's own camera. Returns the saved PNG's absolute 'path' — READ it to see the result.",
+    "Capture an inline PNG in edit or play mode. With no pose it renders the live main camera; pass exactly one id or position (+ lookAt or rotation) to use a temporary disabled/non-main camera that is removed afterwards. Returns a labeled manifest followed by the image block.",
     {
       id: z.string().optional().describe("GUID of a GameObject to frame (uses a temp camera)"),
       position: Vector3Schema
@@ -570,8 +543,7 @@ export function registerDiagnosticTools(
       lookAt: Vector3Schema
         .optional()
         .describe('World point to look at (pair with position) — object {x,y,z} or comma string "x,y,z"'),
-      rotation: z
-        .object({ pitch: z.number(), yaw: z.number(), roll: z.number() })
+      rotation: RotationSchema
         .optional()
         .describe("Explicit camera rotation (pair with position)"),
       fov: z.number().optional().describe("Field of view for the temp camera"),
@@ -584,7 +556,7 @@ export function registerDiagnosticTools(
       if (!res.success) {
         return { content: [{ type: "text", text: `Error: ${res.error}` }] };
       }
-      return { content: [{ type: "text", text: JSON.stringify(res.data, null, 2) }] };
+      return inlineCaptureReply(res, false);
     }
   );
 }

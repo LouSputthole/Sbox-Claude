@@ -12,3 +12,7 @@ scripts/*.mjs text eol=lf
 scripts/**/*.mjs text eol=lf
 scripts/vendor/**/LICENSE text eol=lf
 scripts/codex-overrides/** text eol=lf
+# The MCP TypeScript sources are historically committed with CRLF.
+sbox-mcp-server/**/*.ts whitespace=cr-at-eol
+# s&box project manifests are historically committed with CRLF.
+sbox-bridge-addon/*.sbproj whitespace=cr-at-eol
