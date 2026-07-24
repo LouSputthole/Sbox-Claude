@@ -31,10 +31,10 @@ codex plugin add sbox-codex-bridge@sboxskins
 
 ### Immutable release
 
-After codex-v2.1.0 is published, pin that tag for a reproducible 2.1.0 install. A pinned marketplace does not advance when main changes.
+After codex-v2.2.0 is published, pin that tag for a reproducible 2.2.0 install. A pinned marketplace does not advance when main changes.
 
 ~~~bash
-codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.1.0
+codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.2.0
 codex plugin add sbox-codex-bridge@sboxskins
 ~~~
 
@@ -42,7 +42,7 @@ After adding either marketplace, you can also launch Codex, enter /plugins, sele
 
 ### Manual GitHub download
 
-After codex-v2.1.0 is published, if the owner/repository install is unavailable, download and extract the [`codex-v2.1.0` source archive](https://github.com/LouSputthole/Sbox-Claude/archive/refs/tags/codex-v2.1.0.zip), or clone that tag. Then register the extracted repository folder and install the plugin:
+After codex-v2.2.0 is published, if the owner/repository install is unavailable, download and extract the [`codex-v2.2.0` source archive](https://github.com/LouSputthole/Sbox-Claude/archive/refs/tags/codex-v2.2.0.zip), or clone that tag. Then register the extracted repository folder and install the plugin:
 
 ```bash
 codex plugin marketplace add <extracted-repo-folder>
@@ -64,7 +64,7 @@ codex plugin add sbox-codex-bridge@sboxskins
 
 ### Pinned release
 
-A marketplace pinned to codex-v2.1.0 is immutable. To move to a later Codex release, remove the installed plugin and marketplace, then add the next published tag and reinstall:
+A marketplace pinned to codex-v2.2.0 is immutable. To move to a later Codex release, remove the installed plugin and marketplace, then add the next published tag and reinstall:
 
 ~~~bash
 codex plugin remove sbox-codex-bridge@sboxskins

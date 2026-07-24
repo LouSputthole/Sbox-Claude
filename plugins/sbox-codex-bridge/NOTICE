@@ -10,7 +10,7 @@ Separately licensed material
 - The bundled skills/sbox-api component is adapted from claude-sbox under the
   MIT License. See skills/sbox-api/LICENSE and
   skills/sbox-api/ATTRIBUTION.md.
-- The optional sbox-mcp-server@2.1.0 lifeline is fetched externally by npx
+- The optional sbox-mcp-server@2.2.0 lifeline is fetched externally by npx
   only when a user enables it; it is not bundled in this plugin. It is
   licensed under the MIT License. See:
   https://github.com/LouSputthole/Sbox-Claude/blob/main/sbox-mcp-server/LICENSE
