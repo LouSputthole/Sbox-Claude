@@ -1,13 +1,37 @@
 # Tycoon-Idle Genre Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [Two networking patterns you will need (MP only)](#two-networking-patterns-you-will-need-mp-only)
+- [Standout patterns](#standout-patterns)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Authority + offline: pick your posture, then your time model](#authority--offline-pick-your-posture-then-your-time-model)
+  - [Save/persistence: five patterns the original doc doesn't have](#savepersistence-five-patterns-the-original-doc-doesnt-have)
+  - [Economy: variants beyond "one Money int, clamp it"](#economy-variants-beyond-one-money-int-clamp-it)
+  - [Prestige: bracket-currency + full-wipe-then-reapply](#prestige-bracket-currency--full-wipe-then-reapply)
+  - [Networking idioms the original doc lacks](#networking-idioms-the-original-doc-lacks)
+  - [Building/placement: grid + region connectivity + two-phase ghost](#buildingplacement-grid--region-connectivity--two-phase-ghost)
+  - [Data-driven engines that cut across systems](#data-driven-engines-that-cut-across-systems)
+  - [Genetics / collection meta (if your tycoon breeds things)](#genetics--collection-meta-if-your-tycoon-breeds-things)
+  - [Crowds + populations (when "spawning-waves" isn't combat)](#crowds--populations-when-spawning-waves-isnt-combat)
+  - [Standout sub-genre engines](#standout-sub-genre-engines)
+  - [Zero-asset / runtime-generated content (ship runnable before art)](#zero-asset--runtime-generated-content-ship-runnable-before-art)
+  - [Razor reactivity (the corpus consensus)](#razor-reactivity-the-corpus-consensus)
+  - [Read these games (net-new, by need)](#read-these-games-net-new-by-need)
+<!-- reference-toc:end -->
+
 How to build a harvest -> sell -> upgrade -> prestige tycoon/idle game in modern s&box (GameObject/Component/Scene), distilled from three shipped titles.
 
 ## What defines the genre
 
 A tycoon-idle game is a **numbers-go-up economy with a tight harvest loop wrapped around data-driven progression**. The player does one cheap repeated action (chop / mine / dig), converts the output into a currency, spends currency on **geometric-cost upgrades** that make the action faster, and periodically hits a **prestige/reset** that trades current progress for a permanent multiplier. Everything else (gacha cases, gambling, leaderboards, station UIs) is bolted onto that spine.
 
-The core loop, verbatim from a shipped game's own summary:
-> swing an axe at trees -> fill a weight-capped backpack -> sell logs / mill them into planks -> spend Money on tiered upgrade trees -> unlock map gates -> fast-travel -> prestige reset for permanent multipliers (chop_the_forest: summary).
+A representative core loop is: harvest trees, fill a weight-capped backpack, sell or process logs, buy tiered upgrades, unlock map gates and travel, then prestige-reset for permanent multipliers (chop_the_forest: summary).
 
 Three reference games, three networking postures — pick yours up front because it dictates everything:
 - **chop_the_forest** — host-authoritative multiplayer. Economy lives on the host; clients replicate. Use this if real value (leaderboards, a backend) is at stake.
@@ -170,13 +194,13 @@ protected override void OnUpdate()
 ```
 (chop_the_forest: Code/World/HarvestableResource.cs:49 sync sequence ints, :150 observed-copy init.) In s_miner the inverse idiom appears: an `[Rpc.Broadcast]` method that immediately `if (!Networking.IsHost) return;` — a broadcast runs on every peer, the guard makes only the host act, which re-broadcasts the result. That's how it routes client->host commands without a dedicated server RPC (s_miner: Code/MineReset.cs:241 CastVoteYes).
 
-## Standout patterns worth copying
+## Standout patterns
 
 - **Spatial hash grid** for O(nearby) world queries instead of scene-wide scans + a single round-robin update runner to cap per-frame cost (chop_the_forest: HarvestableResource.cs:10, :163).
 - **Virtual entities** — compute a dense procedural distribution as a seeded `Dictionary<coord,index>` with NO GameObjects; instantiate the real prefab only when the player digs near it and the voxel is still solid (digging_simulator: Code/OreGenerator.cs:49 GenerateVirtualOres, :95 RevealOresInSphere). Massive perf win for "millions of potential things".
 - **Diff-based save** — persist only voxels that differ from the deterministic seeded default + the seed, regenerate the default on load and replay the diff. Tiny saves for an arbitrarily large destructible world (digging_simulator: Code/DiggableZone.cs:261 GetTerrainChanges).
 - **One bool-returning resource gate** drives every consumer: `ConsumeBattery(amount)->bool` is the single chokepoint for drill cost-per-dig, jetpack cost-per-second, and triggers the death/respawn penalty when empty (digging_simulator: Code/PlayerResources.cs:29).
-- **Pure power-law XP curve**, trivially liftable: `xpForLevel = 320 * level^2.55`, sync the derived level for nameplates (s_miner: Code/LevelingTable.cs:140, StatsManager.cs:468 `[Sync] NetworkedLevel`).
+- **Pure power-law XP curve**: `xpForLevel = 320 * level^2.55`; sync the derived level for nameplates (s_miner: Code/LevelingTable.cs:140, StatsManager.cs:468 `[Sync] NetworkedLevel`).
 - **Recharge over Unix time, not `TimeSince`** — store last-recharge as Unix seconds so timed free cases / idle accrual survive save/reload and session boundaries (chop_the_forest: PlayerProgression `FreeCaseLastRechargeUnix`; see `references/systems/idle-offline.md`).
 
 ## Verify live
@@ -191,7 +215,7 @@ Eight more shipped tycoon/idle games mined since the original three. The three a
 
 ### Authority + offline: pick your posture, then your time model
 
-The corpus now spans four authority models, not three. **farm_land is owner-authoritative** (listen-server, each player owns their farm GameObject via `NetworkSpawn(client.Connection)`; every mutator is `[Rpc.Owner]` re-checking `FarmLand.Occupant == player.Client`, with explicit `// todo: host validation` comments). It is the pragmatic middle ground between host-auth and client-auth — copy its *structure* but know the trust boundary is weaker than chop_the_forest's. **sneguborka is the gold-standard host-auth save**: owner writes its own `Game.Cookies`, host re-applies through a re-validation pipeline (see below).
+The corpus now spans four authority models, not three. **farm_land is owner-authoritative** (listen-server, each player owns their farm GameObject via `NetworkSpawn(client.Connection)`; every mutator is `[Rpc.Owner]` re-checking `FarmLand.Occupant == player.Client`, with explicit `// todo: host validation` comments). This is a pragmatic middle ground between host-auth and client-auth, but its trust boundary is weaker than chop_the_forest's. **sneguborka is the gold-standard host-auth save**: owner writes its own `Game.Cookies`, host re-applies through a re-validation pipeline (see below).
 
 Two offline-accrual idioms beyond chop_the_forest's Unix-recharge:
 - **UTC-tick deltas EVERYWHERE, never accumulators** (phenodex). Every timer is `[Sync(FromHost)] long XStartedAtTicks`; `SecondsSince() = TimeSpan.FromTicks(DateTime.UtcNow.Ticks - started).TotalSeconds`. Growth, water decay, and rent bills all derive from ticks, so they advance correctly across save/reload with zero catch-up code. One `DEV_TIME_SCALE` const compresses the whole clock for testing (phenodex: `Cultivation/Plant.cs`, `Player.cs` `NextBillTicks`).
@@ -211,7 +235,7 @@ CycleStartedAt = NowUnix - (offline % cycleSeconds);          // re-seed so the 
 
 The original covers `ValidateAndSanitize` + FNV signature. These are net-new shapes:
 
-1. **Interface-discovered, ordered, versioned save** ★ (fair — the most reusable save system in the corpus). Savers implement `ISaveDataProperty { PropertyName; int PropertyOrder; WriteValue/ReadValue(Scene) }`; `PersistenceManager.FindProperties()` discovers them three ways (scene singleton Components, `GameObjectSystems`, and plain classes via `TypeLibrary.GetTypes<ISaveDataProperty>().Create()`), then `DistinctBy(PropertyName).OrderBy(PropertyOrder)`. Each section is try/caught so one corrupt blob can't nuke the save. Versioning is brutally simple — `if (saved != CurrentSaveVersion) { DeleteFile(path); return false; }` (delete-on-mismatch, no migration). A `SpawnedPrefabSaveData<TComponent,TSaveData>` base saves *every placed prefab instance* grouped by source path and respawns on load (fair: `Persistence/PersistenceManager.cs`, `ISaveDataProperty.cs`).
+1. **Interface-discovered, ordered, versioned save** ★ (fair). Savers implement `ISaveDataProperty { PropertyName; int PropertyOrder; WriteValue/ReadValue(Scene) }`; `PersistenceManager.FindProperties()` discovers them three ways (scene singleton Components, `GameObjectSystems`, and plain classes via `TypeLibrary.GetTypes<ISaveDataProperty>().Create()`), then `DistinctBy(PropertyName).OrderBy(PropertyOrder)`. Each section is try/caught so one corrupt blob can't nuke the save. Versioning is brutally simple — `if (saved != CurrentSaveVersion) { DeleteFile(path); return false; }` (delete-on-mismatch, no migration). A `SpawnedPrefabSaveData<TComponent,TSaveData>` base saves *every placed prefab instance* grouped by source path and respawns on load (fair: `Persistence/PersistenceManager.cs`, `ISaveDataProperty.cs`).
 2. **Polymorphic per-entity blob via `JsonElement` + a string `Type` discriminator** (farm_land). A heterogeneous building list round-trips without a discriminated-union serializer: `GridBuildingData { string BuildingType; ...; JsonElement BuildingSpecificData = JsonSerializer.SerializeToElement(plotData); }`; on load `data.BuildingSpecificData.Deserialize<GridFarmPlotData>()`. Each building type self-registers a handler (`GridSaveHandlerRegistry.Register(new GridFarmPlotSaveHandler())`) so adding a buildable is one class + one line, save loop untouched (farm_land: `Persistence/SaveHandlers/GridSaveHandlers.cs`).
 3. **Save-light "derive on load" + skip-empty** (farm_land). Don't persist what you can recompute: `StatTracker` challenges write `Data = null` and re-derive progress from the canonical `Statistics` store; zero-progress challenges are skipped entirely; completed ones store only `{Type, IsCompleted}`. Big save-size + migration-resilience win.
 4. **Multi-slot save with live screenshot thumbnails + sidecar meta** ★ (fill_the_void — the best save UX in the corpus). Each slot is three files: `slot_N.json` (full state), `slot_N.meta.json` (tiny `{Timestamp,Money,...}` so the menu lists slots *without* parsing the save), and `slot_N.thumb.png` captured at save time via `using var bmp = new Bitmap(256,144); camera.RenderToBitmap(bmp); FileSystem.Data.WriteAllBytes(thumb, bmp.ToPng().ToArray());`. Scene handoff is a **static pending-load channel**: `StartLoadGameFromSlot` sets `pendingLoadJson`, loads the scene, then `GameState.OnStart` calls `ConsumePendingLoadJson()` (fill_the_void: `Code/Components/Game/MainMenuSlotService.cs`).
@@ -240,7 +264,7 @@ public bool TakeMoney(int amount, string reason = "Other") {
 - **Money mutators that return `bool` + normalize at the boundary** (fill_the_void). `SpendMoney(amount) → bool` (affordability gate) lets callers branch (slots, shop, quest-cancel penalty); `Normalize` rejects NaN/Inf, floors at 0, and `MathF.Round`s to whole coins on every delta (fill_the_void: `Code/Components/Game/GameState.cs`).
 - **The resource is a rigidbody, not a counter** (lumberyard). A chopped log is a real physics object the entire pipeline: grab it, drop it on a conveyor whose `BoxCollider.SurfaceVelocity` pushes it, a trigger volume transmutes it to the next tier, a sell zone reads `Collider.Touching` and destroys-for-money. **"Sell" is a collision event, not a UI action** (`SellPoint.OnCollisionStart`, a `SellSucker` that `ApplyForce`s loose wood toward a pad). Balance lives entirely in `TreeResource` float multipliers (`PlankMultiplier=2`...) — designers retune by editing `.tree` assets (lumberyard: `Code/Trees/PlankCutter.cs`, `Conveyor.cs`, `Wood.cs`).
 - **Multiplier-stacking pricing as the whole model** (scoops): `pay = base * (hungry?2:1) * HotZone.BonusAt(pos)/*3x*/ + favouriteBonus + perfectScoopBonus`. **Dynamic per-item inflation** (fill_the_void): `price = basePrice * MathF.Pow(1.5f, purchaseCountSoFar)` with the per-item count persisted, so each repeat buy is ~50% dearer.
-- **`NumberFormatter.ToFormattedString()`** (sandmoney_) — short-scale big-number suffixes (`k,M,B,T,Qa,Qi,Sx,Sp,Oc,No,Dc`) with trailing-zero trim, an extension on `double/long/float`. Copy-paste reusable for any idle UI past a million.
+- **`NumberFormatter.ToFormattedString()`** (sandmoney_) — short-scale big-number suffixes (`k,M,B,T,Qa,Qi,Sx,Sp,Oc,No,Dc`) with trailing-zero trim, exposed as an extension on `double`, `long`, and `float` for high-value idle UIs.
 - **Debounced "+N / -N" value floater** (lumberyard). `AddMoney` accumulates `RecentMoneyChange` and resets `TimeSinceMoneyChange`; if >5s since the last change the accumulator resets first, so rapid sells stack into one growing "+1,234" popup. The HUD hashes `(Money, RecentMoneyChange, TimeSinceMoneyChange > 5f)` — note the bool-ifying so it re-renders once when the floater should vanish (lumberyard: `LumberPlayer.cs`, `MoneyHud.razor`).
 
 ### Prestige: bracket-currency + full-wipe-then-reapply
@@ -268,7 +292,7 @@ The original doesn't cover placement at all; four games converge on the same sha
 
 ### Data-driven engines that cut across systems
 
-- **String-keyed stat-modifier bus** ★ (farm_land — the single most reusable idea across genres). `Buff` is a `GameResource` whose `Effects` is `Dictionary<string, {float Value; Multiply|Add|Set}>`. Gameplay asks `BuffManager.GetModifier("farming.mutation.chance")`, which folds every active+passive matching effect; callers do `baseValue * GetModifier(key)`. A documented dotted-key namespace (`farming.yield.{type}`, `economy.market.{itemId}.sellprice`, `fishing.level.bonus`) means designers author buffs as assets and code reads them by string — any genre (tycoon/RPG/survival) can adopt it (farm_land: `Common/Players/Buffs/Effect.cs`, `BuffManager.cs`).
+- **String-keyed stat-modifier bus** ★ (farm_land). `Buff` is a `GameResource` whose `Effects` is `Dictionary<string, {float Value; Multiply|Add|Set}>`. Gameplay asks `BuffManager.GetModifier("farming.mutation.chance")`, which folds every active+passive matching effect; callers do `baseValue * GetModifier(key)`. A documented dotted-key namespace (`farming.yield.{type}`, `economy.market.{itemId}.sellprice`, `fishing.level.bonus`) lets designers author buffs as assets while code reads them by string across tycoon, RPG, or survival systems (farm_land: `Common/Players/Buffs/Effect.cs`, `BuffManager.cs`).
 
 ```csharp
 // farm_land: BuffManager.GetModifier — fold Multiply/Add/Set across all matching effects
@@ -303,12 +327,12 @@ farm_land's lighter take: mutations are an `ICropMutation` registry (`GiantMutat
 - **Dynamic spawn target with price elasticity + seasonality** (fair): `target = Σ building.AddedGuests * ratingMult / max(0.25, admissionFee/50) * (peakSeason ? 2 : 1)`, clamped to a cap — a population that responds to your prices and attractions, not a fixed wave count (fair: `AI/Guests/GuestManager.cs`).
 - **Weighted-random event director via tagged prefabs** (fair, sandmoney_). fair discovers event prefabs by metadata (`ResourceLibrary.GetAll<PrefabFile>().Where(x => x.GetMetadata("Type","") == "Events")`), rolls on an interval, filters already-active, and cumulative-weight-picks by `Probability`; "content = tagged prefab, discovered by metadata, weighted-picked" generalizes to loot/weather/incidents. sandmoney_ adds an **anti-monotony filter** (after 2 same-direction events, restrict the pool to the opposite drift) and dual independent event clocks (fair: `Park/Events/EventManager.cs`; sandmoney_: `Core/WorldEventManager.cs`).
 
-### Standout sub-genre engines (lift wholesale if relevant)
+### Standout sub-genre engines
 
 - **Procedural OHLC market / price engine** ★ (sandmoney_ — no other corpus game simulates a tradeable market). A singleton `[Sync] float CurrentPrice` random-walk with six layered "phase" regimes (accumulation→breakout structure, not pure noise), progressive mean-reversion that ramps with distance (`MathF.Pow(ratio, 2.5)`) so price is soft-bounded without a hard clamp, a **lookahead buffer** (`[Sync] NetList<float> FuturePrices`, 40 ticks the bots read) for deterministic "smart" bots, and a **ring-buffer candle history** as a flat `[Sync] NetList<float>` of OHLC quads with a wrapping head index (1 hour of 1s candles in one flat list, O(1) append, no per-candle objects). Intentionally **not persisted** — only player wallets save; the market regenerates fresh each boot. Bots get a **self-balancing win-rate corridor**: they steer toward a quality-derived `targetWinRate` (82→98%), entering "recovery mode" or forcing deliberate losses to stay in corridor, keeping passive ROI predictable for economy balance (sandmoney_: `Core/MarketManager.cs`, `Player/TradingBot.cs`).
 - **Procedural recursive tree gen + dynamic log splitting** ★ (lumberyard). L-system branches from scaled `cuttablelog.vmdl` segments with data-driven tapering (`taperMultiplier = Pow(TrunkTaperingRate, depth)`) and gradient leaves; `Branch.Split` cuts a procedural object at an arbitrary point and keeps **both halves valid, networked, and value-prorated** (`top.Value *= 1-splitPos`), rescaling each surviving segment's 0–1 position into the new piece's coordinate space (lumberyard: `Code/Trees/ChoppableTree.cs`, `Branch.cs`).
 - **Client-predicted, host-validated GPU heightmap deformation** ★ (sneguborka). An R16F `Texture` heightmap + a texel-identical CPU float mirror (CPU mutate first, partial GPU re-upload of just the dirty rect via `Texture.Update`); carve locally for instant feedback, then `[Rpc.Host]` validates and `[Rpc.Broadcast]` fans out with `Rpc.FilterExclude(c => c == originator || c.IsHost)` — excluding **both** predictor and host (a broadcast always reaches the host, which would double-carve). Late-join sends an **RLE-vs-raw snapshot** (ship whichever is smaller behind a 1-byte format magic; heavily-carved fields of mostly-zero compress dramatically). Re-bind `Renderer.Attributes` in **both** `OnUpdate` and `OnPreRender` because engine paths (hotload, envmap rebake, LOD recreate) silently clear them — the cure for "the whole field renders as a dark slab" (sneguborka: `World/SnowField.cs`, `.Snapshot.cs`).
-- **Gambling money-sinks with two-phase settlement** (fill_the_void). A weighted-symbol slot machine: `TrySpin()` rolls + stages a `PendingSettlement(bet, payout)` but does NOT touch money; `SettlePendingSpin()` (after the reel animation) applies only the **net delta** so the HUD shows one clean net result and money can't drain mid-animation. Reusable for any spin-then-reveal / loot-open (fill_the_void: `Code/Components/Interaction/SlotMachineComponent.cs`).
+- **Gambling money-sinks with two-phase settlement** (fill_the_void). A weighted-symbol slot machine: `TrySpin()` rolls + stages a `PendingSettlement(bet, payout)` but does NOT touch money; `SettlePendingSpin()` (after the reel animation) applies only the **net delta** so the HUD shows one clean net result and money can't drain mid-animation. The same two-phase transaction semantics fit spin-then-reveal and loot-open flows (fill_the_void: `Code/Components/Interaction/SlotMachineComponent.cs`).
 - **Combo multiplier with rising-pitch audio as the reward** (fill_the_void). Rapid sells in a shrinking window stack a multiplier AND extend the window; each sell plays the coin sound at a rising pitch (capped) so the player *hears* the streak climb — juice from pure parameter math (fill_the_void: `HoleSellComboBonusComponent`).
 - **Two-tier weighted gacha (category roll → level-windowed pick) + pity + spot-cooldown**. farm_land fishing: first a category roll (Treasure/Junk/Fish), then a level-windowed weighted pick. sneguborka drops: a per-`Connection` **pity counter** (guaranteed roll at `PityFloor`) and a **spot-cooldown** so you can't farm one spot; drops spawn owner-only via `Rpc.FilterInclude` (farm_land: `Common/Fishing/FishingModel.cs`; sneguborka: `World/SnowField.DropRolls.cs`).
 - **Leaderboard aggregation: Max vs Sum is load-bearing** (sneguborka). A monotonic count (winters survived) posts with absolute `Stats.SetValue` + `board.SetAggregationMax()`; a lifetime tally (photos found) posts with `Stats.Increment(+1)` + default Sum. Submit **owner-client-only** (stats bind to the local Steam account; the host can't post for another player), and pass the post-increment count as an RPC param so it can't race the `[Sync]` (sneguborka: `Services/LeaderboardService.cs`).

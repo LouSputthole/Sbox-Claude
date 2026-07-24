@@ -1,0 +1,22 @@
+s&box Codex Bridge
+Copyright (c) 2026 sboxskins.gg
+All rights reserved.
+
+This plugin is SOURCE-AVAILABLE, not open source. See LICENSE for the full
+s&box Bridge Source-Available License 1.0 terms.
+
+Separately licensed material
+----------------------------
+- The bundled skills/sbox-api component is adapted from claude-sbox under the
+  MIT License. See skills/sbox-api/LICENSE and
+  skills/sbox-api/ATTRIBUTION.md.
+- The optional sbox-mcp-server@2.2.0 lifeline is fetched externally by npx
+  only when a user enables it; it is not bundled in this plugin. It is
+  licensed under the MIT License. See:
+  https://github.com/LouSputthole/Sbox-Claude/blob/main/sbox-mcp-server/LICENSE
+
+Names, branding & trademark
+---------------------------
+"s&box Bridge", "s&box Claude Bridge", "s&box Codex Bridge", and
+"sboxskins.gg", and their logos and branding, are trademarks of sboxskins.gg
+and are not licensed for reuse.

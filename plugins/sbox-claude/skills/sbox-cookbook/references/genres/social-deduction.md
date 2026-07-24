@@ -1,5 +1,23 @@
 # Social-Deduction Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [The authority model: one synced enum + paired local/RPC transitions](#the-authority-model-one-synced-enum--paired-localrpc-transitions)
+- [Hidden roles + per-recipient visibility (the heart of the genre)](#hidden-roles--per-recipient-visibility-the-heart-of-the-genre)
+- [One host-validated interaction verb (CmdUseTarget)](#one-host-validated-interaction-verb-cmdusetarget)
+- [Task / clue economy (and the anti-role-tell)](#task--clue-economy-and-the-anti-role-tell)
+- [Body-report → meeting, and the vote flow](#body-report--meeting-and-the-vote-flow)
+- [Proximity voice with role + dead channels](#proximity-voice-with-role--dead-channels)
+- [Allocation-free multiplayer HUD](#allocation-free-multiplayer-hud)
+- [Build order](#build-order)
+- [Pitfalls (from the real games)](#pitfalls-from-the-real-games)
+- [Verify live](#verify-live)
+- [Which games to read](#which-games-to-read)
+<!-- reference-toc:end -->
+
 How to build a social-deduction game — hidden asymmetric roles, a task/clue economy, body-reporting, and a discussion→vote→ejection loop — in modern s&box (GameObject/Component/Scene), distilled from two deeply-mined shipped games: `vault108.suspectra` (an Among-Us / Mafia clone: Innocent vs Mafia, ~25 task minigames, sabotages, emergency meetings, proximity+role voice, voting) and `despawn.murder` (a Trouble-in-Terrorist-Town / "Murder" lineage: secret Murderers vs Bystanders who earn a revolver from clues, an AI Director that paces clue spawns, a backend XP/profile service). A third game, `suburbianites.blindloaded`, touches the genre from the *hidden-information* axis (blind rounds — you can't see opponents) rather than hidden *roles*; skim it only if you want sound/decoy/mute information mechanics.
 
 ## What defines the genre
@@ -8,9 +26,9 @@ A social-deduction game is a **hidden-role round game**: at round start the host
 
 Three shapes show up in the corpus:
 
-- **Among-Us / Mafia** (`suspectra`): a big host-driven `GameState` machine with an explicit `Discussion → Voting → Ejection` phase, a task economy whose progress bar advances even for fakers, sabotages, emergency meetings, and proximity voice with role channels. Copy this when you want the full meeting-and-vote ceremony.
-- **TTT / Murder** (`despawn.murder`): a continuous round (no meeting phase) where bystanders *earn* a weapon by collecting clues or completing generated tasks, roles include data-driven sub-roles (Detective/Tracker/Snitch), and an **AI Director** paces clue spawns by live telemetry. Copy this when the "deduction" happens through gunplay + clues rather than a vote.
-- **Blind-round hidden-information** (`blindloaded`): no role secrecy — instead you can't *see* opponents and act from sound/memory, with reveal/mute/decoy items. A different design axis; lift its visibility tricks, not its structure.
+- **Among-Us / Mafia** (`suspectra`): a big host-driven `GameState` machine with an explicit `Discussion → Voting → Ejection` phase, a task economy whose progress bar advances even for fakers, sabotages, emergency meetings, and proximity voice with role channels. Choose this structure when you want the full meeting-and-vote ceremony.
+- **TTT / Murder** (`despawn.murder`): a continuous round (no meeting phase) where bystanders *earn* a weapon by collecting clues or completing generated tasks, roles include data-driven sub-roles (Detective/Tracker/Snitch), and an **AI Director** paces clue spawns by live telemetry. Choose this structure when deduction happens through gunplay and clues rather than a vote.
+- **Blind-round hidden-information** (`blindloaded`): no role secrecy — instead you can't *see* opponents and act from sound/memory, with reveal/mute/decoy items. This is a different design axis; its visibility mechanics can stand independently of its round structure.
 
 **Core loop (Among-Us shape):** `Waiting (lobby readies) → assign roles + tasks → Playing (tasks/kills/sabotage, body reported or meeting called) → Discussion (talk, synced chat) → Voting (tally, tie/skip resolution) → Ejection (reveal + animate) → win check → back to Playing`. Everything else (minimap, voice, HUD, achievements) is scaffolding around that. (suspectra: `Code/GameManager.cs` is the 2088-line spine.)
 
@@ -121,20 +139,29 @@ Tasks serve double duty: they're the **innocents' win timer** and the **cover** 
 
 A body report (or emergency button) **snaps everyone into the meeting** and transitions the FSM to `Discussion`. Record who died and whether the body was found for the meeting header. (suspectra: `MeetingDeathRecords` is a `[Sync] NetList<DeathRecord>`; report goes through `CmdUseTarget`'s `Corpse` case.)
 
-Vote resolution is a complete, copyable algorithm — the part most teams get subtly wrong:
+Vote resolution needs an explicit decision procedure because skip and tie handling are easy to get subtly wrong:
 
-```csharp
-// Each player: [Sync] Guid VotedForPlayerId. Voting for the GameManager's own Id == "Skip".
-int skipVotes = alive.Count(x => x.VotedForPlayerId == GameObject.Id      // explicit skip
-                              || x.VotedForPlayerId == Guid.Empty);       // timed-out = skip
-var realVotes = alive.Where(x => x.VotedForPlayerId != GameObject.Id && x.VotedForPlayerId != Guid.Empty)
-                     .GroupBy(x => x.VotedForPlayerId).ToList();
-int maxVotes  = realVotes.Count == 0 ? 0 : realVotes.Max(g => g.Count());
-var top       = realVotes.Where(g => g.Count() == maxVotes).ToList();
-bool skipOrTie = skipVotes >= maxVotes || top.Count != 1;                 // skip-wins OR tie → no ejection
+```text
+FUNCTION resolveMeetingVote(alivePlayers, skipSentinel)
+  skipVotes = number of alive players whose vote is:
+    skipSentinel, or
+    empty because they timed out
+
+  candidateCounts = group every other vote by candidate
+  highestCandidateCount = maximum candidate count, or zero when none exist
+  leaders = candidates tied at highestCandidateCount
+
+  IF no candidate received a vote
+     OR skipVotes is at least highestCandidateCount:
+    RETURN no ejection with a skipped reason
+
+  IF leaders contains anything other than exactly one candidate:
+    RETURN no ejection with a tied reason
+
+  RETURN eject the sole leading candidate
 ```
 
-(suspectra: `Code/GameManager.ResolveVoting()`, ~150 lines, async.) Key rules to copy: **empty/timed-out votes count as skips**; **a self-id vote is the canonical Skip sentinel**; **skip-wins and ties both resolve to "no one ejected"** (with distinct sentinel tokens `EjectionVoteSkippedToken` / `EjectionVoteTiedToken` so the UI renders the right message); discussion can end early when **all** alive players set `[Sync] WantsToSkipDiscussion` (after a 1s grace). Voting chat is a `[Sync] NetList<ChatMsg>` capped at 80, **host-sanitized** (`NormalizeNetworkText` strips CR/LF, trims, length-clamps — harden every networked string). See `references/systems/dialogue.md` for the generalized vote-flow (it applies to map/kick/decision votes too).
+(suspectra: `Code/GameManager.ResolveVoting()`, ~150 lines, async.) Documented rules: **empty/timed-out votes count as skips**; **a self-id vote is the canonical Skip sentinel**; **skip-wins and ties both resolve to "no one ejected"** (with distinct sentinel tokens `EjectionVoteSkippedToken` / `EjectionVoteTiedToken` so the UI renders the right message); discussion can end early when **all** alive players set `[Sync] WantsToSkipDiscussion` (after a 1s grace). Voting chat is a `[Sync] NetList<ChatMsg>` capped at 80, **host-sanitized** (`NormalizeNetworkText` strips CR/LF, trims, length-clamps — harden every networked string). See `references/systems/dialogue.md` for the generalized vote-flow (it applies to map/kick/decision votes too).
 
 **End-game frame trick:** `EndGame()` is `async` and does `await Task.Delay(50)` after clearing sabotage so the host's local light-restore runs one frame *before* the win screen flips — and it guards `if (!this.IsValid()) return;` after every await. A deliberate "give the renderer a frame" beat. (suspectra: `Code/GameManager.cs::EndGame`.)
 

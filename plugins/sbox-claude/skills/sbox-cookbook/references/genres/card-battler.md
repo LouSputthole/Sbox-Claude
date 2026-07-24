@@ -1,10 +1,36 @@
 # Card-Battler Recipe (deckbuilder / TCG / auto-battler)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Honesty note on the source corpus](#honesty-note-on-the-source-corpus)
+- [What DEFINES the genre + the core loop](#what-defines-the-genre--the-core-loop)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [Original card-game implementation outline](#original-card-game-implementation-outline)
+  - [1. Cards as GameResource content (not hardcoded classes)](#1-cards-as-gameresource-content-not-hardcoded-classes)
+  - [2. Authoritative turn flow: host owns truth, clients read a synced field](#2-authoritative-turn-flow-host-owns-truth-clients-read-a-synced-field)
+  - [3. Playing a card: request → host-validate → broadcast (the core net idiom)](#3-playing-a-card-request--host-validate--broadcast-the-core-net-idiom)
+  - [4. Resolving card effects (the crafting evaluator, repurposed)](#4-resolving-card-effects-the-crafting-evaluator-repurposed)
+  - [5. Win check + result, with late-joiner snapshot](#5-win-check--result-with-late-joiner-snapshot)
+  - [6. Self-seeding balance config](#6-self-seeding-balance-config)
+- [Modern-API gotchas (do / don't)](#modern-api-gotchas-do--dont)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [A. Reflection-driven draft pool (facepunch.ss2 — PerkManager.cs, Player.Perks.cs)](#a-reflection-driven-draft-pool-facepunchss2--perkmanagercs-playerperkscs)
+  - [B. Draft-offer sync with [Rpc.FilterInclude] + PerkChoiceHash (facepunch.ss2)](#b-draft-offer-sync-with-rpcfilterinclude--perkchoicehash-facepunchss2)
+  - [C. INetworkSnapshot for late-join board state (khamitech.battledraft — Manager.cs:42)](#c-inetworksnapshot-for-late-join-board-state-khamitechbattledraft--managercs42)
+  - [D. Disk-vs-wire schema split ([JsonIgnoreNetwork]) (khamitech.battledraft — ItemShop.cs:115, JsonConfiguration.cs:64)](#d-disk-vs-wire-schema-split-jsonignorenetwork-khamitechbattledraft--itemshopcs115-jsonconfigurationcs64)
+  - [E. Stat-modifier engine for card buffs (facepunch.ss2 — Player.Stats.cs)](#e-stat-modifier-engine-for-card-buffs-facepunchss2--playerstatscs)
+  - [F. Vote-to-next-round / map-vote as draft selection (khamitech.battledraft — VoteMapSystem.cs)](#f-vote-to-next-round--map-vote-as-draft-selection-khamitechbattledraft--votemapsystemcs)
+  - [Read these games](#read-these-games)
+<!-- reference-toc:end -->
+
 Build a turn-based card game in modern s&box: a deck of data-authored cards, a hand/board UI, an authoritative turn loop, and resolved card effects (damage / heal / draw / buff). Two players or player-vs-AI.
 
 ## Honesty note on the source corpus
 
-The only mined "card-battler" entry is **khamitech.battledraft**, and its own summary flags it as **NOT a card/draft battler** — it is a mature multiplayer FPS *framework* (battledraft: Code/Asset/Asset.cs:6). So treat this recipe as an **adaptation**: battledraft contributes the genre-agnostic spine a card game actually needs — a data-driven `GameResource` content pipeline, a host-authoritative RPC mutation convention, a round/turn state machine, self-seeding JSON config, and a meta/expression-driven "recipe → result" evaluator that maps almost 1:1 onto card effects. The card-specific glue (hand, board, mana, targeting) is composed from those plus the shared cookbook systems below. Cite-and-adapt, don't lift a "card game" that isn't there.
+The only mined "card-battler" entry is **khamitech.battledraft**, and its own summary flags it as **NOT a card/draft battler** — it is a mature multiplayer FPS *framework* (battledraft: Code/Asset/Asset.cs:6). It documents useful genre-agnostic architecture: a data-driven `GameResource` content pipeline, host-authoritative RPC mutation, a round state machine, self-seeding JSON config, and an inputs-to-results evaluator. The card-specific design below is independently structured around those general requirements plus the shared cookbook systems; it is not presented as card-game source from battledraft.
 
 ## What DEFINES the genre + the core loop
 
@@ -41,125 +67,119 @@ A card-battler is a **turn-structured contest over a shared, replicated game sta
 6. **UI.** Razor hand panel + drag-to-play + targeting + life/mana HUD. This is where screenshots matter — iterate with `take_screenshot`.
 7. **Polish:** mulligan, AI bot, config-driven balance, match result screen.
 
-## How the source actually does it (adapt to cards)
+## Original card-game implementation outline
 
 ### 1. Cards as `GameResource` content (not hardcoded classes)
 
-battledraft authors *every* weapon/recipe as a `GameResource` with a dotted `Type`, an `ID`, and an effect blob, then reconstructs by id at load (battledraft: Code/Asset/Asset.cs:7-52, `GetFirstType` :95). Display text is auto-derived from the id (`{type}_{id}_name`) so content is localizable with zero per-card code (battledraft: Code/Asset/Asset.cs:127). Mirror that for cards:
+battledraft authors weapons and recipes as `GameResource` assets with stable identifiers and reconstructs them by id at load (battledraft: Code/Asset/Asset.cs:7-52, `GetFirstType` :95). Display text is derived from the id (`{type}_{id}_name`) so content is localizable with zero per-item code (battledraft: Code/Asset/Asset.cs:127). A card asset can be specified independently as:
 
-```csharp
-[GameResource( "Card", "card", "A playable card." )]
-public sealed class CardDef : GameResource
-{
-    public string Id { get; set; } = "strike";   // stable key, like Asset.ID
-    public string Type { get; set; } = "spell";   // "spell" | "minion" | "buff"
-    public int Cost { get; set; } = 1;            // mana to play
-    public int Attack { get; set; }               // for minions
-    public int Health { get; set; }
-    public List<CardEffect> Effects { get; set; } = new();   // resolved on play
-    public Model Art { get; set; }
-}
+```text
+CARD DEFINITION ASSET
+  stable identifier
+  category such as spell, minion, or buff
+  mana cost
+  optional attack and health values
+  ordered list of effect specifications
+  presentation asset for the card art
+
+Author each definition as a designer-editable GameResource.
 ```
 
-Build the registry once on load (host + client) — battledraft keys by a hashed id into a dictionary (battledraft: Code/Managers/AssetManager.cs:27). Modern, simpler:
+Build the registry once on load for both host and clients; battledraft documents a hashed-id dictionary (battledraft: Code/Managers/AssetManager.cs:27). A simpler registry outline is:
 
-```csharp
-public static class CardLibrary
-{
-    static Dictionary<string, CardDef> _byId;
-    public static CardDef Get( string id ) => (_byId ??= Build())[id];
-    static Dictionary<string,CardDef> Build() =>
-        ResourceLibrary.GetAll<CardDef>().ToDictionary( c => c.Id );
-}
+```text
+AT CONTENT STARTUP
+  enumerate every Card Definition asset
+  reject missing or duplicate stable identifiers
+  build a map from stable identifier to definition
+
+FUNCTION findCard(cardId)
+  RETURN the definition stored under cardId
 ```
 
 > Why `GameResource`, not a plain class: designers (or a non-coder via the bridge) author cards in the editor inspector, and the same assets are visible host- and client-side, so a card id resolves identically on both ends. Verify the attribute shape with `describe_type GameResource` — the ctor args differ across SDK builds.
 
 ### 2. Authoritative turn flow: host owns truth, clients read a synced field
 
-battledraft's round state is a `[Sync(SyncFlags.FromHost)]` field whose **setter is the transition hook**, polled in the host's update loop (battledraft: Code/Addons/GunGame/GunGameManager.cs:19-41 RoundExpires/IsPlayMode; OnUpdate poll at GunGame.cs:327). `FromHost` means clients physically cannot write it. Apply that to whose turn it is:
+battledraft's round state is a `[Sync(SyncFlags.FromHost)]` field whose **setter is the transition hook**, polled in the host's update loop (battledraft: Code/Addons/GunGame/GunGameManager.cs:19-41 RoundExpires/IsPlayMode; OnUpdate poll at GunGame.cs:327). `FromHost` means clients physically cannot write it. A card-turn manager can use this independent state outline:
 
-```csharp
-public sealed class MatchManager : Component
-{
-    [Sync( SyncFlags.FromHost )] public Guid ActivePlayerId { get; set; }
-    [Sync( SyncFlags.FromHost )] public TimeUntil TurnExpires { get; set; }
-    [Sync( SyncFlags.FromHost )] public int Turn { get; set; }
+```text
+MATCH STATE REPLICATED FROM THE HOST
+  active player identifier
+  turn deadline
+  turn number
 
-    protected override void OnUpdate()             // host-authoritative tick
-    {
-        if ( !Networking.IsHost ) return;          // clients only read the synced fields
-        if ( TurnExpires ) EndTurn();              // timer ran out → auto-pass
-    }
+EACH UPDATE
+  IF this machine is not the host:
+    STOP
+  IF the turn deadline elapsed:
+    end the turn
 
-    void EndTurn()
-    {
-        ActivePlayerId = NextPlayer();
-        TurnExpires = TurnSeconds;
-        Turn++;
-        StartOfTurn( ActivePlayerId );             // refill mana, draw a card
-    }
-}
+PROCEDURE endTurn()
+  choose the next active player
+  reset the turn deadline
+  increment the turn number
+  refill that player's per-turn resource
+  draw the configured number of cards
 ```
 
 battledraft compares `RoundExpires` against wall-clock `DateTime.UtcNow`; modern s&box `TimeUntil`/`TimeSince` is the cleaner heartbeat (see `references/systems/round-match.md`). Turn timing is fine off a synced value — it does **not** need tick accuracy.
 
 ### 3. Playing a card: request → host-validate → broadcast (the core net idiom)
 
-The single most-reused battledraft convention: a client *asks* via `[Rpc.Host]`, the host **re-validates the caller**, mutates host-side truth, then fans the result out — and to avoid double-applying its own broadcast, the host excludes itself and applies locally (battledraft: Code/Addons/GunGame/GunGameManager.cs:171-186, `using (Rpc.FilterExclude(Connection.Host))`). The storage interactable validates the *caller's identity* on every mutation the same way (battledraft: Code/Addons/Arena/Interactables/Storage.cs:136). For cards:
+The relevant network rule is that a client asks via `[Rpc.Host]`, the host **re-validates the caller**, mutates host-side truth, then distributes the result. A host may exclude itself from a broadcast after applying locally to avoid double application (battledraft: Code/Addons/GunGame/GunGameManager.cs:171-186, `using (Rpc.FilterExclude(Connection.Host))`). The storage interactable also validates the caller's identity on every mutation (battledraft: Code/Addons/Arena/Interactables/Storage.cs:136). For card play:
 
-```csharp
-[Rpc.Host]
-public void RequestPlayCard( string cardId, Guid targetId )
-{
-    var caller = Rpc.Caller;                              // who actually sent it
-    if ( PlayerIdOf( caller ) != ActivePlayerId ) return; // not your turn
-    var hand = HandOf( caller );
-    if ( !hand.Contains( cardId ) ) return;               // not in your hand (anti-cheat)
-    var def = CardLibrary.Get( cardId );
-    if ( ManaOf( caller ) < def.Cost ) return;            // can't afford
+```text
+HOST COMMAND requestCardPlay(caller, cardId, targetId)
+  derive the caller's authoritative player identifier
+  reject unless that player owns the current turn
 
-    SpendMana( caller, def.Cost );
-    hand.Remove( cardId );
-    ResolveEffects( def, caller, targetId );              // §4
-    BroadcastBoardState();                                // fan truth to everyone
-    CheckWin();
-}
+  load the caller's authoritative hand
+  reject unless cardId is present in that hand
+
+  resolve cardId through the validated card registry
+  reject unless the target is legal for every declared effect
+  reject unless the authoritative mana balance covers the card cost
+
+  spend mana
+  remove the card from the authoritative hand
+  resolve its effects on host-owned state
+  publish the resulting board state
+  evaluate the win conditions
 ```
 
 Validate **every** field on the host — never trust the client's "I have mana / this card is in my hand." This is the `anti-cheat` posture; see `references/systems/anti-cheat.md`. Reveal a player's hand only to its owner, the way battledraft sends a container's contents only to the current opener via `Rpc.FilterInclude(owner)` (battledraft: Code/Addons/Arena/Interactables/Storage.cs:401):
 
-```csharp
-void RevealHand( Connection owner, string[] cards )
-{
-    using ( Rpc.FilterInclude( owner ) ) ReceiveHand( cards );   // opponent never sees it
-}
-[Rpc.Broadcast] void ReceiveHand( string[] cards ) => LocalHand = cards;
+```text
+PROCEDURE sendPrivateHand(ownerConnection, cardIds)
+  send the hand payload only to ownerConnection
+
+ON the owning client receiving the payload
+  replace the local hand presentation with cardIds
+
+Never replicate private hand contents to opponents.
 ```
 
 ### 4. Resolving card effects (the crafting evaluator, repurposed)
 
-battledraft's `CraftAsset.GetResult` is a clean "inputs → outputs, with value passthrough" engine: it rolls weighted outputs, generates result data, and resolves output fields from input fields — `$0` copies item 0, `$1.durability` pulls a field, and a full expression like `$0.durability + $1.durability` runs through a tiny evaluator (battledraft: Code/Addons/Survival/Asset/Craft/CraftAsset.cs:73 `GetResult`, :102 `ParseMetaValue`). A card effect is the same shape — a small, data-authored op applied to a target — minus the stringly-typed expression mini-language (skip it; it silently returns the raw string on parse failure — battledraft CraftAsset.cs:~140). Prefer a typed effect enum:
+battledraft's `CraftAsset.GetResult` documents an "inputs → outputs, with value passthrough" engine: it rolls weighted outputs, generates result data, and resolves output fields from input fields — `$0` selects item 0, `$1.durability` selects a field, and an expression like `$0.durability + $1.durability` runs through a small evaluator (battledraft: Code/Addons/Survival/Asset/Craft/CraftAsset.cs:73 `GetResult`, :102 `ParseMetaValue`). For cards, avoid the string expression language because parse failure can silently return raw text (battledraft CraftAsset.cs:~140). Use typed effect data:
 
-```csharp
-public struct CardEffect { public EffectOp Op; public int Amount; public TargetKind Target; }
-public enum EffectOp { Damage, Heal, Draw, GainMana, BuffAttack }
+```text
+EFFECT SPECIFICATION
+  operation: damage, heal, draw, gain mana, or buff attack
+  amount
+  target rule
 
-void ResolveEffects( CardDef def, Connection caster, Guid targetId )
-{
-    foreach ( var e in def.Effects )
-    {
-        var who = Resolve( e.Target, caster, targetId );
-        switch ( e.Op )
-        {
-            case EffectOp.Damage:    DamagePlayer( who, e.Amount ); break;
-            case EffectOp.Heal:      HealPlayer( who, e.Amount );   break;
-            case EffectOp.Draw:      Draw( caster, e.Amount );      break;
-            case EffectOp.GainMana:  AddMana( caster, e.Amount );   break;
-            case EffectOp.BuffAttack:BuffBoard( who, e.Amount );    break;
-        }
-    }
-}
+HOST PROCEDURE resolveCardEffects(card, caster, selectedTarget)
+  FOR EACH effect IN card's ordered effects:
+    target = resolve effect.targetRule from caster and selectedTarget
+
+    CASE effect.operation:
+      damage: reduce target health by effect.amount
+      heal: restore target health by effect.amount
+      draw: draw effect.amount cards for caster
+      gain mana: add effect.amount mana for caster
+      buff attack: increase the chosen board unit's attack
 ```
 
 Keep effects pure host-side; UI reads the resulting synced board. For weighted/random outputs (a "draw a random card" mechanic), battledraft uses a `FromEnumerableWithChance` weighted roll (battledraft CraftAsset.cs:77) — replicate with `Game.Random` and broadcast the chosen result so all clients agree (never let two machines roll independently).
@@ -178,7 +198,7 @@ Don't hardcode starting life / hand size / deck limits. battledraft's `ReadOrWri
 - **Host validates everything.** The genre's whole integrity is "the client can't lie about its turn, mana, or hand." Mirror battledraft's per-mutation caller re-validation (Storage.cs:136), never the client's word.
 - **One source of randomness.** Roll on the host, broadcast the outcome — independent client rolls desync the board.
 - **Reveal-scoped data.** Hands are private; use `Rpc.FilterInclude(owner)` (battledraft Storage.cs:401), don't `[Sync]` a hand list to everyone.
-- **Static event buses leak.** If you copy battledraft's static-`Action` bus, you *must* unsubscribe on teardown or it leaks across hotloads (battledraft: EventManager.cs UnlinkDelegates at :107). On a new card game, prefer instance `Scene.RunEvent<T>` or direct component refs and skip the static bus entirely.
+- **Static event buses leak.** If you use a static `Action` bus, you *must* unsubscribe on teardown or it leaks across hotloads (battledraft: EventManager.cs UnlinkDelegates at :107). On a new card game, prefer instance `Scene.RunEvent<T>` or direct component refs and skip the static bus entirely.
 
 ## Verify live
 
@@ -194,66 +214,48 @@ Four games added in the 2026 mining pass — facepunch.ss2, despawn.murder, face
 
 facepunch.ss2 is a bullet-heaven roguelite, but its **level-up perk draft** is structurally identical to "draw N cards to offer, player picks one": a pool discovered at boot by `TypeLibrary.GetTypes<Perk>()`, filtered by per-card attribute gates, then weighted-reservoir-sampled without replacement. This is the missing "draft offer" layer for a card game:
 
-```csharp
-// ss2: perks/Perk.cs + PerkManager.cs (adapted — replace Perk with CardDef)
-[AttributeUsage(AttributeTargets.Class)]
-public sealed class CardAttribute : Attribute
-{
-    public Rarity Rarity;
-    public bool AvailableFromStart;
-    public CardAttribute( Rarity rarity, bool availableFromStart = true )
-        { Rarity = rarity; AvailableFromStart = availableFromStart; }
-}
+```text
+CARD DRAFT METADATA
+  rarity
+  available from match start
 
-// Build pool once at match start — adding a new card file auto-includes it:
-static IReadOnlyList<TypeDescription> BuildPool() =>
-    TypeLibrary.GetTypes<CardDef>()
-               .Where( t => t.GetAttribute<CardAttribute>() is { AvailableFromStart: true } )
-               .ToList();
+AT MATCH START
+  discover registered card definitions
+  keep only cards whose metadata permits an opening offer
+  assign each remaining card a rarity weight
+    example weights: common 425, uncommon 85, rare 22, highest rarity 3
 
-// Weighted-reservoir draw of N offers WITHOUT replacement (ss2 pattern):
-static List<TypeDescription> DraftOffers( IReadOnlyList<TypeDescription> pool,
-                                           int n, Random rng )
-{
-    var result = new List<TypeDescription>();
-    var weights = pool.Select( GetRarityWeight ).ToList();
-    while ( result.Count < n && weights.Any( w => w > 0 ) )
-    {
-        float total = weights.Sum();
-        float roll  = rng.NextFloat() * total;
-        float acc   = 0;
-        for ( int i = 0; i < pool.Count; i++ )
-        {
-            acc += weights[i];
-            if ( roll <= acc ) { result.Add( pool[i] ); weights[i] = 0; break; }
-        }
-    }
-    return result;
-}
-static float GetRarityWeight( TypeDescription t ) =>
-    t.GetAttribute<CardAttribute>()?.Rarity switch
-        { Rarity.Common => 425, Rarity.Uncommon => 85, Rarity.Rare => 22, _ => 3 };
+FUNCTION chooseDraftOffers(eligibleCards, requestedCount, randomSource)
+  candidates = mutable copy of eligibleCards and their weights
+  offers = empty list
+
+  WHILE offers has fewer than requestedCount
+        AND candidates contain positive total weight:
+    select one candidate proportionally to its current weight
+    append it to offers
+    remove that candidate from further selection
+
+  RETURN offers
 ```
 
 Anti-pattern in ss2: the pool is built host-side and the offered indices are broadcast, but perk *display metadata* (name, icon, description) lives in per-class static ctors that only fire when that type is actually instantiated client-side. If you broadcast `cardId` strings to clients who haven't instantiated the `CardDef`, the display dict is empty. ss2 fixes this with `Perk.EnsureRegistered(type)` — it does `TypeLibrary.GetType(type).Create<Perk>()` once solely to trigger the static ctor. For a `GameResource`-based card game you avoid the problem entirely: `ResourceLibrary.GetAll<CardDef>()` loads all assets on both sides at boot, so there is no "static ctor hasn't fired" hole.
 
 ### B. Draft-offer sync with `[Rpc.FilterInclude]` + `PerkChoiceHash` (facepunch.ss2)
 
-The existing file already covers `Rpc.FilterInclude` for hand privacy. ss2 adds a complementary trick: **hash-counter UI reactivity**. A `PerkChoiceHash` int is incremented every time the draft offer list mutates; the Razor panel's `BuildHash()` returns it. This means the panel re-renders exactly once per offer-list change, never per-frame. Adapt for a card-play or draft-offer panel:
+The existing file already covers `Rpc.FilterInclude` for hand privacy. ss2 documents a complementary trick: **hash-counter UI reactivity**. A `PerkChoiceHash` int is incremented every time the draft offer list mutates; the Razor panel's `BuildHash()` returns it. This means the panel re-renders exactly once per offer-list change, never per-frame. An independent card-UI outline is:
 
-```csharp
-// MatchManager addition — cheap dirty flag for UI
-[Sync( SyncFlags.FromHost )] public int DraftHash { get; private set; }
+```text
+HOST-REPLICATED STATE
+  draft revision counter
 
-void SetDraftOffers( Guid playerId, List<string> cardIds )
-{
-    _draftOffers[playerId] = cardIds;
-    DraftHash++;                      // panel rebuilds exactly here, not every frame
-    using ( Rpc.FilterInclude( ConnectionOf( playerId ) ) )
-        ReceiveDraftOffers( cardIds.ToArray() );
-}
-// Razor panel:
-// protected override int BuildHash() => HashCode.Combine( MatchManager.Instance.DraftHash );
+PROCEDURE setDraftOffers(playerId, cardIds)
+  replace the authoritative offers for playerId
+  increment the draft revision counter
+  send cardIds only to that player's connection
+
+UI REBUILD KEY
+  include the draft revision counter in the panel's build hash
+  rebuild only when that counter changes
 ```
 
 ### C. `INetworkSnapshot` for late-join board state (khamitech.battledraft — `Manager.cs:42`)
@@ -392,12 +394,12 @@ Anti-pattern in battledraft: the debounce uses `GameTimer.InvokeOnce("check_vote
 
 ### Read these games
 
-For a card-draft battler, the highest-value source games in order of relevance:
+For a card-draft battler, these package references are useful in order of relevance. Locate each package through [`SOURCE-PROVENANCE.md`](../SOURCE-PROVENANCE.md).
 
-| Game | File | What to mine |
-|---|---|---|
-| **khamitech.battledraft** | `sbox-lessons/mining-v2/games/khamitech.battledraft.md` | Host-auth RPC mutation convention, `GameResource` asset pipeline, round/turn FSM (`RoundExpires`/`IsPlayMode`), `INetworkSnapshot` late-join, `CraftAsset.GetResult` effect evaluator, `FilterExclude(Host)` idiom, `Rpc.FilterInclude(owner)` for hand privacy |
-| **facepunch.ss2** | `sbox-lessons/mining-v2/games/facepunch.ss2.md` | Reflection-driven draft pool (`TypeLibrary.GetTypes<Perk>()`), weighted-reservoir draw, rarity weights, synergy/prerequisite gate, stat-modifier engine (Set/Add/Mult), hash-counter UI reactivity (`PerkChoiceHash`) |
-| **despawn.murder** | `sbox-lessons/mining-v2/games/despawn.murder.md` | `RoundState` base class with `Begin/Tick/Finish` virtuals + `TimeUntil TimeLeft`; `[Rpc.Host] PurchaseHost` host-authoritative buy with ConVar-priced items; per-recipient reveal via ghost clones (`Rpc.FilterInclude`) |
-| **facepunch.fair** | `sbox-lessons/mining-v2/games/facepunch.fair.md` | `INetworkSnapshot` for `ByteStream` bulk-state (owned-chunk set); reason-tagged economy transactions; `ISaveDataProperty` versioned persistence |
-| **barrelproto.ragroll** | `sbox-lessons/mining-v2/games/barrelproto.ragroll.md` | `IGameMode` swappable-interface pattern; owner-gated score write (`[Sync]` setter early-returns unless `Network.IsOwner`); `VoteSystem`-style debounced majority/plurality resolution |
+| Package | What to inspect |
+|---|---|
+| **`khamitech.battledraft`** | Host-auth RPC mutation convention, `GameResource` asset pipeline, round/turn FSM (`RoundExpires`/`IsPlayMode`), `INetworkSnapshot` late-join, `CraftAsset.GetResult` effect evaluator, `FilterExclude(Host)` idiom, `Rpc.FilterInclude(owner)` for hand privacy |
+| **`facepunch.ss2`** | Reflection-driven draft pool (`TypeLibrary.GetTypes<Perk>()`), weighted-reservoir draw, rarity weights, synergy/prerequisite gate, stat-modifier engine (Set/Add/Mult), hash-counter UI reactivity (`PerkChoiceHash`) |
+| **`despawn.murder`** | `RoundState` base class with `Begin/Tick/Finish` virtuals + `TimeUntil TimeLeft`; `[Rpc.Host] PurchaseHost` host-authoritative buy with ConVar-priced items; per-recipient reveal via ghost clones (`Rpc.FilterInclude`) |
+| **`facepunch.fair`** | `INetworkSnapshot` for `ByteStream` bulk-state (owned-chunk set); reason-tagged economy transactions; `ISaveDataProperty` versioned persistence |
+| **`barrelproto.ragroll`** | `IGameMode` swappable-interface pattern; owner-gated score write (`[Sync]` setter early-returns unless `Network.IsOwner`); `VoteSystem`-style debounced majority/plurality resolution |

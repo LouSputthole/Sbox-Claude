@@ -1,5 +1,28 @@
 # Idle / Offline Income Systems
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What this is and when you need it](#what-this-is-and-when-you-need-it)
+- [Canonical approach](#canonical-approach)
+  - [1. The idle-tick generator (host-authoritative, capped store)](#1-the-idle-tick-generator-host-authoritative-capped-store)
+  - [2. Upgrade levels live on the earner, not the player](#2-upgrade-levels-live-on-the-earner-not-the-player)
+  - [3. Live-frame accrual variant (no per-instance component)](#3-live-frame-accrual-variant-no-per-instance-component)
+  - [4. Offline durability part A — persistent identity for placed earners](#4-offline-durability-part-a--persistent-identity-for-placed-earners)
+  - [5. Offline durability part B — at-least-once reward delivery (ACK pattern)](#5-offline-durability-part-b--at-least-once-reward-delivery-ack-pattern)
+- [Variations seen across games](#variations-seen-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [A. UTC-tick scheduling — the correct way to do true offline accrual (klibatocorp.phenodex)](#a-utc-tick-scheduling--the-correct-way-to-do-true-offline-accrual-klibatocorpphenodex)
+  - [B. Dual-faucet offline reconciliation with penalty + fuel bounds (lavagame.sandmoney)](#b-dual-faucet-offline-reconciliation-with-penalty--fuel-bounds-lavagamesandmoney)
+  - [C. Bracket-based prestige currency + full-wipe reset (lavagame.sandmoney)](#c-bracket-based-prestige-currency--full-wipe-reset-lavagamesandmoney)
+  - [D. Prestige-wipe with re-grant and teleport (intercrusstudio.sneguborka)](#d-prestige-wipe-with-re-grant-and-teleport-intercrusstudiosneguborka)
+  - [E. Autonomous hired-unit idle layer without true offline earnings (freddo.scoops)](#e-autonomous-hired-unit-idle-layer-without-true-offline-earnings-freddoscoops)
+  - [F. NaN-guarded money mutators + dynamic per-item shop inflation (itacho.fillthevoid)](#f-nan-guarded-money-mutators--dynamic-per-item-shop-inflation-itachofillthevoid)
+  - [Updated "read these games" pointer](#updated-read-these-games-pointer)
+<!-- reference-toc:end -->
+
 How to build passive-income generators, idle-tick earners, and offline/disconnect-safe reward delivery in modern s&box (GameObject/Component/Scene).
 
 ## What this is and when you need it
@@ -178,7 +201,6 @@ public void AckWin( ulong steamId )
 The existing corpus note says "no game simulates true offline elapsed-time" and tells you to build it yourself. `klibatocorp.phenodex` is now the canonical reference: it stores **UTC tick deltas** (`DateTime.UtcNow.Ticks`), not `Time.Delta` accumulators, so growth and bills advance correctly across sessions regardless of how long the server was offline.
 
 ```csharp
-// phenodex/Code/Plant.cs
 [Sync(SyncFlags.FromHost)] public long PlantedAtTicks  { get; set; }
 [Sync(SyncFlags.FromHost)] public long PhaseStartAtTicks { get; set; }
 
@@ -199,35 +221,29 @@ Bills schedule the same way: `NextBillTicks = DateTime.UtcNow.Ticks + TimeSpan.F
 
 `lavagame.sandmoney_` is the best reference for reconciling **two independently bounded offline income streams** from one `LastSeenUnix` timestamp on load:
 
-```csharp
-// sandmoney_/Code/InfrastructureManager.cs (condensed)
-void SimulateOfflineEarnings( double offlineSec )
-{
-    offlineSec = MathX.Clamp( offlineSec, 0, 86400 );   // hard 24-h cap
-    if ( offlineSec <= 300 ) return;                     // 5-min floor — skip trivial sessions
+```text
+PROCEDURE reconcileMachineIncome(elapsedSeconds, ownedMachines)
+  eligibleSeconds = CLAMP(elapsedSeconds, 0, 24 hours)
+  IF eligibleSeconds is 5 minutes or less
+    STOP
 
-    foreach ( var machine in OwnedMachines )
-    {
-        int cycles = (int)(offlineSec / machine.CycleSec);
-        double earn = cycles * machine.RewardPerCycle * 0.50;  // 50% offline penalty
-        double remainder = offlineSec % machine.CycleSec;
-        machine.CycleStartedAt = DateTime.UtcNow - TimeSpan.FromSeconds( remainder ); // resume mid-cycle
-        ApplyEarnings( earn );
-    }
-}
+  FOR EACH machine IN ownedMachines
+    completedCycles = FLOOR(eligibleSeconds / machine.cycleDuration)
+    grossReward = completedCycles * machine.rewardPerCycle
+    credit 50 percent of grossReward
 
-// sandmoney_/Code/Player/PlayerTrader.cs (condensed)
-void ApplyOfflineEarnings( double offlineSec )
-{
-    foreach ( var bot in ActiveBots )
-    {
-        double earnSec = Math.Min( offlineSec, bot.FuelSeconds );  // fuel-bounded
-        double earn = bot.GetOfflineEarningsPerMin( bot.Tier, bot.Quality ) * (earnSec / 60.0);
-        bot.FuelSeconds -= earnSec;
-        if ( bot.FuelSeconds <= 0 ) bot.SetEnabled( false );       // disables when dry
-        ApplyEarnings( earn );
-    }
-}
+    partialCycleSeconds = eligibleSeconds MODULO machine.cycleDuration
+    set machine cycle start to current UTC time minus partialCycleSeconds
+
+PROCEDURE reconcileBotIncome(elapsedSeconds, activeBots)
+  FOR EACH bot IN activeBots
+    productiveSeconds = MINIMUM(elapsedSeconds, bot.remainingFuelSeconds)
+    reward = bot.offlineRewardPerMinute * productiveSeconds / 60
+    credit reward
+
+    reduce bot fuel by productiveSeconds
+    IF no fuel remains
+      disable bot
 ```
 
 Key techniques:
@@ -242,33 +258,30 @@ This game also has the prestige layer (see section C) — both patterns compose 
 
 The first full prestige implementation in the corpus. Key differentiators over a simple "reset for multiplier":
 
-```csharp
-// sandmoney_/Code/Player/PlayerTrader.cs (condensed)
-long ComputeHeritageCoinsForNetWorth( double nw )
-{
-    // Bracket table: < $1T → 0; each power-of-ten above earns more coins
-    // Returns coins for CURRENT bracket only (not cumulative) —
-    // discourages repeated cheap resets for incremental gains
-    if ( nw < 1e12 ) return 0;
-    if ( nw < 1e13 ) return 1;
-    if ( nw < 1e14 ) return 3;
-    // ...up to 35 at the highest bracket
-    return 35;
-}
+```text
+FUNCTION heritageRewardFor(netWorth)
+  IF netWorth is below 1 trillion
+    RETURN 0
 
-void ResetProfileCore()
-{
-    // "NUCLEAR RESET" — zero everything twice for safety
-    Money = 0; CoinsHeld = 0;
-    foreach ( var bot in ActiveBots ) bot.GameObject.Destroy();
-    ActiveBots.Clear();
-    Upgrades = new UpgradeData();
-    Infrastructure = new InfrastructureData();
-    Missions = new MissionData();
-    // Re-apply permanent Heritage perks AFTER wipe
-    foreach ( var bonus in Heritage.PurchasedBonuses ) ApplyHeritageBonus( bonus );
-    RunFtueBootstrap();  // re-run first-time-user flow for the new run
-}
+  find the single power-of-ten bracket containing netWorth
+  RETURN that bracket's fixed reward, not the sum of lower brackets
+    example: 1 trillion bracket returns 1
+    example: 10 trillion bracket returns 3
+    highest bracket returns 35
+
+PROCEDURE beginNewPrestigeRun(profile)
+  set spendable money and held coins to zero
+
+  FOR EACH active bot
+    destroy its world object
+  clear the active-bot collection
+
+  replace upgrades, infrastructure, and missions with default state
+
+  FOR EACH permanently purchased heritage bonus
+    apply the bonus to the reset profile
+
+  run first-time setup for the new run
 ```
 
 Heritage shop uses `CmdBuyHeritageBonus(id)` with tiered prerequisites (a "Capital I" perk must be bought before "Capital II"); some bonuses grant starting currency, others unlock tiers — a clean meta-currency-spent-on-permanent-multipliers pattern composable into any idle game.
@@ -279,31 +292,22 @@ Anti-pattern: awarding cumulative prestige coins (total earned across resets). T
 
 `intercrusstudio.sneguborka` shows the **networking details** of a prestige reset that the sandmoney_ single-player case hides:
 
-```csharp
-// sneguborka/Code/Player/PlayerPrestigeController.cs (condensed)
-[Rpc.Host]
-void WinterReset( Connection caller )
-{
-    // 1. Wipe wallet/tools/upgrades/inventory on host
-    Wallet.SetMoney( 0 );           // SetMoney is the prestige-wipe-only path
-    ToolUpgrades.Clear();
-    Inventory.Clear();
-    WintersSurvived++;
+```text
+HOST COMMAND performWinterReset(caller)
+  set wallet balance to zero through the reset-only mutator
+  clear tool upgrades and inventory
+  increment winters survived
 
-    // 2. Re-grant starter kit (mirrors spawn flow without recreating the GameObject)
-    GrantStarterSpoon();            // first tool at Cost=0, MaxTier=1
-    GrantStarterBag();
+  grant the zero-cost starter tool and starter bag
 
-    // 3. Zero key-gated state and clear host-only dedupe sets
-    GoldenKeys = 0;
-    _grantedKeysThisWinter.Clear(); // so keys can be re-earned
+  set golden keys to zero
+  clear the host's set of keys already granted this winter
 
-    // 4. Teleport: reservoir-sample a spawn point, apply on owning client
-    var spawn = ResolveSpawnTransform();
-    Rpc.FilterInclude( caller );
-    ApplyTeleport( spawn );         // clears Rigidbody interpolation
-    PlayerController.EyeAngles = spawn.Rotation.Angles();
-}
+  choose a spawn transform with reservoir sampling
+  send the remaining reset only to caller's owning client:
+    teleport to the chosen transform
+    clear rigid-body interpolation state
+    align the player's view with the spawn rotation
 ```
 
 Key points:
@@ -317,7 +321,6 @@ Key points:
 `freddo.scoops` shows the simplest "earn while not playing" design — hired drivers that produce income with no player input, with no offline catch-up at all:
 
 ```csharp
-// scoops/Code/IceCreamTruck.cs (shape)
 public sealed class IceCreamTruck : Component
 {
     [Sync] public int Level { get; set; } = 1;       // per-truck upgrade
@@ -351,29 +354,33 @@ Capped at `MaxDrivers = 6`. Each truck carries its own `[Sync] Level` — upgrad
 `itacho.fill_the_void` contributes two production-quality patterns for idle economy robustness not covered elsewhere:
 
 **1. NaN/Inf-guarded money at every boundary** (GameState.cs):
-```csharp
-// fill_the_void/Code/Components/Game/GameState.cs (condensed)
-float NormalizeMoneyValue( float v )
-    => float.IsFinite( v ) ? MathX.Max( 0f, MathF.Round( v ) ) : 0f;
+```text
+FUNCTION normalizeStoredMoney(value)
+  IF value is not finite
+    RETURN 0
+  RETURN MAXIMUM(0, ROUND(value))
 
-float NormalizeMoneyDelta( float d )
-    => float.IsFinite( d ) ? MathX.Max( 0f, d ) : 0f;
+FUNCTION normalizeMoneyChange(amount)
+  IF amount is not finite
+    RETURN 0
+  RETURN MAXIMUM(0, amount)
 
-public void AddMoney( float amount )
-{
-    var d = NormalizeMoneyDelta( amount );
-    if ( d <= 0 ) return;
-    Money = NormalizeMoneyValue( Money + d );
-    // ...achievements, events
-}
+PROCEDURE addMoney(amount)
+  safeAmount = normalizeMoneyChange(amount)
+  IF safeAmount is zero
+    STOP
 
-public bool SpendMoney( float amount )
-{
-    var d = NormalizeMoneyDelta( amount );
-    if ( NormalizeMoneyValue( Money ) < d ) return false;   // affordability gate returns bool
-    Money = NormalizeMoneyValue( Money - d );
-    return true;
-}
+  storedMoney = normalizeStoredMoney(storedMoney + safeAmount)
+  emit any relevant accounting, achievement, or UI events
+
+FUNCTION trySpendMoney(amount)
+  safeAmount = normalizeMoneyChange(amount)
+  currentBalance = normalizeStoredMoney(storedMoney)
+  IF currentBalance is less than safeAmount
+    RETURN false
+
+  storedMoney = normalizeStoredMoney(currentBalance - safeAmount)
+  RETURN true
 ```
 
 Note: `MathF` is used here (`MathF.Round`) — verify with `describe_type` in your project since `MathF` may not be whitelisted in all s&box SDK versions. `MathX.Max` is always safe.
@@ -381,15 +388,14 @@ Note: `MathF` is used here (`MathF.Round`) — verify with `describe_type` in yo
 **Anti-pattern:** `Math.Max(0, NaN)` returns `NaN` — `JsonSerializer` then throws and **silently kills the save**. Normalize before write *and* clamp on load.
 
 **2. Per-item exponential price inflation persisted to save** (GameState.cs):
-```csharp
-// fill_the_void/Code/Components/Game/GameState.cs (condensed)
-public float GetCurrentShopItemPrice( string itemId, float basePrice,
-                                      float multiplierPerPurchase = 1.5f )
-{
-    var count = GetShopItemPurchaseCount( itemId );   // from a persisted Dictionary<string,int>
-    var scaled = basePrice * MathF.Pow( multiplierPerPurchase, count );
-    return float.IsFinite( scaled ) ? scaled : basePrice;   // guard the Pow result too
-}
+```text
+FUNCTION currentPrice(itemId, basePrice, multiplierPerPurchase = 1.5)
+  purchaseCount = read itemId from the persisted purchase-count map
+  candidatePrice = basePrice * POWER(multiplierPerPurchase, purchaseCount)
+
+  IF candidatePrice is finite
+    RETURN candidatePrice
+  RETURN basePrice
 ```
 
 `_purchasedShopItemCounts` is persisted in the save so prices survive a relog. This is the tycoon standard price curve — `basePrice * mult^purchaseCount` — applied per item-id rather than per upgrade level (suits a shop where each machine type is bought multiple times).

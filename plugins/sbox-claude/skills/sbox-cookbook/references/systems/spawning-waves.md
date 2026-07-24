@@ -1,4 +1,26 @@
 # Spawning Waves
+
+<!-- reference-toc:start -->
+## Contents
+
+- [What it IS / when you need it](#what-it-is--when-you-need-it)
+- [Canonical modern recipe](#canonical-modern-recipe)
+  - [1. The cadence gate — TimeUntil self-rearming, curve-escalated](#1-the-cadence-gate--timeuntil-self-rearming-curve-escalated)
+  - [2. The selection roll — weighted table with anti-streak "pity"](#2-the-selection-roll--weighted-table-with-anti-streak-pity)
+  - [3. The population cap — refuse/throttle when full](#3-the-population-cap--refusethrottle-when-full)
+  - [4. The spawn itself — clone, configure, then NetworkSpawn](#4-the-spawn-itself--clone-configure-then-networkspawn)
+- [Notable variations across games](#notable-variations-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [SS2 — data-driven per-enemy SpawnConfig struct with 4 stacking bonuses (facepunch.ss2)](#ss2--data-driven-per-enemy-spawnconfig-struct-with-4-stacking-bonuses-facepunchss2)
+  - [SS2 — stage events as a separate "director event" layer](#ss2--stage-events-as-a-separate-director-event-layer)
+  - [DOOM Resurrection — difficulty-filtered entity table from WAD data (ataco.sdoomresurrection)](#doom-resurrection--difficulty-filtered-entity-table-from-wad-data-atacosdoomresurrection)
+  - [klavs.basebuilder — escalating respawn HP ladder for a zombie attacker](#klavsbasebuilder--escalating-respawn-hp-ladder-for-a-zombie-attacker)
+  - [SS1 — self-limiting population valve via inverse Utils.Map (facepunch.ss1)](#ss1--self-limiting-population-valve-via-inverse-utilsmap-facepunchss1)
+  - [Anti-patterns flagged in these games](#anti-patterns-flagged-in-these-games)
+<!-- reference-toc:end -->
+
 Host-authoritative system that releases enemies/hazards/pickups in escalating timed bursts, capped by a live population count and rolled from a weighted table.
 
 ## What it IS / when you need it
@@ -230,12 +252,10 @@ Source: `ataco.sdoomresurrection/Code/doomwad/ThingGenerator.cs` (difficulty fil
 
 BaseBuilder uses a completely different kind of wave director: instead of spawning multiple enemies, one player *becomes* the zombie and respawns with escalating HP on each death. The ladder is a plain int array indexed by death count:
 
-```csharp
-// From klavs.basebuilder Code/BaseBuilder/BaseBuilderGameMode.cs
-static readonly int[] ZombieHealthSteps = { 400, 800, 1500, 3000, 6000, 12000, 25000, 50000, 100000 };
-
-int GetZombieHealth( int deaths ) =>
-    ZombieHealthSteps[ MathX.Clamp( deaths, 0, ZombieHealthSteps.Length - 1 ) ];
+```text
+health tiers = an ascending designer-authored list
+select tier index by clamping death count to the list bounds
+return the health value at that tier
 ```
 
 Death handling runs on the main thread (`await GameTask.MainThread()` before mutating scene state) and on each death flips the killed human to zombie, awards `ZombieKillReward` money to the human attacker, and re-evaluates the win condition. The initial zombie is chosen deterministically by `(RoundNumber - 1) % players.Count` so every player eventually "starts as zombie."

@@ -1,5 +1,30 @@
 # Building / Placement System
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it IS and when you need it](#what-it-is-and-when-you-need-it)
+- [Canonical modern-s&box recipe](#canonical-modern-sbox-recipe)
+  - [1. The ghost preview (client-local, NetworkMode.Never)](#1-the-ghost-preview-client-local-networkmodenever)
+  - [2. Cast the mouse ray and position the ghost](#2-cast-the-mouse-ray-and-position-the-ghost)
+  - [3. Validate (client-side, for UI feedback only)](#3-validate-client-side-for-ui-feedback-only)
+  - [4. Commit on the host (authoritative)](#4-commit-on-the-host-authoritative)
+  - [5. Grid variant: cells, footprints, rotation](#5-grid-variant-cells-footprints-rotation)
+- [Variations seen across games](#variations-seen-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Shader-attribute ghost instead of tint-swap (facepunch.fair)](#shader-attribute-ghost-instead-of-tint-swap-facepunchfair)
+  - [Polymorphic commit + auto-rotate-to-neighbour (facepunch.fair)](#polymorphic-commit--auto-rotate-to-neighbour-facepunchfair)
+  - [Track / spline builder: a "ghost" that is a live-remeshed mesh, not a clone (facepunch.fair)](#track--spline-builder-a-ghost-that-is-a-live-remeshed-mesh-not-a-clone-facepunchfair)
+  - [Surface-aligned transform from the trace normal (apl.sandboxwars)](#surface-aligned-transform-from-the-trace-normal-aplsandboxwars)
+  - [Blueprint placement: spawn a saved contraption, not one prefab (apl.sandboxwars / dexlab.sandbox-reforged)](#blueprint-placement-spawn-a-saved-contraption-not-one-prefab-aplsandboxwars--dexlabsandbox-reforged)
+  - [Toolgun-style mode framework for placement tools (dexlab.sandbox-reforged / apl.sandboxwars)](#toolgun-style-mode-framework-for-placement-tools-dexlabsandbox-reforged--aplsandboxwars)
+  - ["Placement" as pre-placed models toggled by purchase — no runtime spawn (bublic.stonebystone)](#placement-as-pre-placed-models-toggled-by-purchase--no-runtime-spawn-bublicstonebystone)
+  - [Buy-land chunks gate the build zone (facepunch.fair)](#buy-land-chunks-gate-the-build-zone-facepunchfair)
+  - [Updated "read these games" pointer](#updated-read-these-games-pointer)
+<!-- reference-toc:end -->
+
 Purpose: let a player place objects (furniture, shelves, props, structures) into the world with a live ghost preview, validity feedback, optional grid-snapping, and host-authoritative commit — the core of shop/restaurant/sandbox builders.
 
 ## What it IS and when you need it
@@ -150,7 +175,7 @@ public bool TryAddFurni( Vector2Int gridPos, FurniResource res, Direction dir, o
 ## Variations seen across games
 
 - **Free vs grid.** enifun.shop_manager & the ISpawner games place a single ghost on a traced surface; GASTROTOWN/restaurant_dev & emg use integer cell grids with multi-cell footprints + rotation.
-- **Tool-strategy build mode.** GASTROTOWN's `BuildModeClient` holds a `Dictionary<BuildTool, IBuildTool>` of stateless tool strategies (Wall/Furni/Floor/Select/Destroy) sharing a `BuildContext { Grid, Server, PhantomManager }`; `SetActiveTool` calls `OnDeactivated/OnActivated`. Clean copyable pattern for multi-mode builders (`Code/Common/BuildMode/BuildModeClient.cs:31`, `Tools/FurniTool.cs:40`).
+- **Tool-strategy build mode.** GASTROTOWN's `BuildModeClient` holds a `Dictionary<BuildTool, IBuildTool>` of stateless tool strategies (Wall/Furni/Floor/Select/Destroy) sharing a `BuildContext { Grid, Server, PhantomManager }`; `SetActiveTool` calls `OnDeactivated/OnActivated`. This is a clean strategy-based design for multi-mode builders (`Code/Common/BuildMode/BuildModeClient.cs:31`, `Tools/FurniTool.cs:40`).
 - **Bounds-derived grids.** emg.everything_must_go derives a stocking grid from the renderer's model `Bounds` (columns × rows) rather than a fixed world grid — items snap into the first free cell (`Code/Shelving/Shelf.cs:66`).
 - **Ident-string spawn router.** Sandbox-style games (artisan.darkrpog, apl.sandboxwars) abstract placement behind `ISpawner` (`DrawPreview`, `Task<bool> Loading`, `Spawn(transform, player)`) and route an ident like `prop:path` through a switch, tracing from the eyes with surface-normal alignment (`Code/Spawner/ISpawner.cs:5`, `Code/GameLoop/GameManager.cs:1042`).
 - **Front-clearance / spacing rules.** enifun adds a second "arrow" raycast so a shelf's customer-access front also lands on valid floor, plus min-distance-between-registers (`ShopBuilder.cs:320`).
@@ -253,7 +278,7 @@ protected override void OnEnabled()  => LoadCookies();   // per-tool persisted s
 protected override void OnDisabled() => SaveCookies();
 ```
 
-Sibling tools live as components on the gun, exactly one enabled, switched via `[Rpc.Host] SetToolMode(name)`. Two extra placement aids worth lifting: a **snap grid** (`ToolMode.SnapGrid.cs`) and, in apl.sandboxwars, a **snap-grid aim-lock** — hold `use` to lock the camera onto the nearest snap corner (`Rotation.LookAt(snapPos - eye)` fed back through `ref angles`), opt-out per tool via `ShouldDisplaySnapGrid`. Constraint tools there are a **two-stage state machine** (pick Point1 → Point2 → create) whose creation `[Rpc.Host(NetFlags.OwnerOnly)]` **re-runs validity on the host** before building — the constraint analogue of "client validity is advisory."
+Sibling tools live as components on the gun, exactly one enabled, switched via `[Rpc.Host] SetToolMode(name)`. Two additional placement aids are a **snap grid** (`ToolMode.SnapGrid.cs`) and, in apl.sandboxwars, a **snap-grid aim-lock** — hold `use` to lock the camera onto the nearest snap corner (`Rotation.LookAt(snapPos - eye)` fed back through `ref angles`), opt-out per tool via `ShouldDisplaySnapGrid`. Constraint tools there are a **two-stage state machine** (pick Point1 → Point2 → create) whose creation `[Rpc.Host(NetFlags.OwnerOnly)]` **re-runs validity on the host** before building — the constraint analogue of "client validity is advisory."
 
 ### "Placement" as pre-placed models toggled by purchase — no runtime spawn (bublic.stone_by_stone)
 

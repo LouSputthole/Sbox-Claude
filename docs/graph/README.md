@@ -1,36 +1,33 @@
 # Bridge Map — graphify knowledge graph
 
-This folder holds a **knowledge graph of the s&box Claude Bridge**: a map of how every
-piece connects to every other piece. It was built with [graphify](https://github.com/) by
-running an AST pass over the code plus a semantic pass over the docs, so the graph links the
-**MCP tools** to the **C# handlers** that implement them and to the **docs/skills** that
-describe them.
+This folder holds a **source knowledge graph of the s&box Claude Bridge**: a map of how its
+code connects. It is regenerated with graphify's AST pass over the C# and TypeScript sources.
+The current source-only graph maps types, methods, handlers, calls, and file relationships;
+consult the project docs and [TOOLSETS.md](../TOOLSETS.md) for the semantic tool guide.
 
 ## What's here
 
 | File | What it is |
 |------|------------|
-| `graph.json` | The graph itself — 1,192 nodes / 2,301 edges. Machine-readable; this is what the query tools read. |
+| `graph.json` | The machine-readable graph used by query tools. See `GRAPH_REPORT.md` for the current regenerated node, edge, and community counts. |
 | `graph.html` | A self-contained interactive viewer. Open it in a browser to **browse** the graph — pan/zoom, click a node to see what it connects to, communities are colour-coded. |
 | `GRAPH_REPORT.md` | A human-readable summary: god nodes (most-connected abstractions), community hubs (navigation), and the extraction audit (EXTRACTED vs INFERRED edges). |
 
 ## How to read the map
 
-- **`IBridgeHandler` is the spine.** It's the top **god node** (~173 edges) — every editor-side
-  command handler implements it, so it sits at the center of the whole bridge. If you're trying
-  to understand how a tool reaches the editor, start there. (`JsonElement` and `Task` rank higher
-  by raw degree but those are language plumbing, not the bridge's own abstraction.)
-- **Every MCP tool maps to its C# handler and to its docs.** A tool like `screenshot_from` links
-  to the handler that executes it (under `IBridgeHandler`) and to the doc/skill text that explains
-  it — so the graph answers "what implements this?" and "what documents this?" in one place.
+- **`IBridgeHandler` is the source-level spine.** Editor-side command handlers implement it, so
+  it remains the bridge-owned hub for tracing how a command reaches the editor. Use the current
+  god-node ranking in `GRAPH_REPORT.md` instead of relying on hard-coded edge counts.
+- **Generated wrappers map to their C# handlers and supporting types.** A tool like
+  `screenshot_from` can be traced through its wrapper, handler, and shared capture service. The
+  source-only graph answers implementation questions; the docs explain intended behavior.
 - **Communities are the cross-document edges.** graphify's community detection groups related
   nodes (e.g. the networking handlers, the visuals tools, the changelog fixes) and surfaces
   connections across files you wouldn't think to look for. The hubs are listed at the top of
   `GRAPH_REPORT.md`.
-- **`MyEditorMenu.cs` is a flagged monolith.** It's the single C# file that holds **all** bridge
-  server + handler code (~165 edges — second only to `IBridgeHandler`). The graph flags it as a
-  large monolith: a natural candidate to split into per-batch handler files. Treat its size as a
-  known smell, not a surprise.
+- **`MyEditorMenu.cs` is the routing spine, not the whole implementation.** Handler families are
+  split across dedicated files, including asset geometry, camera capture, and placement plans.
+  Use communities and file relationships to move from the central registry into each subsystem.
 
 ## How to USE it
 

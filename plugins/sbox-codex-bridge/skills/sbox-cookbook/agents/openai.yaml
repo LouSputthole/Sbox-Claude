@@ -1,0 +1,4 @@
+interface:
+  display_name: "S&box Cookbook"
+  short_description: "Route to proven s&box genre and system recipes"
+  default_prompt: "Use $sbox-cookbook to design this s&box game or system."

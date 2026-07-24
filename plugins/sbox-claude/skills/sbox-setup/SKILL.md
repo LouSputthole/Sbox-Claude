@@ -17,16 +17,25 @@ A short, friendly orientation for someone who just connected the bridge. A few b
 > 👋 Thanks for using the s&box Claude Bridge — let's get you oriented in about 30 seconds.
 
 **2. Confirm the native server is live**
-The editor ships its own MCP server, on by default at `http://127.0.0.1:7269/mcp`. Quickest check: call `mcp__sbox__search_tools` (or `list_toolsets`) — if it answers, you're connected. (A raw `initialize`/`list_toolsets` probe against the endpoint proves the same thing.) Not registered with Claude Code yet? One line:
+The editor ships its own MCP server, on by default at `http://127.0.0.1:7269/mcp`. Quickest check: call `mcp__sbox__search_tools` (or `list_toolsets`) — if it answers, you're connected. (A raw `initialize`/`list_toolsets` probe against the endpoint proves the same thing.)
+
+When this skill arrived through the plugin, inspect the current MCP inventory before
+changing it. The native `sbox` entry should already exist; the optional
+`sbox-lifeline` entry may be enabled or disabled by the host. **Do not add duplicate
+MCP connections.** Enable an existing lifeline entry when diagnostics are wanted. Use
+the manual commands below only when the matching entry is absent or automatic MCP
+registration is unavailable.
 
 ```
 claude mcp add --transport http sbox http://127.0.0.1:7269/mcp
 ```
 
-Recommended second entry — the **lifeline** keeps `read_log` / `get_compile_errors` / docs search working when the editor is down (the native server dies with the editor):
+If no lifeline entry exists, add the optional **lifeline** so `read_log`,
+`get_compile_errors`, and docs search work when the editor is down (the native server
+dies with the editor):
 
 ```
-claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2 --lifeline
+claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.2.0 --lifeline
 ```
 
 If the endpoint doesn't answer, stop and help fix it first:
@@ -47,7 +56,7 @@ Based on what's installed and whether the scene is empty (peek with `get_scene_h
 - "Set the mood — `apply_atmosphere`, fog, a skybox."
 
 **5. Help + feedback**
-- **Troubleshooting:** I can read my own errors (`read_log`, `get_compile_errors` — they live on the lifeline server, so they work even when the editor is down), and there's a full `TROUBLESHOOTING.md`. Just ask me here anytime — that's what I'm for.
+- **Troubleshooting:** When the optional lifeline is enabled, I can use `read_log` and `get_compile_errors` even while the editor is down. If it is disabled or absent, enable it or register the fallback first. There is also a full `TROUBLESHOOTING.md`.
 - **Bugs / feedback:** GitHub issues — https://github.com/LouSputthole/Sbox-Claude/issues
 - Built by **sboxskins.gg**.
 

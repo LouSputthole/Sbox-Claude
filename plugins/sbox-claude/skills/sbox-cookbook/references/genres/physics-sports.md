@@ -1,5 +1,28 @@
 # Physics-Sports Recipe (golf / climbing / skater)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [How the real games do it](#how-the-real-games-do-it)
+  - [Charge-and-release shot with a non-linear power curve — slamdunk.minigolf Player/Ball.cs](#charge-and-release-shot-with-a-non-linear-power-curve--slamdunkminigolf-playerballcs)
+  - [Drag-back-release done entirely in Razor, NO input action — alcoholics.niceputtidiot Code/UI/Hud.razor + Pawns/GolfBall.cs](#drag-back-release-done-entirely-in-razor-no-input-action--alcoholicsniceputtidiot-codeuihudrazor--pawnsgolfballcs)
+  - [The "can't act while moving" gate — the load-bearing rule (both ball games)](#the-cant-act-while-moving-gate--the-load-bearing-rule-both-ball-games)
+  - [Manual continuous-collision against tunneling — slamdunk.minigolf Player/Ball.cs (IScenePhysicsEvents.PrePhysicsStep)](#manual-continuous-collision-against-tunneling--slamdunkminigolf-playerballcs-iscenephysicseventsprephysicsstep)
+  - [Stuck / out-of-bounds / water watchdogs — slamdunk.minigolf Player/Ball.cs](#stuck--out-of-bounds--water-watchdogs--slamdunkminigolf-playerballcs)
+  - [Runtime welded collision mesh for seamless fast-body rolling — slamdunk.minigolf CollisionManager.cs](#runtime-welded-collision-mesh-for-seamless-fast-body-rolling--slamdunkminigolf-collisionmanagercs)
+  - [Trick scoring = controller emits dumb deltas, conditions own the balance — barrelproto.ragroll Skate.cs + score conditions](#trick-scoring--controller-emits-dumb-deltas-conditions-own-the-balance--barrelprotoragroll-skatecs--score-conditions)
+  - [Per-player run vs host-authoritative scorecard — the two scoring models](#per-player-run-vs-host-authoritative-scorecard--the-two-scoring-models)
+  - [Co-presence proxies + nametags — alcoholics.niceputtidiot Pawns/GolfBall.cs](#co-presence-proxies--nametags--alcoholicsniceputtidiot-pawnsgolfballcs)
+  - [Live + auto-refreshing Services leaderboard with metadata — all three](#live--auto-refreshing-services-leaderboard-with-metadata--all-three)
+- [Reusable standout patterns](#reusable-standout-patterns)
+- [Pitfalls](#pitfalls)
+- [Which games to read](#which-games-to-read)
+- [Verify live](#verify-live)
+<!-- reference-toc:end -->
+
 How to build a **physics-locomotion sports game** — your avatar IS a physics body, not a `CharacterController` — in modern s&box (GameObject/Component/Scene), distilled from three mined games: `slamdunk.minigolf` (multiplayer charge-and-release minigolf), `alcoholics.nice_putt_idiot` (drag-back-release "Getting Over It" rage-climber), and `barrelproto.ragroll` (ragdoll trick-score skater). Each contributes a different slice; the genre is the **composition** of a physics-body verb + per-player turn/score + co-presence lobby.
 
 ## What defines the genre
@@ -18,14 +41,14 @@ The defining engineering choice — and the thing the rest of the cookbook does 
 
 Pick from these. The first three are the genre spine; the rest are scoring, presence, and polish.
 
-1. **Physics-body verb** — the one mechanic the whole game tests. A `Rigidbody` (`ApplyForceAt`/`ApplyImpulse`) or a ragdoll. Build on a bare `Rigidbody` + a custom component, **not** the stock `PlayerController`. Tune this longest — it's 80% of the game. See **references/systems/physics-traces.md** and **references/engine/physics-traces-movement** for trace/force APIs.
+1. **Physics-body verb** — the one mechanic the whole game tests. A `Rigidbody` (`ApplyForceAt`/`ApplyImpulse`) or a ragdoll. Build on a bare `Rigidbody` + a custom component, **not** the stock `PlayerController`. Tune this longest — it's 80% of the game. See **references/engine/physics-traces-movement.md** for trace/force APIs.
 2. **Input → force/impulse mapping** — charge-on-hold (minigolf), drag-vector (nice_putt), or continuous physics ticks (ragroll). Two distinct input idioms below: an `InputAction` charge meter vs. screen-space mouse drag with **no input binding at all**.
 3. **"Can't act while moving" gate** — every one of these games refuses input while the body is in motion (`Velocity.Length > threshold`). This is the load-bearing rule that makes a physics verb feel like a *shot*, not a joystick.
 4. **Outcome + scoring** — stroke/par scorecard (minigolf), time+stroke run (nice_putt), or combo accumulator with multiplier + grounded-flush (ragroll). See **references/systems/round-match.md** and **references/systems/leaderboards-services.md**.
 5. **Reset/respawn watchdogs** — stuck-body, out-of-bounds (`z < floor`), and water handling. A slow-rolling or fallen body must be force-stopped/respawned or the turn hangs forever.
 6. **Per-player turn/run state** — either a host-authoritative `[Sync(FromHost)]` scorecard (minigolf) or a fully per-`Client` run with no global round (nice_putt). See **references/systems/round-match.md**.
 7. **Co-presence lobby** — other players' bodies as dimmed translucent proxies + floating Steam nametags; presence without authoritative sync. A lighter cousin of `social-hub`.
-8. **Follow camera** — third-person orbit (minigolf) or side-on orthographic that tracks only two axes (nice_putt). See **references/systems/camera.md**.
+8. **Follow camera** — third-person orbit (minigolf) or side-on orthographic that tracks only two axes (nice_putt). See **references/engine/player-controller.md**.
 
 ## Build order
 

@@ -1,5 +1,25 @@
 # Worldgen & Rendering
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Pattern 1 — Destructible 2D terrain with facepunch.libsdf](#pattern-1--destructible-2d-terrain-with-facepunchlibsdf)
+- [Pattern 2 — Deadlock-proof procedural placement](#pattern-2--deadlock-proof-procedural-placement)
+- [Pattern 3 — Runtime procedural mesh + the weld/constraint gotcha](#pattern-3--runtime-procedural-mesh--the-weldconstraint-gotcha)
+- [Pattern 4 — [Sync] day/night cycle with smoothstep twilight + sunrise/sunset events](#pattern-4--sync-daynight-cycle-with-smoothstep-twilight--sunrisesunset-events)
+- [Pattern 5 — Self-instanced scatter field (GPU DrawModelInstanced + frustum cull + async respawn)](#pattern-5--self-instanced-scatter-field-gpu-drawmodelinstanced--frustum-cull--async-respawn)
+- [Gotcha table](#gotcha-table)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Pattern 6 — GPU clipmap water: compute-generated mesh with CommandList + resource barrier](#pattern-6--gpu-clipmap-water-compute-generated-mesh-with-commandlist--resource-barrier)
+  - [Pattern 7 — CPU/GPU-shared Gerstner waves: physics that matches the pixels](#pattern-7--cpugpu-shared-gerstner-waves-physics-that-matches-the-pixels)
+  - [Pattern 8 — Water exclusion volumes: carve a hole in the surface for boat interiors](#pattern-8--water-exclusion-volumes-carve-a-hole-in-the-surface-for-boat-interiors)
+  - [Pattern 9 — Client→host voxel-edit pipeline: predict locally, validate on host, batch-clamp RPCs](#pattern-9--clienthost-voxel-edit-pipeline-predict-locally-validate-on-host-batch-clamp-rpcs)
+  - [Pattern 10 — Frame-budgeted chunk streamer with global cross-instance cap](#pattern-10--frame-budgeted-chunk-streamer-with-global-cross-instance-cap)
+  - [Pattern 11 — Spatial-grid registry + shared update-runner (the OnUpdate cost fix)](#pattern-11--spatial-grid-registry--shared-update-runner-the-onupdate-cost-fix)
+  - [Additional gotchas](#additional-gotchas)
+<!-- reference-toc:end -->
+
 Procedural, editable, and destructible worlds in s&box: SDF terrain, deadlock-proof spawn placement, and runtime mesh generation — all host-authoritative.
 
 ## Mental model
@@ -95,7 +115,7 @@ public bool PointInside( Vector3 p ) =>
     Scene.Trace.Ray( p, p + Vector3.Right * 64f ).WithAnyTags( "solid" ).Size( 2f ).Run().Hit;
 ```
 
-Verified against `sbox-grubs/Code/Terrain/Terrain.cs:61` (the full loop), `:99` (`Vector3.GetAngle(Vector3.Up, tr.Normal) > maxAngle`), `:107` (the `dist = MathF.Min(...)` relaxation), `:121` (`IsDistanceValid`), and `:215` (the sideways `PointInside` trace). Genre-agnostic — reuse for loot, enemies, scatter props, anything placed on irregular geometry.
+Verified against `sbox-grubs/Code/Terrain/Terrain.cs:61` (the full loop), `:99` (`Vector3.GetAngle(Vector3.Up, tr.Normal) > maxAngle`), `:107` (the `dist = MathF.Min(...)` relaxation), `:121` (`IsDistanceValid`), and `:215` (the sideways `PointInside` trace). The same constraints apply to loot, enemies, scatter props, and other objects placed on irregular geometry.
 
 ---
 
@@ -169,7 +189,7 @@ void Apply()                                            // signed distance to ne
 }
 ```
 
-Verified against intercrusstudio.sneguborka `Code/World/DayNightManager.cs`: `[Sync] TimeOfDay` host-advance (`:57,:91-99`), the smoothstep `dayness = clamped*clamped*(3 - 2*clamped)` (`:149-151`), HDR colour-multiply for intensity (`:155-165`), optional `SkyMaterial` swap at twilight (`:169-176`), and the `OnSunrise`/`OnSunset` events fired only on an ascending threshold crossing (`:179-199`). **Authority nuance worth copying:** it gates on `!Network.Active || !IsProxy`, NOT a strict `Networking.IsHost` — the stricter check returns false on the first frame before the lobby finishes creating and would freeze the cycle in editor Play. **Subscriber contract:** the events fire host-only and every external `+=` MUST be paired with a `-=` in the subscriber's `OnDestroy`. A 5-state day/night + weather *director* (lighting/post/fog/waves) is the richer variant (stepdev.xtrem_road; thefancylads.restaurant_dev `Code/Common/World/DayNightController.cs:40` for the new-day-event flavour).
+Verified against intercrusstudio.sneguborka `Code/World/DayNightManager.cs`: `[Sync] TimeOfDay` host-advance (`:57,:91-99`), the smoothstep `dayness = clamped*clamped*(3 - 2*clamped)` (`:149-151`), HDR colour-multiply for intensity (`:155-165`), optional `SkyMaterial` swap at twilight (`:169-176`), and the `OnSunrise`/`OnSunset` events fired only on an ascending threshold crossing (`:179-199`). **Authority requirement:** gate on `!Network.Active || !IsProxy`, NOT a strict `Networking.IsHost` — the stricter check returns false on the first frame before the lobby finishes creating and would freeze the cycle in editor Play. **Subscriber contract:** the events fire host-only and every external `+=` MUST be paired with a `-=` in the subscriber's `OnDestroy`. A 5-state day/night + weather *director* (lighting/post/fog/waves) is the richer variant (stepdev.xtrem_road; thefancylads.restaurant_dev `Code/Common/World/DayNightController.cs:40` for the new-day-event flavour).
 
 ---
 
@@ -274,18 +294,17 @@ Verified: `duck_pond/Code/Water/WaterManager.cs`, `WaterQuad.cs`, `WaterBodyRend
 
 The hardest correctness problem in water games is making floating objects rest *at the visible surface*, not at a flat plane. `pldr.duck_pond` solves it by implementing the exact same multi-octave Gerstner sum on the CPU (`Code/Water/WaterWaveUtility.cs`) that the vertex shader runs.
 
-```csharp
-// WaterWaveUtility.ComputeDisplacementAt — mirrors the GPU Gerstner shader, CPU-side.
-// Consumers call the static API on WaterManager:
-float h  = WaterManager.GetWaterHeightAt( worldPos );        // vertical surface height
-Vector3 d = WaterManager.GetWaveDisplacementAt( worldPos );  // full X/Y/Z displacement
-Vector3 v = WaterManager.GetWaveVelocityAt( worldPos );      // analytic time-derivative
-bool inside = WaterManager.IsPositionInsideAny( worldPos );  // hull-containment test
+```text
+CPU water-query surface:
+  height at world position := vertical component of the shared Gerstner evaluation
+  displacement at world position := full three-axis result of that evaluation
+  velocity at world position := analytic time derivative using the same wave parameters
+  containment at world position := whether any registered water hull contains the point
 ```
 
 Per octave the CPU model rotates the wave direction by `oct * 1.2f`, scales amplitude by persistence and frequency by lacunarity, and normalises by `maxAmp` — identical constants to the shader. The same `WaterDefinition` GameResource (`ApplyTo(RenderAttributes)`) feeds both sides so tuning one tunes the other.
 
-`treehaven.sdiver` ships the identical library (`namespace RedSnail.WaterTool`) confirming this is a reusable, battle-tested module. Any buoyancy, swim-level, or camera-lift component can query the static API without knowing the wave configuration.
+`treehaven.sdiver` contains another implementation under `namespace RedSnail.WaterTool`, supporting the same separation between wave configuration and consumers. Buoyancy, swim-level, and camera-lift components can query the static API without knowing the wave configuration.
 
 Anti-pattern: sampling a flat `y = WaterPlane.WorldPosition.z` for buoyancy while the shader displaces vertices — objects float visibly above or below the surface at wave crests.
 
@@ -320,37 +339,24 @@ Verified: `duck_pond/Code/Water/WaterExclusionVolume.cs`, `HullWaterExclusionVol
 
 `clearlyy.s_miner` implements host-authoritative destructible voxel terrain with client-side prediction. The pipeline has four stages and avoids the two most common failure modes (silent desync from unvalidated edits; frame spikes from oversized RPC payloads).
 
-```csharp
-// VoxelTerrain.cs — simplified pipeline sketch.
-public void BreakBlocks( Vector3[] positions )
-{
-    var ops = BuildEditOps( positions );
+```text
+on local block-break request(positions):
+  convert positions to edit operations
+  if this machine is host:
+    reject out-of-bounds and no-op edits
+    apply the validated batch locally
+    broadcast the authoritative result
+  otherwise:
+    apply a predicted local result for immediate feedback
+    send the request only to the current host when available
 
-    if ( Networking.IsHost )
-    {
-        var validated = TryBuildValidatedEdits( ops );  // drop out-of-bounds / no-ops
-        ApplyEditsLocally( validated );
-        BroadcastVoxelEdits( validated );
-    }
-    else
-    {
-        PredictClientVoxelEdits( ops );     // instant local feedback — may be wrong, host corrects
-        // Target host only; fall back to broadcast if host connection is gone.
-        using ( Rpc.FilterInclude( Connection.Host ) )
-            RpcRequestVoxelEdits( ops );
-    }
-}
-
-[Rpc.Broadcast]
-public void RpcRequestVoxelEdits( VoxelEditOp[] edits )
-{
-    if ( !Networking.IsHost ) return;                              // re-check on entry
-    if ( edits.Length > GetMaxSafeNetworkEditBatchSize() ) return; // anti-flood
-    if ( !IsIncomingTerrainMessageForThisTerrain( edits ) ) return;
-    var validated = TryBuildValidatedEdits( edits );
-    ApplyEditsLocally( validated );
-    RpcApplyVoxelEdits( validated );   // authoritative rebroadcast
-}
+on host receipt of a requested edit batch:
+  re-check host authority
+  reject batches above the safe network limit
+  reject messages addressed to a different terrain instance
+  validate every edit again
+  apply the accepted batch locally
+  broadcast the accepted batch as authoritative state
 ```
 
 Large explosions are **chunked** by `MaxBreakBlocksPerRpc` (clamped 16–512) before the initial call so no single RPC exceeds the payload limit. `IsIncomingTerrainMessageForThisTerrain` lets multiple terrain instances coexist without cross-talk.
@@ -381,7 +387,7 @@ foreach ( var cell in _priorityQueue )
 }
 ```
 
-GPU rendering reuses the `DrawModelInstanced` pattern but sorts instances by `(model, lodGroup)` first so each LOD bucket is a contiguous span — one `DrawModelInstanced` call per LOD bucket with `transforms.AsSpan(start, lodCount)`, zero per-frame alloc beyond the sort.
+GPU rendering uses `DrawModelInstanced` after sorting instances by `(model, lodGroup)` so each LOD bucket is a contiguous span — one `DrawModelInstanced` call per LOD bucket with `transforms.AsSpan(start, lodCount)`, zero per-frame alloc beyond the sort.
 
 Terrain-material exclusion (`GetMaterialAtWorldPosition`) prevents grass from spawning on rock/path tiles, using the terrain's own material-query API rather than raycasts.
 
@@ -395,17 +401,17 @@ Verified: `chop_the_forest/Code/GrassField/GrassFieldStreamer.cs:1224`.
 
 When hundreds of harvestable objects each run `OnUpdate`, frame time tanks. `vault77.chop_the_forest` fixes this with a static spatial registry and a single shared update-runner.
 
-```csharp
-// HarvestableResource — registers into a cell grid, does NOT run its own OnUpdate.
-static Dictionary<ResourceGridCell, List<HarvestableResource>> _grid = new();
-static ResourceGridCell CellOf( Vector3 p ) => new( (int)(p.x / 512), (int)(p.z / 512) );
+```text
+shared state: map each spatial-grid cell to the resources currently inside it
+cell_for(position) := quantize horizontal coordinates by the configured cell size
 
-protected override void OnStart()   => _grid.GetOrCreate( CellOf(WorldPosition) ).Add( this );
-protected override void OnDestroy() => _grid[CellOf(WorldPosition)].Remove( this );
+on resource start, insert it into the list for its current cell
+on resource destroy, remove it and prune an empty cell
 
-// O(1) range query — used by the harvesting trace to find candidates nearby.
-public static IEnumerable<HarvestableResource> GetActiveResourcesNear( Vector3 pos, float radius )
-    => CellsInRadius( pos, radius ).SelectMany( c => _grid.GetValueOrDefault( c ) ?? [] );
+to find active resources near a position:
+  enumerate only the cells overlapped by the query radius
+  flatten the resources stored in those cells
+  apply the exact distance and active-state checks required by the caller
 ```
 
 One `HarvestableResourceUpdateRunner` component per scene maintains a round-robin cursor (`_idleCursor`) and a per-frame budget (`IdleChecksPerUpdate = 128`). Resources with active visual state (shake, shrink, hit flash) get a full update; idle ones are visited a handful at a time. **Sync via sequence counter, not RPC**: hit effects use `[Sync] int HitEffectSequence` incremented on each hit; observers diff the counter each frame and fire a local effect — cheaper and more robust than `[Rpc.Broadcast]` per hit.
@@ -431,4 +437,4 @@ Verified: `chop_the_forest/Code/World/HarvestableResource.cs`.
 
 ---
 
-**Read these games** for worldgen/rendering depth: `pldr.duck_pond` (GPU clipmap water, Gerstner CPU/GPU parity, exclusion volumes), `clearlyy.s_miner` (voxel worldgen authority pipeline, biome worldgen), `vault77.chop_the_forest` (frame-budgeted chunk streaming, spatial-grid update pattern), `treehaven.sdiver` (confirms `RedSnail.WaterTool` as a reusable water library). The existing `sbox-grubs` / `wirebox` / `intercrusstudio.sneguborka` / `bublic.stone_by_stone` citations above remain the primary references for SDF terrain, mesh building, day/night, and scatter instancing.
+**Read these games** for worldgen/rendering depth: `pldr.duck_pond` (GPU clipmap water, Gerstner CPU/GPU parity, exclusion volumes), `clearlyy.s_miner` (voxel worldgen authority pipeline, biome worldgen), `vault77.chop_the_forest` (frame-budgeted chunk streaming, spatial-grid update pattern), `treehaven.sdiver` (an additional `RedSnail.WaterTool` implementation). The existing `sbox-grubs` / `wirebox` / `intercrusstudio.sneguborka` / `bublic.stone_by_stone` citations above remain the primary references for SDF terrain, mesh building, day/night, and scatter instancing.

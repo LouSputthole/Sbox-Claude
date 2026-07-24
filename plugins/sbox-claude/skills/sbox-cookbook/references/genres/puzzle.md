@@ -1,5 +1,35 @@
 # Puzzle Game Recipe (s&box)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack](#the-system-stack)
+- [Build order](#build-order)
+- [How the real game does it](#how-the-real-game-does-it)
+  - [Pure model, zero engine dependency](#pure-model-zero-engine-dependency)
+  - [Component adapter exposes segregated interfaces](#component-adapter-exposes-segregated-interfaces)
+  - [Input forwards only](#input-forwards-only)
+  - [Ray-pick a board with NO colliders](#ray-pick-a-board-with-no-colliders)
+  - [Runtime GameObject board (spawn + lerp)](#runtime-gameobject-board-spawn--lerp)
+  - [Objectives: strategy + factory](#objectives-strategy--factory)
+  - [Deterministic, always-solvable generation](#deterministic-always-solvable-generation)
+  - [Undo as a reversible-move log](#undo-as-a-reversible-move-log)
+  - [Persistence: defensive, never-throw I/O](#persistence-defensive-never-throw-io)
+  - [Leaderboards + achievements (best-effort)](#leaderboards--achievements-best-effort)
+- [Gotchas](#gotchas)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Multiplayer grid puzzle: [Sync] bool bag for round state](#multiplayer-grid-puzzle-sync-bool-bag-for-round-state)
+  - [Tag-based player state survives host migration; lists do not](#tag-based-player-state-survives-host-migration-lists-do-not)
+  - [Row-cascade board spawn with locked-step animations](#row-cascade-board-spawn-with-locked-step-animations)
+  - [Counter + authoritative recount before win/clear](#counter--authoritative-recount-before-winclear)
+  - [[Sync] NetList position registry outlives GameObjects](#sync-netlist-position-registry-outlives-gameobjects)
+  - [Reactive Razor HUD: BuildHash() + event-subscribe pattern](#reactive-razor-hud-buildhash--event-subscribe-pattern)
+  - [BFS catalog for small boards; seeded-random for large](#bfs-catalog-for-small-boards-seeded-random-for-large)
+  - [#if !DEBUG guard on leaderboard submissions](#if-debug-guard-on-leaderboard-submissions)
+  - [Anti-pattern: MathF availability is SDK-version dependent](#anti-pattern-mathf-availability-is-sdk-version-dependent)
+<!-- reference-toc:end -->
+
 Build a grid/logic puzzle (sliding-tile, match, sokoban, etc.) in modern s&box: a pure C# rules model, thin Component adapters, a read-only visual layer, plus persistence + leaderboards + objectives. Mined from `simalami.15_puzzle_master`, the cleanest-layered codebase in the batch.
 
 ## What defines the genre
@@ -15,11 +45,11 @@ Compose these. The first three are the genre's spine; the rest are bolt-ons most
 1. **Pure domain model** — a plain `sealed class` (no `Component`, no Sandbox types beyond `Vector3`/`Random`) owning tile state + move/win/shuffle rules. Fully unit-testable. (`Board.cs:19`)
 2. **Component adapter** — a `Component` that *owns* a model instance and exposes it through **segregated interfaces** (`IPuzzleData` read / `IPuzzleCommands` write / `IPuzzleEvents` notify). Counts moves, ticks time, fires `OnSolved`. (`SlidingPuzzleLogic.cs:15`)
 3. **Input controller** — a `Component` that ONLY reads `Input.*`/`Mouse.*` and forwards commands. Never picks tiles or builds rays. (`PuzzlePointerController.cs:12`)
-4. **Visual layer** — runtime-spawned `GameObject`s + Razor UI that ONLY read `IPuzzleData`. See `references/systems/razor-ui.md`, `references/systems/runtime-gameobjects.md`.
-5. **Local persistence** — `FileSystem.Data` JSON save/load (profiles, slots, resumable snapshots). See `references/systems/save-load.md`.
-6. **Data-driven levels** — `FileSystem.Mounted` JSON level blueprints. See `references/systems/data-driven-content.md`.
+4. **Visual layer** — runtime-spawned `GameObject`s + Razor UI that ONLY read `IPuzzleData`. See `references/engine/ui-razor.md` and the runtime-board pattern below.
+5. **Local persistence** — `FileSystem.Data` JSON save/load (profiles, slots, resumable snapshots). See `references/systems/save-persistence.md`.
+6. **Data-driven levels** — `FileSystem.Mounted` JSON level blueprints. See `references/engine/data-assets.md`.
 7. **Objective / win-condition system** — strategy + factory over per-level star conditions. (`StarConditionFactory.cs:10`)
-8. **Online leaderboards + achievements** — `Sandbox.Services.Stats`/`Leaderboards`/`Achievements`. See `references/systems/leaderboards-stats.md`.
+8. **Online leaderboards + achievements** — `Sandbox.Services.Stats`/`Leaderboards`/`Achievements`. See `references/systems/leaderboards-services.md`.
 9. **Undo/redo** — bit-packed reversible-move history. (`MoveHistory.cs:43`)
 10. **Deterministic seeded generation** — scramble by N legal moves for guaranteed solvability. (`Board.cs:331`)
 

@@ -159,7 +159,7 @@ public class BatchSetPropertyHandler : IBridgeHandler
 		bool dryRun = p.TryGetProperty( "dryRun", out var dr ) && dr.ValueKind == JsonValueKind.True;
 
 		var results = new List<object>();
-		int succeeded = 0, failed = 0;
+		int succeeded = 0, failed = 0, changed = 0, unchanged = 0;
 
 		foreach ( var idEl in idsEl.EnumerateArray() )
 		{
@@ -180,40 +180,53 @@ public class BatchSetPropertyHandler : IBridgeHandler
 			object current = null;
 			try { current = propDesc.GetValue( component ); } catch { }
 
+			// Resolve the exact typed value before either a dry-run receipt or a write.
+			// Previously dry-run skipped coercion entirely and always claimed a change.
+			object proposed = null;
+			var valueStr = ClaudeBridge.ElementToValueString( valueEl );
+			if ( !ClaudeBridge.CoercePropertyAndSet(
+				propDesc.PropertyType,
+				v => proposed = v,
+				propDesc.Name,
+				valueStr,
+				out var coerceError ) )
+			{
+				Fail( coerceError );
+				continue;
+			}
+
+			bool wouldChange = !Equals( current, proposed );
+
 			if ( dryRun )
 			{
 				succeeded++;
-				results.Add( new { id, ok = true, wouldChange = true, currentValue = current?.ToString() } );
+				if ( wouldChange ) changed++; else unchanged++;
+				results.Add( new
+				{
+					id,
+					ok = true,
+					wouldChange,
+					currentValue = current?.ToString(),
+					proposedValue = proposed?.ToString()
+				} );
 				continue;
 			}
 
 			try
 			{
-				// Same coercion path as set_property: object-form value types first,
-				// then the audited string-coercion (primitives, enums, asset refs).
-				var pt = propDesc.PropertyType;
-				if ( valueEl.ValueKind == JsonValueKind.Object )
+				// Keep apply aligned with dry-run and avoid needless setter side effects.
+				if ( !wouldChange )
 				{
-					object typed = null;
-					if ( pt == typeof( Vector3 ) ) typed = ClaudeBridge.ParseVector3( valueEl );
-					else if ( pt == typeof( Vector2 ) ) typed = ClaudeBridge.ParseVector2( valueEl );
-					else if ( pt == typeof( Color ) ) typed = ClaudeBridge.ParseColor( valueEl );
-					else if ( pt == typeof( Rotation ) ) typed = ClaudeBridge.ParseRotation( valueEl );
-					if ( typed != null )
-					{
-						propDesc.SetValue( component, typed );
-						succeeded++;
-						results.Add( new { id, ok = true, previous = current?.ToString() } );
-						continue;
-					}
+					succeeded++;
+					unchanged++;
+					results.Add( new { id, ok = true, changed = false, previous = current?.ToString(), value = proposed?.ToString() } );
+					continue;
 				}
 
-				var valueStr = ClaudeBridge.ElementToValueString( valueEl );
-				if ( !ClaudeBridge.CoercePropertyAndSet( pt, v => propDesc.SetValue( component, v ), propDesc.Name, valueStr, out var setErr ) )
-				{ Fail( setErr ); continue; }
-
+				propDesc.SetValue( component, proposed );
 				succeeded++;
-				results.Add( new { id, ok = true, previous = current?.ToString() } );
+				changed++;
+				results.Add( new { id, ok = true, changed = true, previous = current?.ToString(), value = proposed?.ToString() } );
 			}
 			catch ( Exception ex )
 			{
@@ -227,10 +240,12 @@ public class BatchSetPropertyHandler : IBridgeHandler
 			succeeded,
 			failed,
 			dryRun,
+			changed,
+			unchanged,
 			results,
 			note = dryRun
-				? "Dry run — nothing was changed. Re-run with dryRun:false to apply."
-				: $"Applied to {succeeded}/{results.Count} objects."
+				? $"Dry run - nothing was changed. {changed} would change; {unchanged} already match."
+				: $"Applied {changed} change(s); {unchanged} object(s) already matched; {failed} failed."
 		} );
 	}
 }

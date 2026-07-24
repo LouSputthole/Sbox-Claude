@@ -1,5 +1,30 @@
 # Bullet-Heaven / Survivor-Roguelite Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [How the real games do each piece](#how-the-real-games-do-each-piece)
+  - [Stat-modifier engine — per-source Set/Add/Mult with priority](#stat-modifier-engine--per-source-setaddmult-with-priority)
+  - [Perk draft — reflection catalog + weighted draw + synergy gates](#perk-draft--reflection-catalog--weighted-draw--synergy-gates)
+  - [Perk event-bus — virtual On hooks + fan-out (the single most reusable pattern)](#perk-event-bus--virtual-on-hooks--fan-out-the-single-most-reusable-pattern)
+  - [Spawn director — data-driven, time-curve, crowd-aware (not authored waves)](#spawn-director--data-driven-time-curve-crowd-aware-not-authored-waves)
+  - [Run flow — clock, boss gate, slow-mo outro](#run-flow--clock-boss-gate-slow-mo-outro)
+  - [Swarm collision — uniform-grid spatial hash (ss1's standout)](#swarm-collision--uniform-grid-spatial-hash-ss1s-standout)
+  - [Curses — negative perks on a difficulty-scaled cadence](#curses--negative-perks-on-a-difficulty-scaled-cadence)
+  - [Meta-progression — one static POCO for currency + shop + save (ss2)](#meta-progression--one-static-poco-for-currency--shop--save-ss2)
+  - [Leaderboards — versioned, single-axis multi-outcome encoding (ss2)](#leaderboards--versioned-single-axis-multi-outcome-encoding-ss2)
+  - [2D-sprite rendering — billboard quads + atlas-offset shader (ss1, optional)](#2d-sprite-rendering--billboard-quads--atlas-offset-shader-ss1-optional)
+- [Networking — host-authoritative run, identity-keyed perk state](#networking--host-authoritative-run-identity-keyed-perk-state)
+- [UI reactivity — hash-counters, not deep diffing](#ui-reactivity--hash-counters-not-deep-diffing)
+- [Pitfalls (from the mined code)](#pitfalls-from-the-mined-code)
+- [Things NOT to copy](#things-not-to-copy)
+- [Verify live](#verify-live)
+- [Which games to read](#which-games-to-read)
+<!-- reference-toc:end -->
+
 How to build a Vampire-Survivors-style survivor roguelite in modern s&box (GameObject/Component/Scene), distilled from Facepunch's two shipped titles: `facepunch.ss2` ("Sausage Survivors 2" — the larger, meta-progression-heavy reference: 300+ perks, data-driven spawn director, currency/shop/save, leaderboards) and `facepunch.ss1` ("Super Square" — the leaner predecessor: 113 perk classes, a spatial-hash collision broadphase, a vendored 2D-sprite engine, cloud-Stats-only persistence). Together they are a near-complete, code-grounded implementation of the genre.
 
 ## What defines the genre

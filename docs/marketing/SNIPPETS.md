@@ -1,13 +1,13 @@
 # Reusable copy blocks — s&box Claude Bridge v2.0.0 "Native"
 
 Grounded, drop-in copy for the site, README, store listings, and social. All claims are live-verified.
-Canonical numbers: **232 native tools · 28 toolsets · 53 read-only · 7 lifeline tools · source-available (no redistribution)**.
+Canonical numbers: **273 native tools · 28 toolsets · 57 read-only · 7 lifeline tools · source-available (no redistribution)**.
 
 ---
 
 ## One-sentence description
 
-The s&box Claude Bridge turns the s&box editor into an AI-agent workspace — 232 native tools, served by the editor's built-in MCP server, that let Claude (or any AI) inspect, build, validate, and playtest s&box projects from conversation.
+The s&box Claude Bridge turns the s&box editor into an AI-agent workspace — 273 native tools, served by the editor's built-in MCP server, that let Claude (or any AI) inspect, build, validate, and playtest s&box projects from conversation.
 
 ## Short paragraph
 
@@ -19,7 +19,7 @@ The s&box editor now ships a native MCP server, and the Claude Bridge runs on it
 
 ## GitHub README intro line
 
-> **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scene, wires up components, screenshots its own work, and iterates until it works. 232 native tools, served by s&box's built-in editor MCP server.
+> **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scene, wires up components, screenshots its own work, and iterates until it works. 273 native tools, served by s&box's built-in editor MCP server.
 
 ---
 
@@ -27,7 +27,7 @@ The s&box editor now ships a native MCP server, and the Claude Bridge runs on it
 
 **Headline:** Build s&box games by talking to Claude
 
-**Subheadline:** Your s&box editor is now an AI-agent workspace. 232 native tools let Claude — or any AI — write the C#, build the scene, wire the components, screenshot its own work, and fix what's wrong. You describe what you want; it builds it and checks it.
+**Subheadline:** Your s&box editor is now an AI-agent workspace. 273 native tools let Claude — or any AI — write the C#, build the scene, wire the components, screenshot its own work, and fix what's wrong. You describe what you want; it builds it and checks it.
 
 **CTA (primary):** Get started → (links to plugin & setup)
 **CTA (secondary / concrete):**
@@ -66,4 +66,8 @@ Runs on s&box's built-in editor MCP server — streamable HTTP on loopback port 
 
 ## Roadmap blurb
 
-**What's next (planned).** A few things are on the roadmap, clearly not yet shipped: **(planned)** finishing the remaining corpus scaffolds mined from the 51-game reference set; **(planned)** a local-loopback multiplayer test harness — spawn N clients, drive each, assert they stay in sync — which lands when s&box's loopback multi-instance socket reaches the shipping build; and **(planned)** typed, structured tool outputs. Everything described elsewhere in this doc is live and verified today; these are labeled planned on purpose.
+**What's next (planned).** Remaining roadmap items are clearly labeled: **(planned)** finishing
+any worthwhile corpus scaffolds left from the 51-game reference set, and **(planned)** typed,
+structured tool outputs. The bounded local multiplayer harness is now in `[Unreleased]`:
+the engine path was live-proven and the canonical source has passed offline gates, with its
+release smoke still pending in `TESTING.md`.

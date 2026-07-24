@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design an S&box Feature"
+  short_description: "Design s&box systems before implementation"
+  default_prompt: "Use $sbox-design-feature to design this non-trivial s&box feature."

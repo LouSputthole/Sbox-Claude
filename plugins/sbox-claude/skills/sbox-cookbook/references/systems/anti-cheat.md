@@ -1,5 +1,33 @@
 # Anti-Cheat / Host Authority
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What this IS and when you need it](#what-this-is-and-when-you-need-it)
+- [Canonical approach](#canonical-approach)
+  - [Layer 1 — host-owned replicated state](#layer-1--host-owned-replicated-state)
+  - [Layer 2 — client proposes, host validates and writes](#layer-2--client-proposes-host-validates-and-writes)
+  - [Layer 2b — request → apply → confirm (optimistic clients)](#layer-2b--request--apply--confirm-optimistic-clients)
+  - [Layer 3 — tamper-resistant persistence](#layer-3--tamper-resistant-persistence)
+- [Variations seen across games](#variations-seen-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Trust the simulated world, not the network message (physical reconciliation)](#trust-the-simulated-world-not-the-network-message-physical-reconciliation)
+  - [Bots reuse the human anti-cheat path (no separate trust model)](#bots-reuse-the-human-anti-cheat-path-no-separate-trust-model)
+  - [Targeted RPC with caller-id AND payload-invariant re-validation](#targeted-rpc-with-caller-id-and-payload-invariant-re-validation)
+  - [Pity timer / bad-luck protection as persisted weighted selection](#pity-timer--bad-luck-protection-as-persisted-weighted-selection)
+  - [Host re-validates eligibility, and price comes from a ConVar (not the item)](#host-re-validates-eligibility-and-price-comes-from-a-convar-not-the-item)
+  - [Owner-gated [Sync] setter + owner-gated shared-trigger consumption](#owner-gated-sync-setter--owner-gated-shared-trigger-consumption)
+  - [Mixed trust model: client-auth solo, host-auth for shared stakes](#mixed-trust-model-client-auth-solo-host-auth-for-shared-stakes)
+  - [Server-legitimacy / anti-piracy via the un-spoofable host SteamId](#server-legitimacy--anti-piracy-via-the-un-spoofable-host-steamid)
+  - [Engine-as-renderer: hold the ledger off the s&box host entirely](#engine-as-renderer-hold-the-ledger-off-the-sbox-host-entirely)
+  - [Monotonic sequence numbers so out-of-order RPCs can't fight (CRDT-lite)](#monotonic-sequence-numbers-so-out-of-order-rpcs-cant-fight-crdt-lite)
+  - [Host-migration-safe re-validation (don't lose the round when the host leaves)](#host-migration-safe-re-validation-dont-lose-the-round-when-the-host-leaves)
+  - [More gotchas (corpus refresh)](#more-gotchas-corpus-refresh)
+  - [Read these games (anti-cheat / authority)](#read-these-games-anti-cheat--authority)
+<!-- reference-toc:end -->
+
 Stop clients lying about state (money, ammo, score, saves). In s&box the host is the trust boundary: clients *propose*, the host *validates and writes*.
 
 ## What this IS and when you need it

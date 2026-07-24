@@ -1,5 +1,29 @@
 # s&box UI: Razor PanelComponents, HUDs & World UI
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Recipe: a declarative HUD panel with correct BuildHash](#recipe-a-declarative-hud-panel-with-correct-buildhash)
+- [Recipe: imperative tree mutation needs StateHasChanged()](#recipe-imperative-tree-mutation-needs-statehaschanged)
+- [Recipe: imperative widget (constructor + Tick)](#recipe-imperative-widget-constructor--tick)
+- [Recipe: networked transient feed (kill feed / toasts)](#recipe-networked-transient-feed-kill-feed--toasts)
+- [Recipe: bootstrap a HUD in code (GameObjectSystem + ScreenPanel)](#recipe-bootstrap-a-hud-in-code-gameobjectsystem--screenpanel)
+- [Recipe: world-space panel on a prop's screen face](#recipe-world-space-panel-on-a-props-screen-face)
+- [Recipe: show a runtime Texture (minimap / camera feed / render target)](#recipe-show-a-runtime-texture-minimap--camera-feed--render-target)
+- [Recipe: guard overlapping async UI (typewriter / fades / auto-advance)](#recipe-guard-overlapping-async-ui-typewriter--fades--auto-advance)
+- [Misc patterns](#misc-patterns)
+- [Gotcha table](#gotcha-table)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Recipe: event-bus singleton → StateHasChanged (namicry.gachacrawler)](#recipe-event-bus-singleton--statehaschanged-namicrygachacrawler)
+  - [Recipe: full-game diegetic WorldPanel with modal input gating (simalami.15puzzlemaster)](#recipe-full-game-diegetic-worldpanel-with-modal-input-gating-simalami15puzzlemaster)
+  - [Recipe: WorldPanel batching collision avoidance (sino.ssino)](#recipe-worldpanel-batching-collision-avoidance-sinossino)
+  - [Recipe: message-driven reactive panel / "dumb view-model" (sino.ssino)](#recipe-message-driven-reactive-panel--dumb-view-model-sinossino)
+  - [Recipe: production HUD suite decomposition (despawn.murder)](#recipe-production-hud-suite-decomposition-despawnmurder)
+  - [Gotcha additions](#gotcha-additions)
+  - [Read these games](#read-these-games)
+<!-- reference-toc:end -->
+
 Purpose: build HUDs, menus, and world-space UI in modern s&box (GameObject/Component/Scene) with correct `BuildHash()` reactivity, networked transient feeds, and async-UI safety.
 
 ## Mental model

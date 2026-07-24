@@ -1,6 +1,6 @@
 # v2.0.0 "Native" — launch announcement (channel-ready variants)
 
-Ground-truth numbers: **232 native tools · 28 toolsets · 53 read-only · 7 lifeline tools · source-available (no redistribution) · built by sboxskins.gg.**
+Ground-truth numbers: **273 native tools · 28 toolsets · 57 read-only · 7 lifeline tools · source-available (no redistribution) · built by sboxskins.gg.**
 Connect: `claude mcp add --transport http sbox http://127.0.0.1:7269/mcp`
 Plugin: `/plugin marketplace add LouSputthole/Sbox-Claude` → `/plugin install sbox-claude`
 Docs: https://sboxskins.gg/claudebridge · GitHub: https://github.com/LouSputthole/Sbox-Claude

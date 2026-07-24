@@ -1,5 +1,29 @@
 # Board-Game Recipe (turn-based grid: chess / checkers / minesweeper / go)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [How the real games do it](#how-the-real-games-do-it)
+  - [1. Grid ↔ world mapping is the foundation (both games)](#1-grid--world-mapping-is-the-foundation-both-games)
+  - [2. Turn arbiter: authoritative side-to-move, decoupled from scoring (chess)](#2-turn-arbiter-authoritative-side-to-move-decoupled-from-scoring-chess)
+  - [3. Co-op round as a bag of [Sync] bools + tag-driven membership (minesweeper)](#3-co-op-round-as-a-bag-of-sync-bools--tag-driven-membership-minesweeper)
+  - [4. Physical-board anti-cheat: trust the simulation, not the message ★ the gold (chess)](#4-physical-board-anti-cheat-trust-the-simulation-not-the-message--the-gold-chess)
+  - [5. Co-op input anti-cheat: flood-fill + re-validate-after-grace + recount cross-check (minesweeper)](#5-co-op-input-anti-cheat-flood-fill--re-validate-after-grace--recount-cross-check-minesweeper)
+  - [6. The action verb: request → host re-validate → broadcast (both)](#6-the-action-verb-request--host-re-validate--broadcast-both)
+  - [7. AI opponent as a client-owned "robot human" (chess) ★](#7-ai-opponent-as-a-client-owned-robot-human-chess-)
+  - [8. Rule variants via strategy-over-a-bus (chess) — optional but the cleanest data-variant pattern in the corpus](#8-rule-variants-via-strategy-over-a-bus-chess--optional-but-the-cleanest-data-variant-pattern-in-the-corpus)
+  - [9. Result fan-out: one match-end fact, many independent reactors (chess)](#9-result-fan-out-one-match-end-fact-many-independent-reactors-chess)
+  - [10. Elo + persistence (chess)](#10-elo--persistence-chess)
+  - [11. Host-migration resilience (both — the genre's defensive backbone)](#11-host-migration-resilience-both--the-genres-defensive-backbone)
+  - [12. Themeable board assets as data (both)](#12-themeable-board-assets-as-data-both)
+- [Gotchas / pitfalls (from the real games)](#gotchas--pitfalls-from-the-real-games)
+- [Verify live](#verify-live)
+- [Which games to read](#which-games-to-read)
+<!-- reference-toc:end -->
+
 How to build a **turn-based board game on a grid** in modern s&box (GameObject/Component/Scene) — a seated/walkable physical board, an authoritative turn arbiter, grid↔world mapping, win/draw resolution, and (for physical boards) anti-cheat that trusts the *simulated world* over the network message. Distilled from two deeply-mined shipped games: `fluffybagel.chess_otb` (over-the-board 3D chess — you sit at a table and **drag wooden pieces by hand**, slap a clock to end your turn; a full ported engine + Elo + 4 game modes + tournament pairing + dual persistence, one of the most complete networked codebases in the corpus) and `mostudio.sweeper_otso` (multiplayer 3D Minesweeper — players **walk on a tile grid**, stepping reveals via flood-fill or detonates a distance-rippled mine wave; built three-layers-deep so a host disconnect never soft-locks the round).
 
 ## What defines the genre
@@ -8,8 +32,8 @@ A board game is **a discrete grid state that players mutate one legal action at 
 
 Two shapes show up in the corpus, and they sit at opposite ends of one axis — *how does a player commit a move?*
 
-- **Alternating-turn, physical-input board** (`chess_otb`): two seats, strict turn ownership, a Fischer clock, and pieces you **physically grab and drop in world space**. The hard problem is that the host can't trust a "SubmitMove e2e4" RPC — so it re-derives the move by diffing where pieces *physically sit* against legal moves (bitboard XOR). Copy this for chess/checkers/go/shogi/any 1v1 rated board game with hand-placed pieces.
-- **Co-op walkable grid, body-as-cursor** (`sweeper_otso`): everyone's on the same team against the board itself; the "move" is **standing your body in a tile's trigger volume** (reveal) or placing a flag, and a single mine ends the round for the whole lobby. The hard problem is flood-fill reveal + a host-migration-proof tile/flag registry. Copy this for minesweeper, co-op tile puzzles, "don't-step-on-the-wrong-square" party games.
+- **Alternating-turn, physical-input board** (`chess_otb`): two seats, strict turn ownership, a Fischer clock, and pieces you **physically grab and drop in world space**. The hard problem is that the host can't trust a "SubmitMove e2e4" RPC — so it re-derives the move by diffing where pieces *physically sit* against legal moves (bitboard XOR). This structure fits chess, checkers, go, shogi, and other rated 1v1 games with hand-placed pieces.
+- **Co-op walkable grid, body-as-cursor** (`sweeper_otso`): everyone's on the same team against the board itself; the "move" is **standing your body in a tile's trigger volume** (reveal) or placing a flag, and a single mine ends the round for the whole lobby. The hard problem is flood-fill reveal + a host-migration-proof tile/flag registry. This structure fits minesweeper, co-op tile puzzles, and body-as-cursor party games.
 
 Both share the spine below; pick the turn model (strict-alternating vs. shared-co-op) and the input model (hand-grab vs. body-trigger) independently — they compose.
 
@@ -30,7 +54,7 @@ Build these as separate components. References point to existing system docs whe
 | **Flood-fill / cascade reveal** (co-op grid only) | Reveal-cell propagates to zero-adjacent neighbors; explosion ripples by distance. | below; sweeper `TileMine.TriggerMineWave` (distance-ordered), board recount cross-check |
 | **Rule-variant handlers** (optional) | Swap capture/placement/turn-end rules via a config without touching the dispatcher. | below; chess `ChessBoardEventBus.cs` strategy-over-bus |
 | **AI opponent** | A bot that drives the *same* commit path a human does. | below; chess "robot human" client-owned pawn + Leorik engine |
-| **Rating / Elo** | Update ratings on match-end, persist per-player. | `references/systems/leaderboards-services.md`; chess `EloMath.cs` (textbook Elo, copy-paste) |
+| **Rating / Elo** | Update ratings on match-end, persist per-player. | `references/systems/leaderboards-services.md`; chess `EloMath.cs` (textbook Elo reference) |
 | **Result fan-out** | Match-end broadcast that independent systems (rating/recording/tournament) each react to. | `references/systems/round-match.md`; chess `IChessMatchEvents.OnMatchEnded` |
 | **Host-migration resilience** | Round survives the host leaving — re-validate over preserve. | `references/engine/networking-authority.md`; sweeper `HostWatchdog.cs`, chess arena orphan + `HostEnsure` |
 | **Themeable board assets** | Piece/tile sets as data, swappable with zero code. | `references/systems/save-persistence.md` (GameResource); chess `ChessSet : GameResource`, sweeper folder-convention tiles |
@@ -127,17 +151,25 @@ This is the single most novel idea in the corpus and the thing that makes a *phy
 2. `BuildPhysicalBitboards()` projects every live piece's world position onto the 8×8 grid (§1), skipping captured + `Grabbed` pieces.
 3. `EvaluateDisplacements()` **XORs** snapshot vs. physical for the side to move (`moverDiff`), generates all legal moves, and compares `moverDiff` against each move's `ExpectedDisplacementMask` (from+to bits; castling adds the deterministic rook from/to bits).
 
-```csharp
-// chess: ChessGameState.Displacement.cs (paraphrased)
-ulong moverDiff = physicalForMover ^ _turnStartBitboardForMover;   // squares that changed
-foreach ( var move in LegalMoves( BoardState ) )
-{
-    ulong expected = move.ExpectedDisplacementMask;                // from|to (+rook for castle)
-    if ( moverDiff == expected ) return Resolved( move );          // exact → legal move made
-    if ( (moverDiff & ~expected) == 0 ) return PartialMatch();     // SUBSET → mid-flight, wait
-}
-ulong illegal = moverDiff & ~coveredByAnyLegalMove;                // leftover bits
-HighlightIllegalSquares( illegal );                                // SUPERSET → cheat / fumble
+```text
+FUNCTION classifyPhysicalMove(turnStartMask, currentPhysicalMask, legalMoves)
+  changedSquares = turnStartMask XOR currentPhysicalMask
+  squaresCoveredByAnyLegalMove = empty mask
+
+  FOR EACH legalMove:
+    expectedSquares = legalMove's displacement mask
+    add expectedSquares to squaresCoveredByAnyLegalMove
+
+    IF changedSquares exactly equals expectedSquares:
+      RETURN resolved legalMove
+
+    IF changedSquares is a subset of expectedSquares:
+      RETURN partial match and wait for the physical move to finish
+
+  unexpectedSquares = changedSquares
+                      minus squaresCoveredByAnyLegalMove
+  highlight unexpectedSquares
+  RETURN invalid physical state
 ```
 
 **The cheat signature is a SUPERSET** (extra unrelated bits changed); a legit-but-incomplete move is a **SUBSET** (mid-castle, piece in hand). The host only clears a player's staged pending move when the diff is *not* a partial match, so it never destroys a legitimate in-progress move. `ValidatePhysicalAgainstMove` returns `ExtraSquares`/`MissingSquares` to validate a *claimed* move — and "Missing" is tolerated as a transient replication gap while a client-owned piece is mid-flight. Because ~32 pieces × 60fps full legal-move generation is the hot path, the per-frame result is **cached by `Time.Now` + board identity** (`EvalThisFrame`). This generalizes to any physical board: *diff observed positions against a turn-start snapshot, match against generated legal moves, classify the leftover as cheating.*
@@ -168,7 +200,7 @@ The cleanest bot pattern in the corpus: the bot is **not** host logic. `ChessOtb
 
 Game termination flows through **one scene event** that multiple systems subscribe to independently — `OnMatchEnded(ChessGameState, GameResult, IReadOnlyList<ushort> packedMoves)` — instead of one god-handler calling each. `EloSystem`, `GameRecordingSystem`, `ArenaSystem`, and `SessionStatsSystem` each react in isolation (chess: `Code/Game/Events/IChessMatchEvents.cs`). This is the composable spine: broadcast the match-end fact, let rating/recording/tournament-scoring react separately. Same idea as the minesweeper `TriggerWin → ClearBoard` loop, just with more subscribers.
 
-### 10. Elo + persistence (chess) — copy-paste ready
+### 10. Elo + persistence (chess)
 
 On match-end, `EloSystem` runs `EloMath.UpdatePair` — textbook Elo, K=32, clamp 100–4000 (chess: `Code/Game/Rating/EloMath.cs`, ~10 lines) — then persists three ways, each composable on its own: (1) s&box **Stats** (`Otb_elo_blitz`, `Otbs_played`…), (2) a `PlayerIdentity` component mirroring Elo + W/L/D as `[Sync(FromHost)]` so the scoreboard reads it without hitting the service, hydrated on join via async `Stats.Refresh`, and (3) an external HTTP backend. The **targeted-RPC** trick for per-player cloud persistence: `Stats.SetValue`/`Increment` are local to the Steam user, so the host tells *only* the owning client to write via `using (Rpc.FilterInclude(target)) hub.RpcWriteMyEloStat(...)` (chess: `Code/Game/Networking/ChessOtbModeRpcs.cs`). See `references/systems/leaderboards-services.md`.
 
@@ -220,7 +252,7 @@ Run **`networking_lint`** on the result — unguarded `[Sync]` mutators, score/r
 
 ## Which games to read
 
-- **`fluffybagel.chess_otb`** (`chess_otb/Code/`) — **the alternating-turn / physical-board reference**, and one of the most complete networked codebases in the corpus. Read `Game/Gameplay/ChessGameState.Displacement.cs` + `Game/Components/ChessBoardComponent.Move.cs` (the bitboard-XOR anti-cheat — *the* gold), `Game Result/Arbiter.cs` + `GameResult.cs` (terminal-state arbiter decoupled from scoring), `Game/Events/IChessMatchEvents.cs` (match-end fan-out), `Game/EventBus/ChessBoardEventBus.cs` + `Game/Handlers/` (strategy-over-bus rule variants), `Game/Rating/EloMath.cs` + `Game/Systems/EloSystem.cs` + `Game/Networking/PlayerIdentity.cs` (copy-paste Elo + synced rating + targeted-RPC persistence), `Bot/` + `BotPlayController.cs` + `ChessOtbGameManager.SpawnBotPawn` (the client-owned "robot human" bot), `Game/Systems/ArenaSystem.cs` (continuous Swiss-ish tournament pairing + host-migration via orphans), `Game/Resources/ChessSet.cs` (themeable piece sets), and `Game/Services/DevSettings.cs` (two-editor solo-test override).
+- **`fluffybagel.chess_otb`** (`chess_otb/Code/`) — **the alternating-turn / physical-board reference**, and one of the most complete networked codebases in the corpus. Read `Game/Gameplay/ChessGameState.Displacement.cs` + `Game/Components/ChessBoardComponent.Move.cs` (the bitboard-XOR anti-cheat — *the* gold), `Game Result/Arbiter.cs` + `GameResult.cs` (terminal-state arbiter decoupled from scoring), `Game/Events/IChessMatchEvents.cs` (match-end fan-out), `Game/EventBus/ChessBoardEventBus.cs` + `Game/Handlers/` (strategy-over-bus rule variants), `Game/Rating/EloMath.cs` + `Game/Systems/EloSystem.cs` + `Game/Networking/PlayerIdentity.cs` (Elo calculation + synced rating + targeted-RPC persistence), `Bot/` + `BotPlayController.cs` + `ChessOtbGameManager.SpawnBotPawn` (the client-owned "robot human" bot), `Game/Systems/ArenaSystem.cs` (continuous Swiss-ish tournament pairing + host-migration via orphans), `Game/Resources/ChessSet.cs` (themeable piece sets), and `Game/Services/DevSettings.cs` (two-editor solo-test override).
 - **`mostudio.sweeper_otso`** (`sweeper_otso/Code/`) — **the co-op walkable-grid reference** + the host-migration-resilience playbook. Read `MINESWEEPER.cs` (`[Sync]`-bool round machine + `RoundActuallyRunning` + tag-driven membership + `RecountSafeTilesInScene` cross-check + the row-cascade spawn), `Mine.cs` (`TriggerMineWave` distance-ordered explosion + three-layer flag truth + `DelayedDetonate` grace), `HostWatchdog.cs` (**the** migration playbook — re-validate-and-restart, deferred settle, orphan reclaim), `Teleport.cs` (de-duped/retried/velocity-frozen networked teleport), `Inventory.cs`/`FlagPlacer.cs` (optimistic-tag-then-spawn, owner-vs-`Rpc.Caller`, networked-Destroy-from-owner), `inventory/Flagcatalog.cs` (folder-convention themeable tiles), and `TutorialMinesweeperGenerator.cs` (subclass-via-`protected`-setters + tutorial→matchmaking handoff).
 
 Cross-links: see the **sbox-api** skill for authoritative type/method lookups (`describe_type`/`search_types`), and the **sbox-build-feature** skill for the screenshot-driven build-and-verify loop the board layout lives or dies by. System deep-dives: `references/systems/round-match.md` (turn/phase machine + timer), `references/systems/anti-cheat.md` (the action-verb + cooldown posture), `references/engine/networking-authority.md` (host migration, orphans, `[Sync]` vs RPC), `references/systems/leaderboards-services.md` (Elo/Stats/leaderboard persistence), `references/systems/save-persistence.md` (GameResource themeable sets). Closest sibling genres: `references/genres/puzzle.md` (pure-grid model + no-collider ray-pick + deterministic generation — the engine-agnostic-rules discipline applies directly), `references/genres/card-battler.md` (the same request→host-validate→broadcast turn idiom + reveal-scoping for hidden state), `references/genres/party-microgame.md` (the co-op round/celebration loop).

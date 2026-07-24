@@ -8,10 +8,10 @@ This plugin bundles:
 
 | Component | What it does |
 |---|---|
-| **MCP server registration** (`sbox` = the editor's NATIVE MCP server over HTTP, plus the `sbox-lifeline` stdio server for editor-down diagnostics) | 232 native tools across 28 toolsets to drive the s&box editor — GameObjects, scripts, scenes, components, physics, networking, UI, world-gen, lighting & atmosphere, characters, lipsync, scene layout, navmesh & spatial queries, particles, animation, NPC brains, playable-game scaffolds, game-feel juice (camera shake / flicker lights / floating combat text), networking & scene inspection/lint, save & services queries, scatter & object utilities, self-diagnosis, console/C# execution, live docs search, type discovery, debug-draw visualization, play-mode time-scale & profiler, and a playtest harness that runs a scripted gameplay loop and asserts the result in-frame |
+| **MCP server registration** (`sbox` = the editor's NATIVE MCP server over HTTP, plus the `sbox-lifeline` stdio server for editor-down diagnostics) | 273 native tools across 28 toolsets to drive the s&box editor — GameObjects, scripts, scenes, components, physics, networking, UI, world-gen, lighting & atmosphere, characters, lipsync, scene layout, navmesh & spatial queries, particles, animation, NPC brains, playable-game scaffolds, game-feel juice (camera shake / flicker lights / floating combat text), networking & scene inspection/lint, save & services queries, scatter & object utilities, self-diagnosis, console/C# execution, live docs search, type discovery, debug-draw visualization, play-mode time-scale & profiler, a playtest harness that runs a scripted gameplay loop and asserts the result in-frame, and a bounded local multiplayer harness that launches and cleans up real `-joinlocal` clients |
 | **Skill: `sbox-build-feature`** | Codifies the screenshot-driven iteration workflow — bridge check, brainstorm gate, API research, hotload verify, screenshot read. Prevents the "guess and check" loop |
 | **Skill: `sbox-api`** | Schema-grounded s&box API knowledge — Unity→s&box translation table, the Ten Rules, and curated component/UI/networking/physics references. Stops Unity-pattern hallucination; repointed to verify signatures via the bridge's live `describe_type`. Adapted from [claude-sbox](https://github.com/gavogavogavo/claude-sbox) (MIT © David Ryan) |
-| **Skill: `sbox-cookbook`** | A master **router** of code-grounded recipes mined from 51 current (2026) open-source s&box games + the modern engine repos -- **11 engine**, **18 system**, and **20 genre** references. Ask "how do I build a tycoon / an inventory / a save system?" and it routes to a grounded how-to |
+| **Skill: `sbox-cookbook`** | A master **router** of code-grounded recipes mined from 51 current (2026) public-source s&box games + the modern engine repos -- **11 engine**, **19 system**, and **20 genre** references. Ask "how do I build a tycoon / an inventory / a save system?" and it routes to a grounded how-to |
 | **Skill: `sbox-scaffold-game`** | Turns one ask into a playable starter scene (first-person preset) |
 | **Skill: `sbox-setup`** | A ~30-second onboarding wizard — verifies the bridge, detects your installed libraries, recommends a first move |
 | **Agent: `sbox-game-dev`** | Optional specialist for handing off self-contained game-dev tasks |
@@ -90,14 +90,14 @@ The agent runs the `sbox-build-feature` skill as its default workflow.
 ## What's bundled vs. fetched
 
 - The main tool surface is served by the **editor itself** (native MCP server) — nothing to fetch
-- The `sbox-lifeline` stdio server is fetched from npm on first use via `npx -y sbox-mcp-server@2.0.0 --lifeline` (the only part that needs Node)
+- The `sbox-lifeline` stdio server is fetched from npm on first use via `npx -y sbox-mcp-server@2.2.0 --lifeline` (the only part that needs Node)
 - The skills and agent are bundled with the plugin
 - The bridge **addon** (the s&box-side C# code) is **not bundled** — install it from the s&box Asset Library or via the install script (see above)
 
 ## Version compatibility
 
-- This plugin is **v2.0.0**. The `sbox` entry points at the editor's native MCP server (no version to pin — it ships with the engine); the `sbox-lifeline` pin (`sbox-mcp-server@2.0.0`) is in the plugin's `.mcp.json`. Keep the bridge **addon** at a matching `2.x` (`BridgeVersion` `2.0.0`) — `get_bridge_status` reports the live addon version.
-- File IPC and the full stdio server remain functional through v2.0.x as a fallback for older engine builds; they retire in v2.1.0.
+- This plugin is **v2.1.0**. The `sbox` entry points at the editor's native MCP server (no version to pin — it ships with the engine); the `sbox-lifeline` pin (`sbox-mcp-server@2.0.0`) is in the plugin's `.mcp.json`. Keep the bridge **addon** at a matching `2.x` (`BridgeVersion` `2.1.0`) — `get_bridge_status` reports the live addon version.
+- File IPC and the full stdio server remain available as a deprecated compatibility fallback in v2.1.0; they are not registered by default and may be removed later.
 
 ## Troubleshooting
 
@@ -113,7 +113,7 @@ For deeper issues see the main repo's [TROUBLESHOOTING.md](https://github.com/Lo
 
 ## License
 
-Source-available (no redistribution). Same as the bridge. You may use and locally modify it to build your own games, but you may not redistribute, fork, repackage, or re-host it, and the "s&box Claude Bridge" / "sboxskins.gg" name and branding may not be reused — see the repo's [LICENSE](https://github.com/LouSputthole/Sbox-Claude/blob/main/LICENSE) and [NOTICE](https://github.com/LouSputthole/Sbox-Claude/blob/main/NOTICE).
+Source-available (no independent redistribution). Same as the bridge. You may use and locally modify it to build your own games. Except for GitHub's built-in public-repository rights described in the LICENSE, you may not independently redistribute, mirror, repackage, or re-host it, and the "s&box Claude Bridge" / "sboxskins.gg" name and branding may not be reused — see the repo's [LICENSE](https://github.com/LouSputthole/Sbox-Claude/blob/main/LICENSE) and [NOTICE](https://github.com/LouSputthole/Sbox-Claude/blob/main/NOTICE).
 
 ## Credits
 

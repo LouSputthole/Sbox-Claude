@@ -1,5 +1,35 @@
 # s&box Architecture
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Pattern: own the game loop in GameObjectSystem](#pattern-own-the-game-loop-in-gameobjectsystem)
+- [Pattern: decoupled event bus on ISceneEvent, split Local vs Global](#pattern-decoupled-event-bus-on-isceneevent-split-local-vs-global)
+- [Pattern: split a big Component into one sealed partial class by concern](#pattern-split-a-big-component-into-one-sealed-partial-class-by-concern)
+- [Pattern: portable system = thin interface in a shared assembly + static registry](#pattern-portable-system--thin-interface-in-a-shared-assembly--static-registry)
+- [Pattern: auto-register pluggable types via TypeLibrary reflection](#pattern-auto-register-pluggable-types-via-typelibrary-reflection)
+- [Pattern: ship a feature as a Library addon](#pattern-ship-a-feature-as-a-library-addon)
+- [Pattern: singletons that survive hotload](#pattern-singletons-that-survive-hotload)
+- [Pattern: dependency-sorted module loader (topological boot + fault isolation)](#pattern-dependency-sorted-module-loader-topological-boot--fault-isolation)
+- [Pattern: separate identity (Role) from win-condition (Team)](#pattern-separate-identity-role-from-win-condition-team)
+- [Pattern: defensive boundaries for drifting APIs and threads](#pattern-defensive-boundaries-for-drifting-apis-and-threads)
+- [Pattern: const tag/input helpers + the canonical trace chain](#pattern-const-taginput-helpers--the-canonical-trace-chain)
+- [Gotchas](#gotchas)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Pattern: per-source keyed stat-modifier stack (facepunch.ss2)](#pattern-per-source-keyed-stat-modifier-stack-facepunchss2)
+  - [Pattern: hash-counter reactivity instead of deep diffing (facepunch.ss2, bublic.stonebystone)](#pattern-hash-counter-reactivity-instead-of-deep-diffing-facepunchss2-bublicstonebystone)
+  - [Pattern: whitelist-synced stats — only replicate what the UI needs (facepunch.ss2)](#pattern-whitelist-synced-stats--only-replicate-what-the-ui-needs-facepunchss2)
+  - [Pattern: client-side static-registry hydration via TypeDescription.Create (facepunch.ss2)](#pattern-client-side-static-registry-hydration-via-typedescriptioncreate-facepunchss2)
+  - [Pattern: abstract RoundState base + TransitionTo + host-mirror RPC (despawn.murder)](#pattern-abstract-roundstate-base--transitionto--host-mirror-rpc-despawnmurder)
+  - [Pattern: host-migration-safe round timer (despawn.murder)](#pattern-host-migration-safe-round-timer-despawnmurder)
+  - [Pattern: copy volatile state BEFORE Finish() destroys it (despawn.murder)](#pattern-copy-volatile-state-before-finish-destroys-it-despawnmurder)
+  - [Pattern: async generation guard for respawning (bublic.stonebystone)](#pattern-async-generation-guard-for-respawning-bublicstonebystone)
+  - [Pattern: zero-networking architecture for single-player games (bublic.stonebystone)](#pattern-zero-networking-architecture-for-single-player-games-bublicstonebystone)
+  - [Pattern: Storage-entry save with meta + JSON files (bublic.stonebystone)](#pattern-storage-entry-save-with-meta--json-files-bublicstonebystone)
+<!-- reference-toc:end -->
+
 How to structure a modern s&box game: own scene-wide logic in systems, decouple via event buses and shared interfaces, decompose fat components, and package reusable features as Library addons.
 
 ## Mental model

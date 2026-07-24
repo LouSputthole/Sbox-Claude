@@ -5,7 +5,7 @@ The known failure modes of the v2.0.0 native transport, each as **Symptom → Di
 Companion docs:
 
 - **[BRIDGE_GOTCHAS.md](BRIDGE_GOTCHAS.md)** — engine limitations you work *around*, not fix (input synthesis, asset shadowing, Razor transpiler quirks, whitelist errors, GPU stalls).
-- The root **[TROUBLESHOOTING.md](../TROUBLESHOOTING.md)** — the legacy file-IPC transport (still compiled-in as a fallback through v2.0.x; retires v2.1.0).
+- The root **[TROUBLESHOOTING.md](../TROUBLESHOOTING.md)** — the legacy file-IPC transport (retained as a compatibility fallback in current source).
 - **[RELAUNCH.md](RELAUNCH.md)** (what v2.0.0 is) · **[FAQ.md](FAQ.md)** (common questions) · **[INSTALL.md](../INSTALL.md)** (setup) if you landed here before finishing setup.
 
 ---
@@ -34,7 +34,7 @@ Companion docs:
 
 **Symptom:** `search_tools` finds the native built-ins (`scene_tree`, `asset_search`, …) but no bridge tools; `list_toolsets` shows no `bridge_*` toolsets.
 
-**Diagnosis:** The bridge's 262 tools are `[McpTool]` methods discovered from the **claudebridge addon's compiled editor assembly**. If the library isn't installed in the *open* project, or its C# isn't compiling, the engine has nothing to discover. (Also check location: the addon must live in `<project>/Libraries/` — the global `addons/` folder silently refuses to compile custom C#.)
+**Diagnosis:** The bridge's 273 tools are `[McpTool]` methods discovered from the **claudebridge addon's compiled editor assembly**. If the library isn't installed in the *open* project, or its C# isn't compiling, the engine has nothing to discover. (Also check location: the addon must live in `<project>/Libraries/` — the global `addons/` folder silently refuses to compile custom C#.)
 
 **Fix:**
 1. Confirm the library is installed in this project: **Editor → Library Manager** → `sboxskinsgg.claudebridge`.

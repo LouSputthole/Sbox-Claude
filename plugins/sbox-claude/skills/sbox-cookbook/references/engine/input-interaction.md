@@ -1,5 +1,27 @@
 # Input & Interaction
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Patterns (recipes)](#patterns-recipes)
+  - [1. Define named actions, poll by name](#1-define-named-actions-poll-by-name)
+  - [2. Designer-editable, rebindable binding field](#2-designer-editable-rebindable-binding-field)
+  - [3. IPressable for use/press, with its two real gotchas](#3-ipressable-for-usepress-with-its-two-real-gotchas)
+  - [4. Contextual "Press E to ..." prompt over IPressable](#4-contextual-press-e-to--prompt-over-ipressable)
+  - [5. Analog feel from binary keys: read-raw → filter, separate rise/fall](#5-analog-feel-from-binary-keys-read-raw--filter-separate-risefall)
+  - [6. Indirect control: route a controller's input with ClientInput.PushScope](#6-indirect-control-route-a-controllers-input-with-clientinputpushscope)
+  - [7. Centralized dispatch with cancellable pre/post events](#7-centralized-dispatch-with-cancellable-prepost-events)
+  - [8. Block UI click-passthrough by element type](#8-block-ui-click-passthrough-by-element-type)
+- [Gotcha table](#gotcha-table)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [9. Custom IUse interface with per-frame focus-tracking (LookingAt)](#9-custom-iuse-interface-with-per-frame-focus-tracking-lookingat)
+  - [10. Drag-to-aim in Razor: screen-space MousePanelEvent + Hud.DrawLine, no InputAction](#10-drag-to-aim-in-razor-screen-space-mousepanelevent--huddrawline-no-inputaction)
+  - [11. Hold-to-confirm with TimeSince/Remap + Input.ReleaseAction to consume the key](#11-hold-to-confirm-with-timesinceremap--inputreleaseaction-to-consume-the-key)
+  - [12. Controller-agnostic key glyphs with Input.GetGlyph](#12-controller-agnostic-key-glyphs-with-inputgetglyph)
+  - [13. Block game input while a UI panel is open: UseInputControls + Mouse.Visibility](#13-block-game-input-while-a-ui-panel-is-open-useinputcontrols--mousevisibility)
+<!-- reference-toc:end -->
+
 Reading player input in s&box: named actions, the `IPressable` use-flow, designer-editable bindings, analog feel, and routing one player's input into vehicles/turrets/possessed objects.
 
 ## Mental model

@@ -1,5 +1,31 @@
 # Component & GameObject Lifecycle
 
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Patterns (recipes)](#patterns-recipes)
+  - [1. Hide-until-positioned to kill the one-frame origin flicker](#1-hide-until-positioned-to-kill-the-one-frame-origin-flicker)
+  - [2. Guaranteed deps with [RequireComponent]; correct FindMode for lookups](#2-guaranteed-deps-with-requirecomponent-correct-findmode-for-lookups)
+  - [3. Split persistent networked data from the disposable pawn](#3-split-persistent-networked-data-from-the-disposable-pawn)
+  - [4. Belt-and-suspenders cleanup for transient (per-round) objects](#4-belt-and-suspenders-cleanup-for-transient-per-round-objects)
+  - [5. Scene-scoped services via GameObjectSystem with ordered hooks](#5-scene-scoped-services-via-gameobjectsystem-with-ordered-hooks)
+  - [6. Simulation gating — LocalSimulation || Network.IsOwner (incl. collisions)](#6-simulation-gating--localsimulation--networkisowner-incl-collisions)
+  - [7. Defer heavy init out of OnStart behind a readiness gate](#7-defer-heavy-init-out-of-onstart-behind-a-readiness-gate)
+  - [8. Teardown discipline — cancel async, then unsubscribe, then clear](#8-teardown-discipline--cancel-async-then-unsubscribe-then-clear)
+  - [9. Partition a large pawn by concern](#9-partition-a-large-pawn-by-concern)
+- [Gotcha table](#gotcha-table)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [10. Hotload-safe singleton via IHotloadManaged](#10-hotload-safe-singleton-via-ihotloadmanaged)
+  - [11. OnEnabled/OnDisabled for component registration](#11-onenabledondisabled-for-component-registration)
+  - [12. StartEnabled=false → configure → NetworkSpawn to prevent first-frame uninitialized state](#12-startenabledfalse--configure--networkspawn-to-prevent-first-frame-uninitialized-state)
+  - [13. Proxy initialization bundle in OnStart](#13-proxy-initialization-bundle-in-onstart)
+  - [14. Centralized GameObjectSystem tick — agents must NOT override OnUpdate](#14-centralized-gameobjectsystem-tick--agents-must-not-override-onupdate)
+  - [15. [Sync, Change("MethodName")] — callback on sync value change](#15-sync-changemethodname--callback-on-sync-value-change)
+  - [16. !IsValid() guard in tick methods](#16-isvalid-guard-in-tick-methods)
+<!-- reference-toc:end -->
+
 Purpose: spawn timing, dependency wiring, persistent-vs-disposable object splits, scene-scoped services, simulation gating, and deterministic teardown for s&box `Component`/`GameObject`/`Scene` code.
 
 ## Mental model
@@ -267,13 +293,11 @@ This pattern generalises to any "parent holds a list of child subsystems" design
 
 Spawn networked objects with `StartEnabled = false` in the `CloneConfig`, configure all properties, then enable and network-spawn:
 
-```csharp
-// from facepunch.fair: AI/Guests/GuestManager.cs
-var go = guestPrefab.Clone( new CloneConfig { StartEnabled = false, Transform = spawnPoint } );
-var guest = go.Components.Get<Guest>();
-guest.IsRich = Random.Float() < 0.04f;
-go.Enabled = true;
-go.NetworkSpawn();
+```text
+clone the configured guest prefab in a disabled state at the spawn transform
+resolve the guest component and assign its initial randomized properties
+enable the completed object
+network-spawn it once from the host
 ```
 (facepunch.fair: AI/Guests/GuestManager.cs; same principle in enifun.shop_manager: Code/AI/CustomerSpawner.cs — `Clone()` → `Dresser.Randomize()` → `NetworkSpawn()`)
 

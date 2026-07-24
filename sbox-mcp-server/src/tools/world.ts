@@ -380,19 +380,30 @@ export function registerWorldTools(
   // ── place_along_path ─────────────────────────────────────────────
   server.tool(
     "place_along_path",
-    "Drop instances of a model along a path (list of points). Useful for fences, lampposts, road markers, lined-up rocks. Returns `placed` (instance count) and `folder` — the GUID of the new parent GameObject grouping the instances; pass `folder` to delete_gameobject to remove the whole run, or to set_parent/set_transform to move it.",
+    "Place up to 2,048 model instances along a waypoint path. Existing calls mutate immediately and keep the legacy { placed, folder } result, but reject larger paths before creating anything. Use dryRun:true for a deterministic, non-mutating preview with exact transforms, model-local bounds, warnings, and a 10-minute planId; then call commit_placement_plan to create those exact placements atomically with slot-to-GUID receipts. align follows path direction; randomizeYaw is used only when align is false.",
     {
       model: z.string().describe("Model path (e.g. 'models/dev/box.vmdl' or installed-asset path)"),
       points: z
-        .array(z.object({ x: z.number(), y: z.number(), z: z.number().default(0) }))
+        .array(
+          z
+            .object({
+              x: z.number().finite(),
+              y: z.number().finite(),
+              z: z.number().finite().default(0),
+            })
+            .strict()
+        )
         .min(2)
         .describe("Path waypoints (at least 2)"),
-      spacing: z.number().default(200).describe("Distance between placements (world units)"),
-      jitter: z.number().default(0).describe("Max random offset perpendicular to path"),
-      min_scale: z.number().default(1).describe("Minimum uniform scale per instance (random between min and max). Default 1."),
-      max_scale: z.number().default(1).describe("Maximum uniform scale per instance. Default 1."),
+      spacing: z.number().finite().positive().default(200).describe("Distance between placements (world units; must be > 0)"),
+      jitter: z.number().finite().nonnegative().default(0).describe("Max random XY offset (must be >= 0)"),
+      min_scale: z.number().finite().positive().default(1).describe("Minimum positive uniform scale per instance. Default 1."),
+      max_scale: z.number().finite().positive().default(1).describe("Maximum positive uniform scale per instance; must be >= min_scale. Default 1."),
       seed: z.number().int().default(42).describe("Random seed for jitter and scale — same seed reproduces the same placement. Default 42."),
       name: z.string().default("PathItem").describe("Base name for placed objects"),
+      align: z.boolean().optional().describe("Face each instance along its path segment (default false)"),
+      randomizeYaw: z.boolean().optional().describe("Randomize yaw when align is false (default false)"),
+      dryRun: z.boolean().optional().describe("Preview only: return deterministic transforms and planId without creating objects"),
     },
     async (params) => {
       const res = await bridge.send("place_along_path", params);

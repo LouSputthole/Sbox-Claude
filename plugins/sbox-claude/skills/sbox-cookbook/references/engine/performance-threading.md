@@ -1,4 +1,31 @@
-﻿# Performance & Threading
+
+# Performance & Threading
+
+<!-- reference-toc:start -->
+## Contents
+
+- [Mental model](#mental-model)
+- [Recipe: never block OnUpdate — offload + observe the task](#recipe-never-block-onupdate--offload--observe-the-task)
+- [Recipe: timed lifetimes — TimeUntil + Destroy, not async void](#recipe-timed-lifetimes--timeuntil--destroy-not-async-void)
+- [Recipe: worker→main handoff with a lock-free triple-buffer](#recipe-workermain-handoff-with-a-lock-free-triple-buffer)
+- [Recipe: per-player limits from a scoped tracked list](#recipe-per-player-limits-from-a-scoped-tracked-list)
+- [Recipe: tunable limits as replicated server ConVars](#recipe-tunable-limits-as-replicated-server-convars)
+- [Recipe: strip presentation on headless dedicated servers](#recipe-strip-presentation-on-headless-dedicated-servers)
+- [Recipe: custom GPU work via CommandList on the scene camera](#recipe-custom-gpu-work-via-commandlist-on-the-scene-camera)
+- [Recipe: async GPU readback with GetPixelsAsync](#recipe-async-gpu-readback-with-getpixelsasync)
+- [Recipe: low-latency PCM streaming with SoundStream + backpressure](#recipe-low-latency-pcm-streaming-with-soundstream--backpressure)
+- [Recipe: client sound scheduler with game-speed pitch + ambient crossfade](#recipe-client-sound-scheduler-with-game-speed-pitch--ambient-crossfade)
+- [Gotcha table](#gotcha-table)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Recipe: GPU-instanced scatter with frustum + distance culling — no per-frame allocation](#recipe-gpu-instanced-scatter-with-frustum--distance-culling--no-per-frame-allocation)
+  - [Recipe: async respawn with a generation guard — cancel stale Tasks after reset](#recipe-async-respawn-with-a-generation-guard--cancel-stale-tasks-after-reset)
+  - [Recipe: BuildHash from cheap revision counters — O(changes) Razor re-renders](#recipe-buildhash-from-cheap-revision-counters--ochanges-razor-re-renders)
+  - [Recipe: [DontExecuteOnServer] — declarative server strip for visual-only components](#recipe-dontexecuteonserver--declarative-server-strip-for-visual-only-components)
+  - [Recipe: spatial hash for O(1) point-in-zone lookup](#recipe-spatial-hash-for-o1-point-in-zone-lookup)
+  - [Recipe: frame-budgeted main-thread drain queue](#recipe-frame-budgeted-main-thread-drain-queue)
+  - [Recipe: coalescing off-thread write queue with priority backpressure](#recipe-coalescing-off-thread-write-queue-with-priority-backpressure)
+  - [Gotcha additions](#gotcha-additions)
+<!-- reference-toc:end -->
 
 Keep s&box games inside frame budget: offload heavy work off the main thread, never block `OnUpdate`, hand state across threads lock-free, scope limits per-player, strip presentation on headless servers, and stream audio without underruns.
 
@@ -6,16 +33,16 @@ Keep s&box games inside frame budget: offload heavy work off the main thread, ne
 
 `OnUpdate` runs on the main thread and feeds the render thread. Anything that overruns the frame budget there (procedural gen, pathfinding bakes, large AI/physics batches, file IO, emulation, synchronous GPU readback) stalls rendering and tanks framerate. The discipline:
 
-- **Cheap, per-frame, lifetime-owned work** stays in `OnUpdate` â€” but use `TimeUntil`/`TimeSince` for timing, not `async void` + `await DelaySeconds`.
+- **Cheap, per-frame, lifetime-owned work** stays in `OnUpdate` — but use `TimeUntil`/`TimeSince` for timing, not `async void` + `await DelaySeconds`.
 - **Heavy or blocking work** moves to a background `Task` via `GameTask.RunInThreadAsync`, with a `CancellationToken` for teardown and an *observe-task* so faults aren't swallowed.
-- **Workerâ†’main handoff** uses a preallocated lock-free triple-buffer (Interlocked slot swaps), never locks or per-frame allocations.
+- **Worker→main handoff** uses a preallocated lock-free triple-buffer (Interlocked slot swaps), never locks or per-frame allocations.
 - **Counting/limits** scope to a per-player tracked list, never a whole-scene scan.
 - **Headless dedicated servers** disable renderers/controllers nobody sees.
 - **GPU work** goes through `Sandbox.Rendering.CommandList` on the scene camera; readbacks use `GetPixelsAsync`.
 
-Profile before optimizing â€” none of the below is free complexity worth adding speculatively.
+Profile before optimizing — none of the below is free complexity worth adding speculatively.
 
-## Recipe: never block `OnUpdate` â€” offload + observe the task
+## Recipe: never block `OnUpdate` — offload + observe the task
 
 `GameTask.RunInThreadAsync` is the sanctioned offload primitive. A faulted background Task is silently swallowed, so always start a second task that just `await`s the worker to surface exceptions, and cancel on teardown (sgba: `Code/EmulatorComponent.CoreThread.cs:78`).
 
@@ -28,7 +55,7 @@ public void Start()
     if ( _cts != null ) return;
     _cts = new CancellationTokenSource();
     _workerTask = GameTask.RunInThreadAsync( Run );
-    _ = ObserveWorkerTaskAsync( _workerTask ); // surface faults â€” fire and forget
+    _ = ObserveWorkerTaskAsync( _workerTask ); // surface faults — fire and forget
 }
 
 private async Task Run()
@@ -49,11 +76,11 @@ private async Task ObserveWorkerTaskAsync( Task t )
 }
 ```
 
-Tear down in `OnDisable`/`OnDestroy`: `_cts?.Cancel();` then clear any wake signals so the loop exits â€” never let the thread outlive the component (sgba `CoreThread.cs:89` `End()` cancels the CTS and forces the sync signals).
+Tear down in `OnDisable`/`OnDestroy`: `_cts?.Cancel();` then clear any wake signals so the loop exits — never let the thread outlive the component (sgba `CoreThread.cs:89` `End()` cancels the CTS and forces the sync signals).
 
-## Recipe: timed lifetimes â€” `TimeUntil` + `Destroy`, not `async void`
+## Recipe: timed lifetimes — `TimeUntil` + `Destroy`, not `async void`
 
-Do NOT write `async void OnUpdate` with `await Task.DelaySeconds(life); go.Destroy();` â€” the continuation outlives the GameObject/scene, isn't cancelled on disable or hotload, and `async void` swallows exceptions. (This is exactly the footgun shown in sbox-scenestaging `Code/ExampleComponents/SpawnObjectPeriodically.cs:9`, where the spawned object is destroyed via an awaited delay â€” fine as a demo, wrong as a pattern.)
+Do NOT write `async void OnUpdate` with `await Task.DelaySeconds(life); go.Destroy();` — the continuation outlives the GameObject/scene, isn't cancelled on disable or hotload, and `async void` swallows exceptions. (This is exactly the footgun shown in sbox-scenestaging `Code/ExampleComponents/SpawnObjectPeriodically.cs:9`, where the spawned object is destroyed via an awaited delay — fine as a demo, wrong as a pattern.)
 
 Instead let a component synchronously check a `TimeUntil` it owns:
 
@@ -74,12 +101,12 @@ public sealed class DestroyAfter : Component
 
 Reserve `async`/`await` loops for components whose lifetime *owns* the loop (stepping a traversal with `await GameTask.Frame()`), never for fire-and-forget delays.
 
-## Recipe: workerâ†’main handoff with a lock-free triple-buffer
+## Recipe: worker→main handoff with a lock-free triple-buffer
 
 When a background thread produces data the main thread consumes each frame, don't lock a shared object or enqueue freshly-allocated frames (contention + GC churn on the hot path). Preallocate three slots (write/ready/read) and swap ownership with `Interlocked.Exchange` (sgba: `Code/Emulator/GbaVideo.Rendering.cs:475` producer, `:639` consumer).
 
 ```csharp
-// slots preallocated ONCE â€” never reallocate on the hot path
+// slots preallocated ONCE — never reallocate on the hot path
 private int _writeSlot = 0, _readySlot = 1, _readSlot = 2;
 private int _frameReady; // 0/1, Interlocked
 
@@ -99,7 +126,7 @@ bool TryClaimLatest()
 }
 ```
 
-Lock-free and allocation-free: the consumer always gets the newest complete frame, the producer never waits. Reusable for any decoupled simulation/render split.
+Lock-free and allocation-free: the consumer always gets the newest complete frame, the producer never waits. This supports decoupled simulation/render pipelines.
 
 ## Recipe: per-player limits from a scoped tracked list
 
@@ -131,7 +158,7 @@ private int Count( long steamId, Func<GameObject, bool> filter = null )
 }
 ```
 
-The count is O(player's objects), not O(scene), and the list self-heals with no separate GC pass. For batch ops (a duplicator paste) pre-check atomically â€” `current + dupeCount > limit` rejects the whole paste so it can't partially overrun the cap (`LimitsSystem.cs:135`).
+The count is O(player's objects), not O(scene), and the list self-heals with no separate GC pass. For batch ops (a duplicator paste) pre-check atomically — `current + dupeCount > limit` rejects the whole paste so it can't partially overrun the cap (`LimitsSystem.cs:135`).
 
 ## Recipe: tunable limits as replicated server ConVars
 
@@ -147,7 +174,7 @@ private static bool IsExceeded( int limit, int count ) => limit >= 0 && count >=
 
 ## Recipe: strip presentation on headless dedicated servers
 
-On a host with no display, animating skinned meshes and running client controllers is wasted CPU. Wrap the engine flag so you can fake/test it in-editor, then periodically disable every `SkinnedModelRenderer` and `PlayerController` â€” gated on host-only checks so it never fires for real players (dxrp: `game/code/GameManager.cs:47`, `game/code/GameNetworkManager.cs:179`).
+On a host with no display, animating skinned meshes and running client controllers is wasted CPU. Wrap the engine flag so you can fake/test it in-editor, then periodically disable every `SkinnedModelRenderer` and `PlayerController` — gated on host-only checks so it never fires for real players (dxrp: `game/code/GameManager.cs:47`, `game/code/GameNetworkManager.cs:179`).
 
 ```csharp
 public static bool IsHeadless => Application.IsHeadless; // wrap so editor can fake it
@@ -189,7 +216,7 @@ _camera.RemoveCommandList( cmd );
 
 ## Recipe: async GPU readback with `GetPixelsAsync`
 
-Synchronous `texture.GetPixels()` forces a CPU/GPU sync point that blocks until the GPU finishes â€” a framerate cliff under load. Any feature reading a render target every frame (network video, live thumbnails, photo mode, AI vision) must read back asynchronously and accept the deferred callback (sgba: `Code/Emulator/GbaVideo.Rendering.cs:903`).
+Synchronous `texture.GetPixels()` forces a CPU/GPU sync point that blocks until the GPU finishes — a framerate cliff under load. Any feature reading a render target every frame (network video, live thumbnails, photo mode, AI vision) must read back asynchronously and accept the deferred callback (sgba: `Code/Emulator/GbaVideo.Rendering.cs:903`).
 
 ```csharp
 tex.GetPixelsAsync<byte>( span =>
@@ -221,13 +248,13 @@ _soundHandle.AirAbsorption = false;
 if ( _audioStream.QueuedSampleCount <= samplesPerFrame * HighWaterFrames )
     _audioStream.WriteData( pcm.AsSpan( 0, count ) );
 
-// streams die on scene reload / device change â€” re-init when invalid
+// streams die on scene reload / device change — re-init when invalid
 if ( !_soundHandle.IsValid() ) ReinitStream();
 ```
 
 ## Recipe: client sound scheduler with game-speed pitch + ambient crossfade
 
-For timed/sequenced cues (countdowns, stingers) keep a small static client scheduler: pre-queue `(soundEvent, Time.Now + delay)`, flush due cues in `Update()`, track every returned `SoundHandle` so you can prune and `StopAll`. Push `Pitch = SpeedPercent / 100f` onto each handle so audio follows time scaling, and lerp an ambient handle's `Volume` toward a target each frame to crossfade. Audio is client-only â€” early-return on the dedicated server (garryware: `Code/Ware/UI/WareSounds.cs:135`, `:214`, `:222`).
+For timed/sequenced cues (countdowns, stingers) keep a small static client scheduler: pre-queue `(soundEvent, Time.Now + delay)`, flush due cues in `Update()`, track every returned `SoundHandle` so you can prune and `StopAll`. Push `Pitch = SpeedPercent / 100f` onto each handle so audio follows time scaling, and lerp an ambient handle's `Volume` toward a target each frame to crossfade. Audio is client-only — early-return on the dedicated server (garryware: `Code/Ware/UI/WareSounds.cs:135`, `:214`, `:222`).
 
 ```csharp
 public static void Update()
@@ -264,11 +291,11 @@ _ambientHandle.Volume = v;
 | Gotcha | Why it bites | Fix |
 | --- | --- | --- |
 | `async void` in the per-frame lifecycle | Continuation outlives the GameObject/scene, isn't cancelled on disable/hotload, swallows exceptions | `TimeUntil` + `Destroy` for delays; reserve async loops for lifetime-owning components |
-| Faulted `RunInThreadAsync` Task | Invisible by default â€” worker dies silently, you debug a "frozen" system with no error | Start an observe-task that `await`s the worker and logs |
-| Worker not torn down | CTS not cancelled / wake signals not cleared â†’ thread leaks across hotload & scene change | Cancel CTS + clear signals in `OnDisable`/`OnDestroy` |
+| Faulted `RunInThreadAsync` Task | Invisible by default — worker dies silently, you debug a "frozen" system with no error | Start an observe-task that `await`s the worker and logs |
+| Worker not torn down | CTS not cancelled / wake signals not cleared → thread leaks across hotload & scene change | Cancel CTS + clear signals in `OnDisable`/`OnDestroy` |
 | `AddCommandList` without `RemoveCommandList` | Passes accumulate on the camera across hotloads | Pair every `AddCommandList` with `RemoveCommandList` on teardown |
-| Missing `UavBarrier` between compute passes | Second pass may read before the first finishes writing â†’ garbage/nondeterministic | Insert `cmd.UavBarrier(tex)` between dependent passes |
-| Synchronous `GetPixels()` per frame | CPU/GPU sync point â€” a framerate cliff that only shows up under real load | `GetPixelsAsync` with a deferred callback |
+| Missing `UavBarrier` between compute passes | Second pass may read before the first finishes writing → garbage/nondeterministic | Insert `cmd.UavBarrier(tex)` between dependent passes |
+| Synchronous `GetPixels()` per frame | CPU/GPU sync point — a framerate cliff that only shows up under real load | `GetPixelsAsync` with a deferred callback |
 | Full-scene scan to count limits | O(scene), silently a hotspot as object counts grow | Per-player tracked `List` + `HashSet`, O(player's objects) |
 | Per-player `List`/`HashSet` pruned separately | The O(1) dedupe set drifts out of sync with the list | Prune both together inside the count loop |
 | Headless strip disabling `PlayerController` on clients | Disables controllers for real players | Gate on wrapped `IsHeadless` + `Networking.IsHost`/`IsActive` |
@@ -279,20 +306,20 @@ _ambientHandle.Volume = v;
 | Dropping the `SoundHandle` from `Sound.Play` | Can't stop/fade/retune/speed-scale a sound after the fact | Keep + track handles; prune invalid/stopped ones |
 | Audio in networked/proxy/server code | Won't play or plays on the wrong machine | Run scheduler on the local client; early-return on `Application.IsDedicatedServer` |
 
-Verify live: API names drift between SDK builds â€” confirm exact members (`GameTask.RunInThreadAsync`, `CommandList`, `Texture.CreateRenderTarget`, `GetPixelsAsync`, `SoundStream`, `SoundHandle.SpacialBlend`, `ConVarFlags`) with `describe_type`/`search_types`/`get_method_signature`; bridge reflection is authoritative for the installed SDK. No bridge tool profiles frame time, GC allocations, ConVars, or background-task/CommandList state, so these patterns are verified by static inspection â€” measure in-engine before optimizing.
+Verify live: API names drift between SDK builds — confirm exact members (`GameTask.RunInThreadAsync`, `CommandList`, `Texture.CreateRenderTarget`, `GetPixelsAsync`, `SoundStream`, `SoundHandle.SpacialBlend`, `ConVarFlags`) with `describe_type`/`search_types`/`get_method_signature`; bridge reflection is authoritative for the installed SDK. No bridge tool profiles frame time, GC allocations, ConVars, or background-task/CommandList state, so these patterns are verified by static inspection — measure in-engine before optimizing.
 
 See also: **sbox-api** (resolve exact type/method signatures) and **sbox-build-feature** (screenshot-driven iteration loop for landing the change).
 
 ## Corpus refresh (2026): more reference implementations
 
-Seven net-new patterns sourced from real open-source s&box games (2026 mining pass).
+Seven net-new patterns sourced from real public-source s&box games (2026 mining pass).
 
-### Recipe: GPU-instanced scatter with frustum + distance culling â€” no per-frame allocation
+### Recipe: GPU-instanced scatter with frustum + distance culling — no per-frame allocation
 
 For dense decorative worldgen (trees, rocks, foliage), GPU instancing via `SceneCustomObject` beats spawning individual GameObjects by orders of magnitude. The key discipline: reuse arrays and pass `Span<Transform>` so nothing allocates on the hot path (bublic.stone_by_stone: `Code/RecourcesGeneratorComponent.cs`).
 
 ```csharp
-// One SceneCustomObject with RenderOverride â€” lives as long as the component
+// One SceneCustomObject with RenderOverride — lives as long as the component
 _renderer = new SceneCustomObject( Scene.SceneWorld );
 _renderer.RenderOverride = RenderInstances;
 
@@ -307,7 +334,7 @@ void RenderInstances( SceneObject self )
     {
         var bounds = new BBox( inst.Pos, 1f ).Grow( 0.5f );
         var distSq = (inst.Pos - cam.WorldPosition).LengthSquared;
-        if ( distSq > MaxDistanceSq ) continue;              // distanceÂ² â€” no sqrt
+        if ( distSq > MaxDistanceSq ) continue;              // distance² — no sqrt
         if ( !frustum.IsInside( bounds ) ) continue;         // frustum cull
         _transformBuf[count++] = inst.Transform;
     }
@@ -318,9 +345,9 @@ void RenderInstances( SceneObject self )
 
 Anti-pattern: allocating `new Transform[count]` each frame for the span argument triggers GC churn on the hot render path. Preallocate the buffer to `MaxInstances` once.
 
-### Recipe: async respawn with a generation guard â€” cancel stale Tasks after reset
+### Recipe: async respawn with a generation guard — cancel stale Tasks after reset
 
-When a harvested resource should respawn after a delay, an `async Task` is natural â€” but naively using `await Task.DelaySeconds` lets stale continuations fire after a scene reset or the component is disabled. Capture an integer "generation" at Task start and bail if it has advanced (bublic.stone_by_stone: `Code/RecourcesGeneratorComponent.cs`).
+When a harvested resource should respawn after a delay, an `async Task` is natural — but naively using `await Task.DelaySeconds` lets stale continuations fire after a scene reset or the component is disabled. Capture an integer "generation" at Task start and bail if it has advanced (bublic.stone_by_stone: `Code/RecourcesGeneratorComponent.cs`).
 
 ```csharp
 private int _spawnGeneration;
@@ -340,29 +367,26 @@ protected override void OnDisabled()
 }
 ```
 
-This is the canonical fix for "zombie resurrections" â€” objects reappearing after a reset because a delayed Task continued past the disable/scene-reload boundary.
+This is the canonical fix for "zombie resurrections" — objects reappearing after a reset because a delayed Task continued past the disable/scene-reload boundary.
 
-### Recipe: `BuildHash` from cheap revision counters â€” O(changes) Razor re-renders
+### Recipe: `BuildHash` from cheap revision counters — O(changes) Razor re-renders
 
-The anti-pattern `BuildHash() => HashCode.Combine(Time.Delta)` (seen in bublic.stone_by_stone all-panel shortcut) forces a full re-render every frame â€” correct for data that always changes, wasteful for panels that update rarely. The fix: expose a monotonic `Revision` int that bumps only on real change, and quantize continuous progress so the hash changes at most N times per unit (pldr.duck_pond: `Code/UI/DuckSwitcherPanel.razor`).
+The anti-pattern `BuildHash() => HashCode.Combine(Time.Delta)` (seen in bublic.stone_by_stone all-panel shortcut) forces a full re-render every frame — correct for data that always changes, wasteful for panels that update rarely. The fix: expose a monotonic `Revision` int that bumps only on real change, and quantize continuous progress so the hash changes at most N times per unit (pldr.duck_pond: `Code/UI/DuckSwitcherPanel.razor`).
 
-```csharp
-// In the data source:
-public int Revision { get; private set; }
-private void OnDuckListChanged() => Revision++;   // bump only on real change
+```text
+data-source state:
+  expose a read-only monotonic revision counter
+  increment it only when the corresponding collection or value actually changes
 
-// In the Razor panel:
-protected override int BuildHash()
-    => HashCode.Combine(
-        Controller?.Revision ?? 0,
-        Spawner?.Revision    ?? 0,
-        (int)(SpawnProgress * 100)  // quantize to 100 buckets â€” re-renders ~once per 1%
-    );
+panel hash calculation:
+  combine the revision counters of each discrete dependency
+  quantize continuous progress into the desired number of visible buckets
+  include that bucket index instead of frame time
 ```
 
 Anti-pattern: `HashCode.Combine(Time.Delta)` is fine for a single counter panel but silently becomes a 60 fps re-render budget hole when multiplied across many panels. Use it deliberately, not by default.
 
-### Recipe: `[DontExecuteOnServer]` â€” declarative server strip for visual-only components
+### Recipe: `[DontExecuteOnServer]` — declarative server strip for visual-only components
 
 Rather than scattering `if (Application.IsHeadless) return;` checks, annotate visual-only components with `[DontExecuteOnServer]` so the engine never runs `OnUpdate`/`OnEnabled` on a dedicated server at all (pldr.duck_pond: `Code/Water/WaterManager.cs`, `WaterQuad.cs`, `WaterBodyRenderer.cs`).
 
@@ -379,7 +403,7 @@ This is the declarative companion to the existing "headless strip" recipe (which
 
 ### Recipe: spatial hash for O(1) point-in-zone lookup
 
-When you need to answer "which zone does this point belong to?" many times per frame (sector hit-tests, navmesh zone queries, dungeon room lookups), a brute-force per-zone polygon test is O(NÃ—V). Bucket zones by world cell and only test the handful whose cell overlaps the query point (ataco.sdoomresurrection: `Code/entities/DoomMap.cs`, `Sector.SectorChunks`).
+When you need to answer "which zone does this point belong to?" many times per frame (sector hit-tests, navmesh zone queries, dungeon room lookups), a brute-force per-zone polygon test is O(N×V). Bucket zones by world cell and only test the handful whose cell overlaps the query point (ataco.sdoomresurrection: `Code/entities/DoomMap.cs`, `Sector.SectorChunks`).
 
 ```csharp
 // Build once (e.g. OnStart / after worldgen):
@@ -406,7 +430,7 @@ Zone FindZone( Vector2 point )
 }
 ```
 
-Use `MathX.Floor` â€” `System.MathF` does not exist in the s&box sandbox.
+Use `MathX.Floor` — `System.MathF` does not exist in the s&box sandbox.
 
 ### Recipe: frame-budgeted main-thread drain queue
 
@@ -444,7 +468,7 @@ Pairs with `GameTask.RunInThreadAsync` for the *producer* side: background threa
 Saving a player's state on every balance change or inventory move hammers the disk if done naively. A coalescing write queue deduplicates: a second `Enqueue` for the same path replaces the pending payload, and low-priority writes are dropped under memory pressure while gameplay saves are never dropped (artisan.darkrpog: `Concurrency/PersistenceFlushQueue.cs`).
 
 ```csharp
-// Priority order â€” lower value = higher priority = never dropped
+// Priority order — lower value = higher priority = never dropped
 public enum WritePriority { Critical = 0, Gameplay = 1, Autosave = 2, Diagnostic = 3 }
 
 private readonly Dictionary<string, (string payload, WritePriority priority)> _pending = new();
@@ -473,10 +497,10 @@ Critical rule: validate paths inside `Enqueue` (reject `..`, absolute paths, `:`
 | --- | --- | --- |
 | `new Transform[count]` inside `RenderOverride` | Per-frame GC allocation on the render hot path | Preallocate `Transform[]` to `MaxInstances` once; pass `AsSpan(0, count)` |
 | `await Task.DelaySeconds` without a generation guard | Continuation fires after scene reset / component disable, resurrecting dead objects | Capture `_spawnGeneration` before the delay; bail if it changed |
-| `BuildHash() => HashCode.Combine(Time.Delta)` on every panel | 60 fps re-renders across all panels â€” silent perf sink at scale | Use monotonic `Revision` ints + quantized continuous values |
-| Per-component `OnUpdate` on hundreds of entities | 500 components Ã— `OnUpdate` = 500 virtual calls + cache misses per frame | Centralize in a `GameObjectSystem` that single-passes `Scene.GetAll<T>()` |
-| Brute-force point-in-zone scan per frame | O(NÃ—V) test silently becomes a hotspot as zone count grows | Spatial hash by cell size; test only the bucket that contains the point |
+| `BuildHash() => HashCode.Combine(Time.Delta)` on every panel | 60 fps re-renders across all panels — silent perf sink at scale | Use monotonic `Revision` ints + quantized continuous values |
+| Per-component `OnUpdate` on hundreds of entities | 500 components × `OnUpdate` = 500 virtual calls + cache misses per frame | Centralize in a `GameObjectSystem` that single-passes `Scene.GetAll<T>()` |
+| Brute-force point-in-zone scan per frame | O(N×V) test silently becomes a hotspot as zone count grows | Spatial hash by cell size; test only the bucket that contains the point |
 | Synchronous disk write on the main thread (save on every mutation) | Blocks the frame for the duration of the I/O | Off-thread coalescing queue; gameplay saves are never dropped, low-priority writes are |
 | `[DontExecuteOnServer]` omitted on visual-only components | OnUpdate runs on the headless server burning CPU for nothing | Add `[DontExecuteOnServer]` to any component that is presentation-only |
 
-Read these games for full working implementations: **bublic.stone_by_stone** (GPU-instanced scatter + generation-guard respawn), **pldr.duck_pond** (revision-based `BuildHash`, `[DontExecuteOnServer]`, `CommandList` ordering), **ataco.sdoomresurrection** (spatial hash sector lookup, runtime mesh-from-polygon), **artisan.darkrpog** (FrameBudgetQueue, coalescing off-thread writes, `PerFramePanelCache`, distance-gated `OnUpdate`). Per-game mining details: `D:\sbox-lessons\mining-v2\games\`.
+Read these games for full working implementations: **bublic.stone_by_stone** (GPU-instanced scatter + generation-guard respawn), **pldr.duck_pond** (revision-based `BuildHash`, `[DontExecuteOnServer]`, `CommandList` ordering), **ataco.sdoomresurrection** (spatial hash sector lookup, runtime mesh-from-polygon), **artisan.darkrpog** (FrameBudgetQueue, coalescing off-thread writes, `PerFramePanelCache`, distance-gated `OnUpdate`). Use the public links in [SOURCE-PROVENANCE.md](../SOURCE-PROVENANCE.md) to inspect the cited projects.

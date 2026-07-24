@@ -1,6 +1,27 @@
 # Co-op Kitchen / Assembly-Line (Overcooked-like) Recipe
 
-Build a 1–4-player co-op throughput game: players race a shift clock to assemble multi-stage items at shared stations — grab an ingredient, carry it, process it, hand it off, deliver it against time-limited order tickets for a shared star score. Distilled mainly from `gabreusenra.wjse` (an Overcooked-style **packing & shipping** game — dispense → pack → label → deliver), with composable pieces lifted from `luckygaming.doner_kiosk` (a co-op kebab kiosk: ordered ingredient assembly + dual win/lose counters + co-op disconnect cleanup) and `emg.everything_must_go` (carry-boxes-to-shelf stocking + host-authoritative discipline + co-op roles).
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+  - [Core loop](#core-loop)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [The interaction interface (every station rides it)](#the-interaction-interface-every-station-rides-it)
+- [Carryable items + hand-off (the co-op verb)](#carryable-items--hand-off-the-co-op-verb)
+- [State-on-the-object assembly (no Recipe asset)](#state-on-the-object-assembly-no-recipe-asset)
+- [Stations: dispense, process, consume, hand-off](#stations-dispense-process-consume-hand-off)
+- [The order board: interval spawn, soft cap, per-order timers](#the-order-board-interval-spawn-soft-cap-per-order-timers)
+- [Turn-in validator + quality-graded scoring](#turn-in-validator--quality-graded-scoring)
+- [Round flow, lobby, and best-run save](#round-flow-lobby-and-best-run-save)
+- [Proximity world UI on stations (no per-frame panel churn)](#proximity-world-ui-on-stations-no-per-frame-panel-churn)
+- [Co-op cleanup on disconnect](#co-op-cleanup-on-disconnect)
+- [Build order](#build-order)
+- [Gotchas & anti-patterns (wjse ships these — teach the fix)](#gotchas--anti-patterns-wjse-ships-these--teach-the-fix)
+- [Verify live](#verify-live)
+- [Which games to read](#which-games-to-read)
+<!-- reference-toc:end -->
+
+Build a 1–4-player co-op throughput game: players race a shift clock to assemble multi-stage items at shared stations — grab an ingredient, carry it, process it, hand it off, deliver it against time-limited order tickets for a shared star score. The documented examples are mainly `gabreusenra.wjse` (an Overcooked-style **packing & shipping** game — dispense → pack → label → deliver), `luckygaming.doner_kiosk` (a co-op kebab kiosk: ordered ingredient assembly + dual win/lose counters + co-op disconnect cleanup), and `emg.everything_must_go` (carry-boxes-to-shelf stocking + host-authoritative discipline + co-op roles).
 
 ## What defines the genre
 
@@ -18,7 +39,7 @@ A co-op kitchen game is **shared-station throughput under a clock**. Distinct fr
 
 ## The system stack to compose
 
-Build these as separate components. References point to existing system/genre docs where one applies — lift those and add the kitchen-specific glue here.
+Build these as separate components. References point to existing system/genre docs where one applies; combine those general systems with the kitchen-specific glue here.
 
 | System | Role | Reference / source |
 |---|---|---|
@@ -32,36 +53,45 @@ Build these as separate components. References point to existing system/genre do
 | Lobby: map vote + character pick | vote tally + tie-break, picks carried across scene load | `references/genres/social-hub.md` (wjse `LobbyManager.cs`) |
 | Best-run save (content-keyed) | per-map high score, write-on-improvement | `references/systems/save-persistence.md` (wjse `SaveManager.cs`) |
 | Proximity world UI on stations | enable a world panel only when the local player is near | below (wjse `IngredientBox.cs`) |
-| Item registry (id → prefab/icon) | small `GameResource` DB, lookup by int id | `references/systems/data-assets.md` (wjse `ItemResource.cs`) |
+| Item registry (id → prefab/icon) | small `GameResource` DB, lookup by int id | `references/engine/data-assets.md` (wjse `ItemResource.cs`) |
 | Co-op cleanup on disconnect | reclaim/close the leaver's stations | below (doner `GameNetworkManager`) |
 
 The first five are the irreducible core — a kitchen game is *interaction interface + carryables + stations + an order board + a turn-in validator*. The rest is flow and polish.
 
-## The interaction interface (lift this first — every station rides it)
+## The interaction interface (every station rides it)
 
 One tiny interface is the whole interaction surface (wjse: `Cooking/IUse.cs`):
 
-```csharp
-public interface IUse
-{
-    bool CanUse( GameObject user );      // gate (e.g. empty hands, has-box)
-    void OnUse( GameObject user );        // do the thing
-    void LookingAt( bool isLooking );     // focus enter/exit → world "inspect" UI
-}
+```text
+INTERACTION CONTRACT
+  canInteract(user) -> boolean
+    checks station-specific preconditions
+
+  interact(user)
+    performs the station action
+
+  focusChanged(isFocused)
+    shows or hides world-space inspection UI
 ```
 
 The player runs one per-frame trace, tracks the focused `IUse`, fires `LookingAt` on focus changes, and routes the `use` press (wjse: `Player/PlayerInventory.RaycastDetection`):
 
-```csharp
-var tr = Scene.Trace.Ray( eyePos, eyePos + eyeFwd * Reach )
-    .UseHitboxes().WithoutTags( "player" ).Run();         // camera ray self-hits the body — exclude it
-var hit = tr.GameObject?.Components.Get<IUse>( FindMode.EverythingInSelfAndParent );
-if ( hit != _focused ) { _focused?.LookingAt( false ); hit?.LookingAt( true ); _focused = hit; }
-if ( Input.Pressed( "use" ) )
-{
-    if ( _focused is not null && _focused.CanUse( GameObject ) ) _focused.OnUse( GameObject );
-    else DropHeldItem();                                   // looking at nothing → drop
-}
+```text
+EACH FRAME FOR THE LOCAL PLAYER
+  trace from the eyes forward to interaction reach
+  include hitboxes and exclude the player's own body
+  resolve an interaction target from the hit object or its parents
+
+  IF the target changed:
+    notify the old target that focus ended
+    notify the new target that focus began
+    store the new focused target
+
+  IF the use action was pressed:
+    IF a focused target exists and accepts this user:
+      invoke its interaction
+    ELSE:
+      drop the currently held item
 ```
 
 Every station (`IngredientBox`, `PackingStation`, `LabelStation`, `DeliveryStation`) implements `IUse`. To add a station: implement the interface, no dispatcher change. This trace→`IUse`→focus→press-E trio is the most-reused thing in the genre. (See also the document-sim `Interactable.RunLogic()` variant — same idea, abstract `Component` instead of an interface.)
@@ -96,12 +126,28 @@ newBox.itemID = existingBox.itemID;                            // carry the cont
 newBox.Label  = existingBox.Label;                             // carry any prior label
 ```
 
-The ordered, linear-recipe variant (doner `EntityBoard.cs`) is worth lifting when stages are *fixed-sequence on one bench* rather than spread across rooms: a `BoardState` enum (`AwaitBread → AwaitSauce → AwaitMeat → … → Finish`), each `GiveX()` enables the next ingredient model and advances the state, and the player validates via two dictionaries — item→required-state and item→place-action — refusing out-of-order ingredients with a "Need {x}" hint (doner: `Code/Player/Player.cs`, `Code/Game/EntityBoard.cs`):
+The ordered, linear-recipe variant (doner `EntityBoard.cs`) fits stages that are *fixed-sequence on one bench* rather than spread across rooms: a `BoardState` enum (`AwaitBread → AwaitSauce → AwaitMeat → … → Finish`), each `GiveX()` enables the next ingredient model and advances the state, and the player validates via two mappings — item→required-state and item→place-action — refusing out-of-order ingredients with a "Need {x}" hint (doner: `Code/Player/Player.cs`, `Code/Game/EntityBoard.cs`):
 
-```csharp
-_itemToBoardState = { { bread, AwaitBread }, { sauce, AwaitSauce }, { meat, AwaitMeat } };
-_placementActions = { { bread, b => b.GiveBread() }, { meat, b => b.GiveMeat() } };
-if ( board.AwaitItemBoard != requiredState ) { Hint($"Need {requiredState}"); return; }
+```text
+LINEAR BENCH CONFIGURATION
+  requiredStateByItem:
+    bread -> awaiting bread
+    sauce -> awaiting sauce
+    meat  -> awaiting meat
+
+  placementActionByItem:
+    bread -> place bread and advance
+    sauce -> place sauce and advance
+    meat  -> place meat and advance
+
+PROCEDURE tryPlace(item, board)
+  requiredState = requiredStateByItem[item]
+  IF board's current state is not requiredState:
+    show a hint naming the required stage
+    RETURN rejected
+
+  run placementActionByItem[item] on the board
+  RETURN accepted
 ```
 
 **Compose them:** use wjse's stack-state-forward for *parallel, recombinant* assembly (any order, combos), and doner's `BoardState` FSM + hold-to-place gate for a *single fixed-sequence* prep bench. Both grade only at the end.
@@ -161,15 +207,15 @@ if ( !comboOk )                    points -= 40;    // wrong/incomplete packagin
 CurrentScore += points;                              // (host-only — see gotchas)
 ```
 
-Expired orders cost a flat penalty (`-50`). At game-over, `GameLoopManager` maps the final score to 0–3 stars via three thresholds (`Star1/2/3Score`). This is the genre's *quality-graded turn-in* economy — the same shape as document-sim's verdict scoring and shopkeeper order fulfilment, so lift the grading idea from whichever you've already built. (wjse: `OrderManager.cs`, `GameLoopManager.cs`)
+Expired orders cost a flat penalty (`-50`). At game-over, `GameLoopManager` maps the final score to 0–3 stars via three thresholds (`Star1/2/3Score`). This is the genre's *quality-graded turn-in* economy — the same general shape as document-sim verdict scoring and shopkeeper order fulfilment. (wjse: `OrderManager.cs`, `GameLoopManager.cs`)
 
 ## Round flow, lobby, and best-run save
 
-The shift clock is a host-authoritative countdown — `if (!Networking.IsHost) return;`, `[Sync] TimeRemaining`/`IsGameOver`, star thresholds, `GetTimeFormatted()` → `m\:ss`, host-only **Restart** (`Game.ActiveScene.Load` the same scene) or **Menu**. This is the bog-standard round skeleton — see **`references/systems/round-match.md`** and lift it wholesale. (wjse: `GameLoopManager.cs`, `EndGameUI.razor`)
+The shift clock is a host-authoritative countdown — `if (!Networking.IsHost) return;`, `[Sync] TimeRemaining`/`IsGameOver`, star thresholds, `GetTimeFormatted()` → `m\:ss`, host-only **Restart** (`Game.ActiveScene.Load` the same scene) or **Menu**. See **`references/systems/round-match.md`** for the general round skeleton. (wjse: `GameLoopManager.cs`, `EndGameUI.razor`)
 
-For the **dual win/lose** variant (a success target *and* a failure cap rather than just a clock), lift doner's twin-counter spine: `CustomerNeedCount` (hit 0 → win) vs `PlayerErrorCount` (hit 4 → lose), each polled in `OnUpdate` with a one-shot latch so the ending fires exactly once (doner: `Code/Game/GameSettings.cs`). Its `RestartSettings()` is a clean **soft-restart without a scene reload** (re-enable the controller, destroy all spawned NPCs/items, reposition players, reset the board).
+For the **dual win/lose** variant (a success target *and* a failure cap rather than just a clock), use a twin-counter spine: `CustomerNeedCount` (hit 0 → win) vs `PlayerErrorCount` (hit 4 → lose), each polled in `OnUpdate` with a one-shot latch so the ending fires exactly once (doner: `Code/Game/GameSettings.cs`). Its `RestartSettings()` is a clean **soft-restart without a scene reload** (re-enable the controller, destroy all spawned NPCs/items, reposition players, reset the board).
 
-**Lobby (map vote + character pick carried into the match)** and **best-run save (content-keyed)** are social-hub / save-persistence sub-patterns — see **`references/genres/social-hub.md`** and **`references/systems/save-persistence.md`**. The two non-obvious bits to lift from wjse:
+**Lobby (map vote + character pick carried into the match)** and **best-run save (content-keyed)** are social-hub / save-persistence sub-patterns — see **`references/genres/social-hub.md`** and **`references/systems/save-persistence.md`**. Two non-obvious implementation details from wjse are:
 - The chosen characters are copied into a **static** dict (`LobbyManager.StartingPlayers`) *just before* `Game.ActiveScene.Load`, then read by the next scene's spawner — the static dict is the deliberate bridge across the scene-load boundary. (wjse: `LobbyManager.cs`, `GameSpawner.cs`)
 - The save is keyed by `Game.ActiveScene.Source?.ResourcePath` (the map's content path), writes only when the new score/stars **beat** the record, and the game-over UI uses a `_hasSavedRecord` latch so it writes once, not 60×/sec. (wjse: `SaveManager.cs`, `EndGameUI.razor`)
 
@@ -187,7 +233,7 @@ For Razor reactivity, override `BuildHash()` over exactly the fields that should
 
 ## Co-op cleanup on disconnect
 
-When a player leaves mid-shift, reclaim or reset their stations so the round isn't soft-locked. doner finds the *other* player's named props (curtain/light/door) and force-closes them on disconnect (doner: `GameNetworkManager.OnDisconnected`). The general rule: anything a leaver could be holding or had reserved (a held carryable's `PlayerHolder`, a station's in-progress input) must be released host-side on `INetworkListener` disconnect, or it strands forever. emg's host-authoritative `Shop` (`if (!Networking.IsHost) return;` simulate-on-host, clients are render-only mirrors) is the cleanest discipline to copy if you want all station state owned in one place — it sidesteps most of these orphan cases by construction.
+When a player leaves mid-shift, reclaim or reset their stations so the round isn't soft-locked. doner finds the *other* player's named props (curtain/light/door) and force-closes them on disconnect (doner: `GameNetworkManager.OnDisconnected`). The general rule: anything a leaver could be holding or had reserved (a held carryable's `PlayerHolder`, a station's in-progress input) must be released host-side on `INetworkListener` disconnect, or it strands forever. emg's host-authoritative `Shop` (`if (!Networking.IsHost) return;` simulate-on-host, clients are render-only mirrors) is a useful discipline when all station state should live in one place — it sidesteps most of these orphan cases by construction.
 
 ## Build order
 
@@ -195,8 +241,8 @@ When a player leaves mid-shift, reclaim or reset their stations so the round isn
 2. **One dispenser + one turn-in.** Dispenser clones+`NetworkSpawn`s a carryable; turn-in destroys it and adds a flat score. Verify a full grab→carry→deliver with score moving (host-side).
 3. **A processing station + state-on-the-object.** Add a timed `PackingStation` that spawns the next-stage item carrying `itemId`/types/label forward. Now you have multi-stage assembly.
 4. **Order board.** `OrderManager` with allow-listed pools, interval spawn + soft cap, per-order `TimeRemaining` ticked host-side, and `OrderScreen.razor` with a `BuildHash`. Wire the turn-in validator to grade against the soonest matching order (additive penalties).
-5. **Shift clock + stars.** Lift `round-match`: `[Sync] TimeRemaining`, star thresholds, host-only Restart/Menu.
-6. **Lobby + best-run save.** Lift social-hub map-vote/character-pick (static carry-over dict → next-scene spawner) and the content-path-keyed write-on-improvement save with a one-shot latch.
+5. **Shift clock + stars.** Compose with `round-match`: `[Sync] TimeRemaining`, star thresholds, host-only Restart/Menu.
+6. **Lobby + best-run save.** Add social-hub map-vote/character-pick (static carry-over dict → next-scene spawner) and the content-path-keyed write-on-improvement save with a one-shot latch.
 7. **Polish.** Consumable station resources (tape), throw-to-deliver trigger, proximity world UI, dynamic carry IK, disconnect cleanup, a stress/relief mechanic if you want texture.
 
 ## Gotchas & anti-patterns (wjse ships these — teach the fix)
@@ -225,7 +271,7 @@ The installed SDK is the source of truth — confirm signatures with reflection 
 ## Which games to read
 
 - **`gabreusenra.wjse`** — the near-complete reference for this genre. `Cooking/IUse.cs` (interaction interface), `Cooking/Ingredient.cs` (carryable), `Cooking/PackingStation.cs` (timed processor + state-stacking + consumable tape), `Cooking/IngredientBox.cs`/`LabelStation.cs`/`DeliveryStation.cs` (station archetypes), `OrderManager.cs` (order board + scoring — *and the anti-patterns*), `GameLoopManager.cs` + `EndGameUI.razor` (round flow + stars + save latch), `Map and Lobby/LobbyManager.cs` + `GameSpawner.cs` (map vote + cross-scene character carry-over), `SaveManager.cs` (content-keyed best-run), `ItemResource.cs`/`LevelData.cs` (data-asset backbone).
-- **`luckygaming.doner_kiosk`** — lift the **ordered linear-recipe** assembly bench (`EntityBoard.cs` `BoardState` FSM + item→state/action dicts + hold-to-place gate), the **dual win/lose counter** round spine + **soft-restart-without-reload** (`GameSettings.cs`), the **`BaseInteractor : IPressable`** tooltip-pressable prop base, and **co-op disconnect cleanup** of a partner's named stations.
-- **`emg.everything_must_go`** — lift the **host-authoritative discipline** (one host-owned sim component, clients render-only mirrors; authority-forked read properties), the **struct-of-arrays `NetList` workaround** for replicating lists of structs (`Shop.CheckoutSync.cs`), and the **carry-box → snap-onto-surface** stocking engine (`Shelf.cs`/`SurfaceLevel.cs`) if your "delivery" is placing items on a rack rather than into a truck.
+- **`luckygaming.doner_kiosk`** — reference for the **ordered linear-recipe** assembly bench (`EntityBoard.cs` `BoardState` FSM + item→state/action dicts + hold-to-place gate), the **dual win/lose counter** round spine + **soft-restart-without-reload** (`GameSettings.cs`), the **`BaseInteractor : IPressable`** tooltip-pressable prop base, and **co-op disconnect cleanup** of a partner's named stations.
+- **`emg.everything_must_go`** — reference for **host-authoritative discipline** (one host-owned sim component, clients render-only mirrors; authority-forked read properties), the **struct-of-arrays `NetList` workaround** for replicating lists of structs (`Shop.CheckoutSync.cs`), and the **carry-box → snap-onto-surface** stocking engine (`Shelf.cs`/`SurfaceLevel.cs`) if your "delivery" is placing items on a rack rather than into a truck.
 
 Cross-links: **`references/systems/round-match.md`** (shift clock + stars), **`references/genres/social-hub.md`** (lobby/map-vote), **`references/systems/save-persistence.md`** (best-run save), **`references/systems/spawning-waves.md`** (order spawner), **`references/engine/networking-authority.md`** (host authority + `NetList` SoA). Use the **sbox-api** skill for reflection-verified type signatures and **sbox-build-feature** for the screenshot-driven build-and-verify loop.

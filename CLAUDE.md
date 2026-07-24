@@ -2,12 +2,15 @@
 
 > Let non-coders build s&box games through conversation with Claude Code.
 
-## Status: v2.1.0 "Action!" (2026-07-13)
+## Status: v2.2.0
 
-**262 native tools / 28 toolsets / 53 read-only / 7 lifeline / 275 total / 267 handlers.**
-v2.1.0 = the 30-tool Tier-2 + gameplay-recording + cinematic waves on top of v2.0.0
-"Native", all live-verified on Gravehold — see CHANGELOG `[2.1.0]`. Run
-`get_bridge_status` for the live count — it's the assembly fingerprint.
+**Current working source: 273 native tools / 28 toolsets / 57 read-only / 7 lifeline /
+286 total / 278 handlers.** Released v2.1.0 added the 30-tool Tier-2 +
+gameplay-recording + cinematic waves on top of v2.0.0 "Native"; those 30 were
+live-verified on Gravehold — see CHANGELOG `[2.1.0]`. The eleven `[Unreleased]` tools
+included in the working-source totals have passed source and offline gates; live editor
+smoke remains pending. Run `get_bridge_status` for the installed live count — it's the
+assembly fingerprint.
 
 The bridge runs on **s&box's built-in editor MCP server** (`http://127.0.0.1:7269/mcp`,
 on by default since editor 2026-07-06, Editor → Preferences → MCP Server). Full release
@@ -26,12 +29,12 @@ Claude Code → (streamable HTTP) → s&box native MCP server → [McpTool] meth
 - **Tool surface** = static `[McpTool]` methods in `Editor/Mcp/` — 27 **generated** toolset
   classes (`BridgeAssetTools.cs` … `BridgeWorldTools.cs`, emitted from the TS zod schemas)
   plus 2 **hand-written** files: `McpGate.cs` (single gate: play-mode guard, handler lookup,
-  error-object → exception) and `BridgeScreenshotTools.cs` (4 screenshot tools returning
+  error-object → exception) and `BridgeScreenshotTools.cs` (9 camera/screenshot tools returning
   **inline PNG** `McpResult.Image` blocks).
 - **Discovery is automatic**: EditorTypeLibrary picks up `[McpTool]` methods on hotload;
   agents reach them via the native server's `search_tools` / `call_tool` / `list_toolsets`.
   XML docs ARE the schema. `[McpTool.ReadOnly]` = no permission prompt.
-- **Handlers** (the 237 `IBridgeHandler` classes registered in `MyEditorMenu.cs`) are the
+- **Handlers** (the 278 registered `IBridgeHandler` routes in `MyEditorMenu.cs`) are the
   execution layer the gate delegates to — unchanged from v1.
 - **6 tool names are deliberately absent** from our surface (native built-ins own them):
   `spawn_model`, `list_scenes`, `save_scene`, `undo`, `redo`, `remove_component`.
@@ -39,8 +42,8 @@ Claude Code → (streamable HTTP) → s&box native MCP server → [McpTool] meth
 - **Lifeline** (`sbox-mcp-server --lifeline`, stdio): 7 editor-down tools — `read_log`,
   `get_compile_errors`, docs search ×3, `run_self_test`, `get_bridge_status`. The native
   server dies with the editor; the lifeline is how Claude diagnoses a dead one.
-- **Legacy file IPC** (`%TEMP%/sbox-bridge-ipc/`, 50 ms polling) still works as a fallback
-  through v2.0.x and is **deleted in v2.1.0**. Root `TROUBLESHOOTING.md` covers it;
+- **Legacy file IPC** (`%TEMP%/sbox-bridge-ipc/`, 50 ms polling) remains available as a compatibility fallback
+  in the current source; retirement is deferred until a separate compatibility decision. Root `TROUBLESHOOTING.md` covers it;
   `docs/TROUBLESHOOTING.md` covers the native transport.
 
 ## Repo structure
@@ -92,7 +95,7 @@ repo ↔ live copy when developing. **Never sync the repo `.sbproj` into a proje
 truly never mutates; scene-mutating names go into `_sceneMutatingCommands`; verify live via
 hotload → compile check → `search_tools` finds it → `call_tool` runs it.
 
-**Regenerating the wrapper layer** (only while the TS schemas remain the source, v2.0.x):
+**Regenerating the wrapper layer** (the TS schemas remain the current source for generated wrappers):
 
 ```bash
 cd sbox-mcp-server && npm run build
@@ -169,7 +172,7 @@ Asset Library GUI (Org sboxskinsgg, **IncludeSourceFiles=true** — false ships 
   harness — merged upstream 2026-07-02, not shipped), `MovieRecorder` record-to-clip,
   offline lipsync/viseme API. Tracked in `docs/TOOL_BACKLOG.md`.
 
-### Legacy IPC (fallback only, deleted v2.1.0)
+### Legacy IPC (compatibility fallback retained)
 - File IPC = `req_<id>.json`/`res_<id>.json` in `%TEMP%/sbox-bridge-ipc/`, UTF-8 **without
   BOM** (`new UTF8Encoding(false)` C# side; Node strips BOM as a safety net).
 - `status.json` is a heartbeat (1 s refresh; >5 s stale = disconnected).
@@ -212,7 +215,7 @@ Project.Current.GetRootPath();  Project.Current.Config.Title;
 - [ ] Map-edit convenience tools (`add_terrain_hill` etc.) assume `MapBuilder`/`CaveBuilder`/
       `ForestGenerator`-shaped components; `invoke_button` works anywhere.
 - [ ] `is_playing.sessionPlaying` can read stale — trust `gameFlag`.
-- [ ] v2.1.0: delete the file-IPC transport + retire the TS full surface (lifeline stays).
+- [ ] Future compatibility decision: retire file IPC + the TS full surface only after older-engine fallback users have a migration path (lifeline stays).
 
 ## Bridge map (knowledge graph)
 

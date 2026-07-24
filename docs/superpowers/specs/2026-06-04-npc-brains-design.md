@@ -1,7 +1,7 @@
 # NPC Brains / Gameplay Logic — Design Spec
 
 > **Status:** DESIGN ONLY. No implementation. Feature wave #3 for the s&box Claude Bridge.
-> **Date:** 2026-06-04 · **Targets the bridge at:** `C:\Users\cargi\Desktop\sbox-claude` (MCP server `sbox-mcp-server/`, addon `sbox-bridge-addon/Editor/MyEditorMenu.cs`).
+> **Date:** 2026-06-04 · **Targets the bridge in this repository** (MCP server `sbox-mcp-server/`, addon `sbox-bridge-addon/Editor/MyEditorMenu.cs`).
 > **Concrete test games:** Sasquatched (asymmetric horror, the `bigfoot` project) and RUN (co-op roguelite).
 
 ---

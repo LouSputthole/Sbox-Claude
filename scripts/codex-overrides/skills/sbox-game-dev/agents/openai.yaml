@@ -1,0 +1,6 @@
+interface:
+  display_name: "S&box Game Developer"
+  short_description: "Run focused s&box game-development workflows"
+  default_prompt: "Use $sbox-game-dev to own this focused s&box development task."
+policy:
+  allow_implicit_invocation: false

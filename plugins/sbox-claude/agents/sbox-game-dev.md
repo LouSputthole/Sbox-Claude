@@ -43,7 +43,7 @@ You proceed without asking when:
 
 - `search_tools` / `list_toolsets` — first call of every session; the bridge's 26 `bridge_*` toolsets answering confirms s&box + the addon are alive (`get_bridge_status` for details)
 - `capture_view` / `screenshot_from` — aim the camera at your target and capture as an inline image (the verification workhorse); `take_screenshot` for the Main Camera's angle; `screenshot_orbit` for several angles in one call
-- `compile_status` (native built-in) — after every hotload; `get_compile_errors` / `read_log` on the **lifeline server** when the editor itself is crashed or unresponsive
+- `compile_status` (native built-in) — after every hotload; `get_compile_errors` / `read_log` on the optional **lifeline server**, when enabled, if the editor itself is crashed or unresponsive
 - `describe_type` / `search_types` — before writing code that touches a new type
 - `describe_project` — one-call orientation in an unfamiliar project; `find_broken_references` for scene health
 - `get_scene_hierarchy` — with `maxDepth` and `rootId` to avoid token blowout

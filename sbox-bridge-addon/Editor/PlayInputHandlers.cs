@@ -460,30 +460,7 @@ public class DrivePlayerHandler : IBridgeHandler
 
 	// {pitch,yaw,roll} object, [pitch,yaw,roll] array, or "pitch,yaw,roll" string.
 	static Angles ParseAngles( JsonElement el )
-	{
-		float pitch = 0f, yaw = 0f, roll = 0f;
-		if ( el.ValueKind == JsonValueKind.Object )
-		{
-			if ( el.TryGetProperty( "pitch", out var pp ) && pp.TryGetSingle( out var pf ) ) pitch = pf;
-			if ( el.TryGetProperty( "yaw",   out var yp ) && yp.TryGetSingle( out var yf ) ) yaw = yf;
-			if ( el.TryGetProperty( "roll",  out var rp ) && rp.TryGetSingle( out var rf ) ) roll = rf;
-		}
-		else if ( el.ValueKind == JsonValueKind.Array )
-		{
-			var a = el.EnumerateArray().ToList();
-			if ( a.Count > 0 && a[0].TryGetSingle( out var p0 ) ) pitch = p0;
-			if ( a.Count > 1 && a[1].TryGetSingle( out var p1 ) ) yaw = p1;
-			if ( a.Count > 2 && a[2].TryGetSingle( out var p2 ) ) roll = p2;
-		}
-		else if ( el.ValueKind == JsonValueKind.String )
-		{
-			var parts = ( el.GetString() ?? "" ).Split( ',' );
-			if ( parts.Length > 0 ) float.TryParse( parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out pitch );
-			if ( parts.Length > 1 ) float.TryParse( parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out yaw );
-			if ( parts.Length > 2 ) float.TryParse( parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out roll );
-		}
-		return new Angles( pitch, yaw, roll );
-	}
+		=> ClaudeBridge.ParseRotation( el ).Angles();
 
 	// {x,y} object, [x,y] array, or "x,y" string. x=forward(+)/back(-), y=left(+)/right(-).
 	static Vector2 ParseMove( JsonElement el )

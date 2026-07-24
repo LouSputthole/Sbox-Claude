@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v2.0.0</strong> · <strong>262 native tools</strong> · <strong>28 toolsets</strong> (+ 7 lifeline tools) · Source-available (no redistribution) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v2.2.0</strong> · <strong>273 native tools</strong> · <strong>286 total tools / 278 handlers</strong> · <strong>28 toolsets</strong> (+ 7 lifeline tools) · Source-available (no independent redistribution; official channels authorized) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -23,6 +23,24 @@ Claude Code connects to the **live s&box editor** through the editor's **native 
 > **[docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md)** (how an agent works the platform) ·
 > **[docs/ECOSYSTEM.md](docs/ECOSYSTEM.md)** (plain-English tour of all 28 toolsets) ·
 > **[docs/FAQ.md](docs/FAQ.md)** (do my old workflows still work, can an agent modify my project, what's next).
+
+---
+
+## What's new in v2.2.0
+
+- **Rotation and vector arguments just work now.** The native MCP gate stringifies structured
+  arguments; every rotation/vector parse path now unwraps stringified JSON and accepts comma
+  strings (`"12,45,7"`), arrays, and objects. No more workarounds through `set_game_object`.
+- **The multiplayer test harness is live.** `start_multiplayer_test` boots real `sbox.exe
+  -joinlocal` clients into a private hidden lobby; `multiplayer_test_status` tracks connections
+  and client processes truthfully (dead clients report dead); `stop_multiplayer_test` cleans up.
+  Capacity checks, overlapping-run prevention, false-positive join guards, failed-start rollback.
+- **First-party Codex distribution.** The **[s&box Codex Bridge](plugins/sbox-codex-bridge/)**
+  ships from this repo: same 286 tools, native editor MCP, lifeline diagnostics, API brain,
+  cookbook, and workflow skills — packaged for OpenAI Codex and generated from the Claude
+  plugin by `scripts/gen-codex-plugin.mjs` to enforce parity.
+- Prefab `[Property]` values are documented as **authoritative over code defaults** — tuning
+  flows through prefab edits (see the `sbox-build-feature` gotchas reference).
 
 ---
 
@@ -56,7 +74,7 @@ Upgrading from v1.x? **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)** is the mig
 | Piece | What it is | Where it lives |
 |---|---|---|
 | **Native MCP server** | Facepunch's editor-hosted MCP server — streamable HTTP, loopback-only, on by default (**Editor → Preferences → MCP Server**, port 7269) | ships with s&box |
-| **Editor addon** | The bridge: a C# editor library whose 262 tools are `[McpTool]` methods the engine auto-discovers, each dispatching into the bridge's handler layer on the main editor thread | installed via the s&box **Asset Library / Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
+| **Editor addon** | The bridge: a C# editor library whose 273 tools are `[McpTool]` methods the engine auto-discovers, each dispatching into the bridge's handler layer on the main editor thread | installed via the s&box **Asset Library / Library Manager** (`sboxskinsgg.claudebridge`) into your **project's `Libraries/` folder** |
 | **Lifeline server** *(optional)* | A slim stdio server for editor-down diagnostics — the native server dies with the editor; the lifeline doesn't | npm package `sbox-mcp-server@2`, run with `--lifeline` |
 
 **Invocation pattern.** The native server exposes a handful of entry points — `search_tools`, `call_tool`, `call_tools`, `list_toolsets`, `describe_toolset` — and discovers everything else live from the addon:
@@ -69,13 +87,22 @@ call_tools [...]                   → several calls, one round trip
 
 Hotload = live re-registration: new `[McpTool]` methods appear in `search_tools` within seconds of a clean compile.
 
-> **Legacy fallback (v2.0.x, retires v2.1.0).** The v1.x file-IPC transport and the full stdio TS server remain compiled-in and functional through v2.0.x as a fallback for older engine builds without the native server. They are no longer registered by default and retire in **v2.1.0**. Legacy-transport issues are covered by the root [TROUBLESHOOTING.md](TROUBLESHOOTING.md); v2 issues live in **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**.
+> **Legacy fallback (deprecated in v2.1.0).** The v1.x file-IPC transport and full stdio TS server remain compiled-in for compatibility with older engine builds, but they are not registered by default and may be removed in a later release. Legacy-transport issues are covered by the root [TROUBLESHOOTING.md](TROUBLESHOOTING.md); native-v2 issues live in **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**.
 
 ---
 
 ## Install
 
 Three steps. Node.js is **not** required (only for the optional lifeline).
+
+> **Using Codex instead of Claude Code?** Install the first-party **[s&box Codex Bridge](plugins/sbox-codex-bridge/)** from this repository. It packages the same bridge, MCP servers, API brain, cookbook, and workflows for Codex:
+>
+> ```bash
+> codex plugin marketplace add LouSputthole/Sbox-Claude --ref main
+> codex plugin add sbox-codex-bridge@sboxskins
+> ```
+>
+> Start a new Codex session after installation. The plugin README covers prerequisites, updates, uninstalling, and editor-addon setup.
 
 1. **Install the editor addon** — get the **`claudebridge`** library from the s&box **Asset Library** (or **Editor → Library Manager**, search **`sboxskinsgg.claudebridge`**) and install it *into your project*. It lands in `<your-project>/Libraries/` — the one correct location; the global `addons/` folder silently refuses to compile custom C#.
 2. **Connect Claude Code** to the editor's native MCP server (on by default — **Editor → Preferences → MCP Server**):
@@ -84,7 +111,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
    ```
 3. **(Optional, recommended) Add the lifeline** — the editor-down diagnostics server. The native server dies with the editor; the lifeline answers "why did the editor crash" when nothing else can:
    ```bash
-   claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2 --lifeline
+   claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.2.0 --lifeline
    ```
 
 **Prefer the plugin?** `/plugin marketplace add LouSputthole/Sbox-Claude` then `/plugin install sbox-claude` — from v2.0.0 the plugin's `.mcp.json` wires **both** servers (native + lifeline) for you and ships the workflow skills. You still install the editor addon (step 1).
@@ -95,7 +122,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 
 ## Tools & features
 
-**262 native tools across 28 `bridge_*` toolsets**, plus the **7 lifeline tools**. The full generated inventory — every tool, its toolset, and its read-only status — is **[docs/TOOLSETS.md](docs/TOOLSETS.md)**. Upgraders: **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)**.
+**273 native tools across 28 `bridge_*` toolsets**, plus the **7 lifeline tools**. The full generated inventory — every tool, its toolset, and its read-only status — is **[docs/TOOLSETS.md](docs/TOOLSETS.md)**. Upgraders: **[docs/V2-MIGRATION.md](docs/V2-MIGRATION.md)**.
 
 | Toolset | What it covers |
 |---|---|
@@ -110,7 +137,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 | `bridge_material` | Models, `.vmat` authoring, material assignment and properties |
 | `bridge_moviemaker` | `Sandbox.MovieMaker` playback *and recording* — `.movie` clips, `MoviePlayer` wiring, record live gameplay to a replayable clip (`record_gameplay_clip`) |
 | `bridge_navigation` | Navmesh baking + walkable-path queries |
-| `bridge_networking` | Multiplayer setup + codegen — `[Sync]`, RPCs (broadcast/host/targeted), ownership, host migration |
+| `bridge_networking` | Multiplayer setup + codegen — `[Sync]`, RPCs (broadcast/host/targeted), ownership, host migration, bounded local multi-instance tests |
 | `bridge_npc` | NPC brains, spawners, patrol routes, perception simulation, utility AI, daily schedule brains |
 | `bridge_physics` | Rigidbodies, colliders, joints, raycasts, overlap queries |
 | `bridge_playmode` | Enter/exit play mode, play state, runtime property read/write |
@@ -142,6 +169,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 ## Integrations
 
 - **Claude Code plugin** — bundles both MCP server entries, the `sbox-build-feature` workflow skill, the `sbox-api` schema-grounded API skill, the `sbox-cookbook` recipe router, the `sbox-scaffold-game` starter-scene skill, the `sbox-setup` onboarding wizard, and the `sbox-game-dev` specialist agent. (See the next section.)
+- **Codex plugin** — packages the same MCP entries and knowledge/workflow bundle as the first-party **[s&box Codex Bridge](plugins/sbox-codex-bridge/)** (`sbox-codex-bridge`). It is generated from the Claude plugin by `scripts/gen-codex-plugin.mjs` to enforce parity.
 - **The s&box engine** — the native MCP server hosts the transport; the claudebridge addon's `[McpTool]` methods run everything on the main editor thread.
 - **Installed-library detection & leverage** — `list_libraries` reads your project's `Libraries/` and each `.sbproj`, so Claude can discover and *drive what you already have* rather than reinventing it. If you have the **Shrimple Character Controller** (`fish.scc`) or **`facepunch.playercontroller`**, it can wire up player movement via `add_component_with_properties` instead of writing a controller from scratch. The `sbox-setup` wizard surfaces this on first connect.
 - **s&box Cloud assets** — reference cloud models/textures/sounds (note: Cloud-only assets are ephemeral across restarts — prefer local files for anything permanent).
@@ -155,10 +183,10 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 
 | Piece | What it is |
 |---|---|
-| **MCP server config** | `.mcp.json` registers **both servers** from v2.0.0 — `sbox` (the native HTTP endpoint at `http://127.0.0.1:7269/mcp`) and `sbox-lifeline` (`npx -y sbox-mcp-server@2 --lifeline`) — no manual registration, no version drift |
+| **MCP server config** | `.mcp.json` registers **both servers** from v2.0.0 — `sbox` (the native HTTP endpoint at `http://127.0.0.1:7269/mcp`) and `sbox-lifeline` (`npx -y sbox-mcp-server@2.2.0 --lifeline`) — no manual registration, no version drift |
 | **Skill: `sbox-build-feature`** | The screenshot-driven build workflow: confirm the bridge is alive → brainstorm non-trivial features → research the API with `describe_type` → bite-sized edits → hotload + scan the log → **screenshot and read the inline PNG**. Plus a table of s&box gotchas (Cloud assets aren't persistent; Citizen bone names are case-sensitive; `CitizenAnimationHelper.IkRightHand` drives IK at runtime; `Color` properties want `"r, g, b, a"` strings; etc.) |
 | **Skill: `sbox-api`** | Schema-grounded s&box API knowledge — the Unity→s&box translation table, the Ten Rules, and curated component/UI/networking/physics references, so Claude stops hallucinating Unity patterns |
-| **Skill: `sbox-cookbook`** | A master **router** indexing code-grounded recipes mined from **51 open-source s&box games** plus the modern engine repos: engine references (networking-authority, architecture, player-controller, ui-razor, and more), systems (inventory, economy, saves, progression, gacha, leaderboards, building, crafting, dialogue, rounds, waves, anti-cheat…), and genre recipes (tycoon, shopkeeper, survival-horror, deathmatch, platformer, card-battler, social-hub…). Ask "how do I build a tycoon / an inventory / a save system?" and it routes you to a grounded how-to |
+| **Skill: `sbox-cookbook`** | A master **router** indexing code-grounded recipes mined from **51 public-source s&box games** plus the modern engine repos: engine references (networking-authority, architecture, player-controller, ui-razor, and more), systems (inventory, economy, saves, progression, gacha, leaderboards, building, crafting, dialogue, rounds, waves, anti-cheat…), and genre recipes (tycoon, shopkeeper, survival-horror, deathmatch, platformer, card-battler, social-hub…). Ask "how do I build a tycoon / an inventory / a save system?" and it routes you to a grounded how-to |
 | **Skill: `sbox-scaffold-game`** | Turns one ask into a playable starter scene (first-person preset) by orchestrating the scaffold tools |
 | **Skill: `sbox-setup`** | A warm ~30-second onboarding wizard. It greets you on first connect, verifies the bridge, **detects your installed libraries** (`list_libraries`), recommends a concrete first move, and points you to help + feedback |
 | **Agent: `sbox-game-dev`** | A specialist sub-agent for self-contained game-dev tasks; it runs `sbox-build-feature` as its default workflow |
@@ -197,9 +225,9 @@ Then ask for the real thing: *"Create a first-person player controller with WASD
 
 ## License
 
-**Source-available (no redistribution)** — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+**Source-available (no independent redistribution; official channels authorized)** — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
-You can freely use the Claude Bridge to build your s&box games — free or commercial — and modify it locally for your own use. You may **not** redistribute, fork, mirror, repackage, or re-host the bridge or its source, publish a derivative of it, or offer it to others as a service. The code you create *with* the bridge (your games and their source) is yours and is not restricted.
+You can freely use the Claude or Codex Bridge to build your s&box games — free or commercial — and modify it locally for your own use. Except for GitHub's built-in public-repository rights described in the LICENSE, you may **not** independently redistribute, mirror, repackage, or re-host the bridge or its source, publish a derivative of it, or offer it to others as a service. The code you create *with* the bridge (your games and their source) is yours and is not restricted.
 
 > **Branding & trademark.** The **"s&box Claude Bridge"** / **"sboxskins.gg"** name, logos, and branding are trademarks of sboxskins.gg and are *not* licensed for reuse. See [NOTICE](NOTICE).
 

@@ -1,5 +1,38 @@
 # Deathmatch / Arena-Combat Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [The two authority idioms that make it work](#the-two-authority-idioms-that-make-it-work)
+- [Build order](#build-order)
+- [How the real games do each piece](#how-the-real-games-do-each-piece)
+  - [Damage contract — one interface, trace to parents](#damage-contract--one-interface-trace-to-parents)
+  - [Hitscan — trace ray with spread, multi-result](#hitscan--trace-ray-with-spread-multi-result)
+  - [Weapon framework — reparent-to-owner carriable Components](#weapon-framework--reparent-to-owner-carriable-components)
+  - [Melee — animation-gated damage window](#melee--animation-gated-damage-window)
+  - [Player movement — stock controller vs. hand-rolled swept BBox](#player-movement--stock-controller-vs-hand-rolled-swept-bbox)
+  - [Pickups & the use-prompt (TickPlayerUse is gone)](#pickups--the-use-prompt-tickplayeruse-is-gone)
+  - [AI opponents — IEnumerator-as-state-machine](#ai-opponents--ienumerator-as-state-machine)
+  - [Match / round state machine](#match--round-state-machine)
+- [Pitfalls (from the mined code)](#pitfalls-from-the-mined-code)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Round FSM as component-per-phase (alternative to one enum switch)](#round-fsm-as-component-per-phase-alternative-to-one-enum-switch)
+  - [Host-migration-safe round timer (re-arm TimeUntil on the new host)](#host-migration-safe-round-timer-re-arm-timeuntil-on-the-new-host)
+  - [Identity-keyed combat state — never network the upgrade objects](#identity-keyed-combat-state--never-network-the-upgrade-objects)
+  - [Whitelist-synced stats — don't replicate the whole stat table](#whitelist-synced-stats--dont-replicate-the-whole-stat-table)
+  - [Owner-gated shared trigger — the multiplayer pickup idiom most code gets wrong](#owner-gated-shared-trigger--the-multiplayer-pickup-idiom-most-code-gets-wrong)
+  - [Killfeed + match-timeline → "hero of the round" / killcam](#killfeed--match-timeline--hero-of-the-round--killcam)
+  - [Per-recipient wallhack outline (radar / spotted) via ghost clone](#per-recipient-wallhack-outline-radar--spotted-via-ghost-clone)
+  - [Data-key → spawned-behavior shop (in-round powerups)](#data-key--spawned-behavior-shop-in-round-powerups)
+  - [Runtime-added prop health — make build-phase props destructible in battle](#runtime-added-prop-health--make-build-phase-props-destructible-in-battle)
+  - [Data-driven spawn director (alternative to scripted waves)](#data-driven-spawn-director-alternative-to-scripted-waves)
+  - [Leaderboard score encoding for win/partial/loss on one board](#leaderboard-score-encoding-for-winpartialloss-on-one-board)
+  - [Read these games (in the corpus) for deathmatch/arena](#read-these-games-in-the-corpus-for-deathmatcharena)
+<!-- reference-toc:end -->
+
 How to build a deathmatch-arena game in modern s&box (GameObject/Component/Scene), distilled from two mined games: `ataco.sdoomresurrection` (a from-scratch Doom engine — hitscan, carriable weapons, monster AI, custom movement) and `aethercore.versus` (a 1v1 host-authoritative soulslike fighter — round state machine, melee damage windows, trade-bug-hardened hit resolution).
 
 ## What defines the genre
@@ -201,14 +234,13 @@ Five more mined games push the genre past the original two. The headline combat 
 ### Round FSM as component-per-phase (alternative to one enum switch)
 `despawn.murder` and `barrelproto.ragroll` both improve on the single-enum FSM in idiom #1: each phase is its **own `Component`** with `Begin()/Tick()/Finish()` + `OnTimeUp`, and a manager ticks the active one host-only. Murder adds the crucial wrinkle — the manager raises round-start/end **locally on host AND via a host-only broadcast RPC**, so client-side systems (HUD, audio, kill feed) react to the exact same events without each one re-deriving state from `[Sync]`.
 
-```csharp
-// despawn.murder: Systems/Rounds/RoundManager.cs — transition + mirror so clients re-raise
-public void TransitionTo<T>( Action<T> init ) where T : RoundState {
-    State?.Finish();
-    State = States.OfType<T>().First(); init( (T)State ); State.Begin();
-    IRoundStateEvents.Post( x => x.OnRoundStateBegin( State ) );        // host-local
-    BroadcastStateBegin( StateIndex );                                  // [Rpc.Broadcast(HostOnly)] → clients re-raise
-}
+```text
+transition to a requested phase type:
+  finish the current phase
+  select the configured phase instance and apply transition-specific setup
+  begin the new phase
+  notify host-local round listeners
+  broadcast the phase index so clients raise the equivalent presentation event
 ```
 (despawn.murder: Systems/Rounds/RoundManager.cs `TransitionNext`/`TransitionTo`; Systems/Rounds/RoundState.cs the `Begin/Tick/Finish/OnTimeUp` base with `[Sync(SyncFlags.FromHost)] TimeUntil TimeLeft`. barrelproto.ragroll: Code/mode/RollMode.cs `IGameMode` + `[Sync,Change] RagRollState` + `CanMove => state != Prepare` gating input from the FSM.) See `references/systems/round-match.md` for the generic skeleton; this is the **multi-phase, multi-system-react** upgrade to it.
 

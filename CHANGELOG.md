@@ -2,6 +2,65 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
+## [Unreleased]
+
+### Added
+
+- Deterministic `dryRun:true` placement plans for `place_along_path`, `grid_duplicate`, and `scatter_props`, plus `commit_placement_plan` for exact, rollback-protected creation with slot-to-GUID receipts.
+- `inspect_model_geometry` for model-local render/physics bounds, footprint, height, and pivot-to-ground offsets before placement.
+- Provenance-rich `get_bounds` aggregates for render, all physics, and non-trigger physics, plus play-aware `find_objects_near`.
+- Session camera bookmarks, ordered multi-view captures with previous-capture RGBA metrics and occlusion diagnostics, and deterministic orthographic `capture_topdown`.
+- `start_multiplayer_test`, `multiplayer_test_status`, and `stop_multiplayer_test` for a bounded local multi-instance harness: create a private, hidden host lobby in play mode, launch up to two real `sbox.exe -joinlocal` clients, inspect host-side joins, and clean up tracked processes.
+
+### Changed
+
+- `set_transform` now pre-parses every supplied value, supports explicit world/local space, returns before/after receipts, and rolls back if apply or receipt construction fails.
+- `batch_set_property` dry runs now perform the same coercion/reference resolution as apply, distinguish changes from no-ops, and avoid needless setters.
+- Scatter placement now rejects error models and invalid ranges, preserves fixed non-unit scale, and grounds model bottoms using traced end positions plus model-local pivot offsets.
+- Path placement now rejects invalid models/ranges, preflights a 2,048-object safety cap before immediate creation, and uses a stable fallback up vector for vertical aligned segments.
+- Camera captures now use strict pose parsing, runtime-safe GameObject resolution, disabled non-main temporary cameras, dynamic far planes, deterministic cleanup, transactional comparison baselines, and a bounded 64 MiB session cache.
+- Nearby searches now require exactly one finite center source, exclude the Scene root, and report radius clamping explicitly.
+- Parity auditing now discovers every concrete `IBridgeHandler` class recursively and fails when a handler is omitted from `RegisterHandlers`.
+- Bridge feature guidance now treats saved scene/prefab `[Property]` values as authoritative and directs project-specific tuning through project-owned helpers rather than code initializers.
+
+### Fixed
+
+- Rotation arguments now semantically unwrap native-stringified JSON objects/arrays before parsing, preserving `pitch`/`yaw`/`roll` keys regardless of property order across shared, strict `set_transform`, camera-bookmark, character/equipment, capture, and `drive_player` paths.
+- The proven multiplayer-test handlers from the installed library are now present in canonical source, registered, exposed through TypeScript/native MCP wrappers, and covered by discovery/status smoke checks. Starts now reject overlap, validate host-plus-client capacity, count joins from a pre-spawn connection baseline, create private/hidden lobbies, and roll back newly created lobbies when every spawn fails; failed client kills remain tracked for truthful retryable cleanup.
+
+> Source and offline gates are verified; live editor smoke coverage remains pending and is tracked in `TESTING.md`.
+
+## [2.2.0] -- 2026-07-24
+
+### Fixed
+- Rotation/vector arguments arriving through the native MCP gate as stringified JSON
+  objects/arrays are now unwrapped before parsing (shared + strict paths). Comma strings,
+  arrays, and objects all parse; `add_component_to_new_object`/`set_transform` rotation
+  works end-to-end (live-verified in the s&box editor).
+- `start_multiplayer_test`, `multiplayer_test_status`, and `stop_multiplayer_test` are now
+  actually registered in `RegisterHandlers` (they shipped unregistered in 2.1.0) and are
+  exposed through both the TypeScript and native MCP surfaces with parity coverage.
+
+### Changed
+- Multiplayer test harness hardened: private/hidden lobbies, capacity validation,
+  overlapping-run prevention, false-positive join guards, failed-start rollback, and
+  truthful tracking of dead clients and failed cleanup (live-verified: real second
+  client joined, was tracked, and its death was reported honestly).
+- Prefab `[Property]` values documented as authoritative over code defaults; tuning flows
+  through project helpers (see sbox-build-feature gotchas).
+- Docs corrected: legacy file-IPC retirement announced for v2.1.0 did NOT happen and is
+  deferred pending a compatibility decision (CLAUDE.md / V2-MIGRATION now say so).
+
+### Codex
+- The Codex distribution prepared in 2.1.0 ships publicly with this release: `plugins/sbox-codex-bridge`
+  (marketplace, native editor MCP, optional lifeline diagnostics, API brain, cookbook,
+  and workflow skills). 286 tools / 278 handlers / zero orphans.
+
+## Codex distribution [2.1.0] -- 2026-07-16
+
+- Prepared the first Codex distribution: the GitHub-backed marketplace, s&box Codex Bridge plugin 2.1.0, native editor MCP, optional lifeline diagnostics, API brain, cookbook, and workflow skills.
+- When published, this distribution should use the separate immutable tag `codex-v2.1.0`. The existing `v2.1.0` tag predates the Codex package and remains unchanged.
+
 ## [2.1.0] -- 2026-07-13 "Action!"
 
 **+30 tools — Tier-2 completion + gameplay recording + the cinematic wave. 275 tools / 267 handlers / 262 native across 28 toolsets / 7 lifeline (was 245/237/232). Seven new families, all additive — no existing tool contract changed. All 30 live-verified on Gravehold (the Tier-2/recording 25 on 2026-07-12, the 5 cinematic tools e2e 2026-07-13): every handler executed for real, every generated scaffold hotload-compiled clean + TypeLibrary-load-confirmed, and the scene + project left pristine.**
@@ -443,7 +502,7 @@ With v1.10.0's `create_economy_wallet`, these complete a **"game director" trio*
 
 ### Changed — Cookbook (51-game re-mine)
 
-- The **`sbox-cookbook`** skill was re-mined across **51** current open-source s&box games (was 47 — added `facepunch.ss2`, `despawn.murder`, `facepunch.fair`, `barrelproto.ragroll`). **+6 genre references** (social-deduction, survivor-roguelite, coop-kitchen, board-game, casino-gambling, physics-sports) and **+2 system references** (ai-director, services-backend). High-traffic references (economy-currency, save-persistence, round-match, shop-vendor, progression-upgrades, leaderboards-services, building-placement, anti-cheat, tycoon-idle, deathmatch-arena) got a "Corpus refresh" pass with the newly-mined implementations. New **`references/CORPUS-INDEX.md`** cross-references which games implement each system/genre — so a recipe can be composed by pulling pieces from several games. Per-game findings live in the local `sbox-lessons/mining-v2/`.
+- The **`sbox-cookbook`** skill was re-mined across **51** current public-source s&box games (was 47 — added `facepunch.ss2`, `despawn.murder`, `facepunch.fair`, `barrelproto.ragroll`). **+6 genre references** (social-deduction, survivor-roguelite, coop-kitchen, board-game, casino-gambling, physics-sports) and **+2 system references** (ai-director, services-backend). High-traffic references (economy-currency, save-persistence, round-match, shop-vendor, progression-upgrades, leaderboards-services, building-placement, anti-cheat, tycoon-idle, deathmatch-arena) got a "Corpus refresh" pass with the newly-mined implementations. New **`references/CORPUS-INDEX.md`** cross-references which games implement each system/genre — so a recipe can be composed by pulling pieces from several games. Per-game sources and provenance are recorded in the cookbook's bundled reference files.
 
 ### Added — Bridge map (knowledge graph)
 
@@ -470,7 +529,7 @@ With v1.10.0's `create_economy_wallet`, these complete a **"game director" trio*
 
 ### Added — `sbox-cookbook` skill
 
-- A new bundled skill: a master **router** indexing **code-grounded recipes** mined from **27 current (2026) open-source s&box games** plus the modern engine repos. Its `references/` hold **11 engine** references (networking-authority, architecture, components-lifecycle, player-controller, ui-razor, combat-weapons, input-interaction, physics-traces-movement, worldgen-rendering, performance-threading, data-assets), **15 systems** (inventory, economy-currency, shop-vendor, save-persistence, progression-upgrades, gacha-loot, leaderboards-services, idle-offline, building-placement, crafting, dialogue, round-match, spawning-waves, anti-cheat, level-design), and **14 genre recipes** (tycoon-idle, shopkeeper, document-sim, roleplay, sandbox-voxel, social-hub, platformer-obstacle, deathmatch-arena, card-battler, survival-horror, gacha-crawler, puzzle, vehicles, party-microgame). Ask "how do I build a tycoon / an inventory / a save system?" and it routes to a grounded how-to. Full bundled skill set: `sbox-api`, `sbox-build-feature`, `sbox-setup`, `sbox-scaffold-game`, `sbox-cookbook`.
+- A new bundled skill: a master **router** indexing **code-grounded recipes** mined from **27 current (2026) public-source s&box games** plus the modern engine repos. Its `references/` hold **11 engine** references (networking-authority, architecture, components-lifecycle, player-controller, ui-razor, combat-weapons, input-interaction, physics-traces-movement, worldgen-rendering, performance-threading, data-assets), **15 systems** (inventory, economy-currency, shop-vendor, save-persistence, progression-upgrades, gacha-loot, leaderboards-services, idle-offline, building-placement, crafting, dialogue, round-match, spawning-waves, anti-cheat, level-design), and **14 genre recipes** (tycoon-idle, shopkeeper, document-sim, roleplay, sandbox-voxel, social-hub, platformer-obstacle, deathmatch-arena, card-battler, survival-horror, gacha-crawler, puzzle, vehicles, party-microgame). Ask "how do I build a tycoon / an inventory / a save system?" and it routes to a grounded how-to. Full bundled skill set: `sbox-api`, `sbox-build-feature`, `sbox-setup`, `sbox-scaffold-game`, `sbox-cookbook`.
 
 ### Changed — License
 

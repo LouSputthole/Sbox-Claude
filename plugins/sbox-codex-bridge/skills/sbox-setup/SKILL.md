@@ -1,0 +1,72 @@
+---
+name: sbox-setup
+description: First-run onboarding for the s&box Codex Bridge. Run when a user first connects the bridge or asks how to get started — it verifies the connection, detects their installed libraries, recommends what to build with, and points them to help + feedback. Keep it warm and brief.
+---
+
+# s&box Bridge — Setup & Welcome
+
+## Codex MCP tool mapping
+
+The plugin registers the enabled-by-default `sbox` server and the optional, disabled-by-default `sbox-lifeline` server. Codex exposes native-server wrappers such as `mcp__sbox__search_tools`, `mcp__sbox__call_tool`, and `mcp__sbox__call_tools`. Bridge names such as `get_bridge_status`, `describe_type`, and `capture_view` are arguments passed through `call_tool`; they are not assumed to be standalone host tools. If Codex exposes a slightly different normalized tool name, trust the current tool inventory.
+
+A short, friendly orientation for someone who just connected the bridge. A few beats, not an interrogation — and adapt to what the user says. If they already know what they want, skip the tour and just build.
+
+## When to run
+- It's clearly the user's first session with the bridge, or they just connected it.
+- They ask "how do I start?", "what can this do?", or run `$sbox-setup`.
+
+## The beats
+
+**1. Welcome**
+> 👋 Thanks for using the s&box Codex Bridge — let's get you oriented in about 30 seconds.
+
+**2. Confirm the native server is live**
+The editor ships its own MCP server, on by default at `http://127.0.0.1:7269/mcp`. Quickest check: call `mcp__sbox__search_tools` (or `list_toolsets`) — if it answers, you're connected. (A raw `initialize`/`list_toolsets` probe against the endpoint proves the same thing.)
+
+When this skill arrived through the plugin, inspect the current MCP inventory before
+changing it. The native `sbox` entry should already exist; the optional
+`sbox-lifeline` entry may be enabled or disabled by the host. **Do not add duplicate
+MCP connections.** Enable an existing lifeline entry when diagnostics are wanted. Use
+the manual commands below only when the matching entry is absent or automatic MCP
+registration is unavailable.
+
+```
+codex mcp add sbox --url http://127.0.0.1:7269/mcp
+```
+
+If no lifeline entry exists, add the optional **lifeline** so `read_log`,
+`get_compile_errors`, and docs search work when the editor is down (the native server
+dies with the editor):
+
+```
+codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.2.0 --lifeline
+```
+
+If the endpoint doesn't answer, stop and help fix it first:
+- Check **Editor → Preferences → MCP Server** — it should be on (it's the default), port 7269.
+- Editor log says `[MCP] Couldn't start MCP server on port 7269`? A stale HTTP.sys registration from a dying editor instance is holding the port — restart the editor once the stale process exits.
+- Make sure s&box is running with the `claudebridge` library installed — that's what puts the bridge tools on the server.
+
+**3. Detect their libraries**
+Call `list_libraries` (via `call_tool`) and summarize in plain language. Call out the useful ones:
+- A character controller — `fish.scc` (Shrimple) or `facepunch.playercontroller` → "I can wire up player movement with this, no code from scratch."
+- World/build tools — splines, roads, interiors, tree/asset browsers → mention they're on hand.
+- `claudebridge` — that's me, the bridge itself.
+
+**4. Recommend a first move**
+Based on what's installed and whether the scene is empty (peek with `get_scene_hierarchy` if useful), offer 2–3 concrete starts, e.g.:
+- "Spawn a controllable player" — using an installed controller if there is one.
+- "Block out a test scene — ground, a light or two, a few props."
+- "Set the mood — `apply_atmosphere`, fog, a skybox."
+
+**5. Help + feedback**
+- **Troubleshooting:** When the optional lifeline is enabled, I can use `read_log` and `get_compile_errors` even while the editor is down. If it is disabled or absent, enable it or register the fallback first. There is also a full `TROUBLESHOOTING.md`.
+- **Bugs / feedback:** GitHub issues — https://github.com/LouSputthole/Sbox-Claude/issues
+- Built by **sboxskins.gg**.
+
+**6. Hand off**
+> What do you want to build first?
+
+## Notes
+- Use `capture_view` (or its alias `screenshot_from`) to *show* results framed on what you changed — `take_screenshot` is the main camera's view (the player's view in play mode), so it may not be aimed at it. Screenshots come back **inline in the tool result** — just look at the returned image.
+- This is a guide, not a script. Read the room: a returning power user doesn't need the welcome.

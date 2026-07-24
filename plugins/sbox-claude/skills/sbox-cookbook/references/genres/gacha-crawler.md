@@ -1,5 +1,31 @@
 # Gacha-Crawler Genre Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [The defining UI-binding pattern: one Component, event Action, Razor reads it](#the-defining-ui-binding-pattern-one-component-event-action-razor-reads-it)
+- [Netcode you'll need (sim posture only)](#netcode-youll-need-sim-posture-only)
+- [Standout implementation patterns](#standout-implementation-patterns)
+- [Things NOT to copy](#things-not-to-copy)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [1. Reflection-driven gacha pool (facepunch.ss2)](#1-reflection-driven-gacha-pool-facepunchss2)
+  - [2. Stat-modifier stack for equipment-derived stats (facepunch.ss2)](#2-stat-modifier-stack-for-equipment-derived-stats-facepunchss2)
+  - [3. Single-axis multi-outcome leaderboard encoding (facepunch.ss2)](#3-single-axis-multi-outcome-leaderboard-encoding-facepunchss2)
+  - [4. EV-preserving economy normalization (lavagame.multiscases)](#4-ev-preserving-economy-normalization-lavagamemultiscases)
+  - [5. Wear/float as a secondary value axis (lavagame.multiscases)](#5-wearfloat-as-a-secondary-value-axis-lavagamemultiscases)
+  - [6. Save integrity without a crypto library (lavagame.multiscases)](#6-save-integrity-without-a-crypto-library-lavagamemultiscases)
+  - [7. Cloud-authoritative load + saveReady guard (lavagame.multiscases)](#7-cloud-authoritative-load--saveready-guard-lavagamemultiscases)
+  - [8. Client-verified server legitimacy via Steam host SteamId (lavagame.multiscases)](#8-client-verified-server-legitimacy-via-steam-host-steamid-lavagamemultiscases)
+  - [9. Persistent bad-luck protection / pity tickets (despawn.murder)](#9-persistent-bad-luck-protection--pity-tickets-despawnmurder)
+  - [10. [Sync] social feed for "recent wins" (lavagame.multiscases)](#10-sync-social-feed-for-recent-wins-lavagamemultiscases)
+  - [Anti-patterns from this pass](#anti-patterns-from-this-pass)
+  - [Read these games](#read-these-games)
+<!-- reference-toc:end -->
+
 How to build a collect -> roll -> gear-up -> fight -> repeat gacha RPG (lootbox dungeon-crawler / case-opening sim) in modern s&box (GameObject/Component/Scene), distilled from two shipped titles.
 
 ## What defines the genre
@@ -50,7 +76,7 @@ public static ItemRarity RollLootboxRarity( Random rng )
     return ItemRarity.Common;                            // 59.75%
 }
 ```
-(namicry.gacha_crawler: Code/Data/ItemGenerator.cs:936 RollLootboxRarity.) **CAUTION:** the sibling `RollRarity` (:912) checks Mythic at `< 0.6f` *before* Legendary at `< 0.12f` — a real shipped bug that makes Legendary/Rare **unreachable**. Cumulative thresholds only work ascending; copy the lootbox ordering. For per-item integer weights instead of rarity buckets, use the subtract-walk pick (lavagame.multis_cases: Code/Game/Economy/ItemDefinition.cs:117 RollWinner). Full treatment of both in `references/systems/gacha-loot.md`.
+(namicry.gacha_crawler: Code/Data/ItemGenerator.cs:936 RollLootboxRarity.) **CAUTION:** the sibling `RollRarity` (:912) checks Mythic at `< 0.6f` *before* Legendary at `< 0.12f` — a real shipped bug that makes Legendary/Rare **unreachable**. Cumulative thresholds only work in ascending order. For per-item integer weights instead of rarity buckets, use the subtract-walk pick (lavagame.multis_cases: Code/Game/Economy/ItemDefinition.cs:117 RollWinner). Full treatment of both in `references/systems/gacha-loot.md`.
 
 **2. Newcomer pity as consumable flags.** Two bools on the character (default `true`) that the roll *reads and reports consumption of* via a tuple; the caller burns the flag. Save-friendly, no counter, and the same flags can gate whether the player is allowed to skip the reveal (you must watch your guaranteed first legendary).
 
@@ -132,18 +158,26 @@ static GameItem GenerateWeapon( int level, ItemRarity rarity )
 if ( effects.HasFlag( CraftIngredientEffect.WeaponType ) ) forcedType = ItemType.Weapon;
 if ( effects.HasFlag( CraftIngredientEffect.ClassMatch ) ) forcedClass = player.Class;
 ```
-(namicry.gacha_crawler: Code/GameManager.cs:1913 CraftItems, Code/Data/CraftIngredientData.cs:183 GetEffectsForTier maps (type,tier)->effects, Code/Data/ItemGenerator.cs:1210 GenerateCraftedItem.) **Guard generation first in a copy** — fusion consumes the inputs before generating, so a null generate loses materials. More in `references/systems/crafting.md`.
+(namicry.gacha_crawler: Code/GameManager.cs:1913 CraftItems, Code/Data/CraftIngredientData.cs:183 GetEffectsForTier maps (type,tier)->effects, Code/Data/ItemGenerator.cs:1210 GenerateCraftedItem.) **Generate and validate the result before consuming inputs** — otherwise a null generation result loses materials. More in `references/systems/crafting.md`.
 
-**8. Combat as an OnUpdate() state machine (crawler only).** `OnUpdate()` dispatches to `UpdateBattle()` when fighting; a `BattlePhase` enum (Walking -> Combat -> Victory/Defeat) is advanced by timers, alternating player/monster attacks. The damage formula is a tuned standalone worth lifting:
+**8. Combat as an OnUpdate() state machine (crawler only).** `OnUpdate()` dispatches to `UpdateBattle()` when fighting; a `BattlePhase` enum (Walking -> Combat -> Victory/Defeat) is advanced by timers, alternating player/monster attacks. An independently structured damage calculation is:
 
-```csharp
-// Percentage damage reduction, then crit. (Magic branch swaps Attack->MagicAttack, Defense->MagicDefense.)
-int baseDamage = (int)(playerStats.Attack * weaponEfficiency);
-float reductionPercent = relevantDefense / (float)(relevantDefense + 50 + ActiveCharacter.Level * 5);
-int dmg = (int)(baseDamage * (1f - reductionPercent));
-if ( Game.Random.Float() < playerStats.CritChance ) dmg = (int)(dmg * playerStats.CritDamage);
+```text
+FUNCTION resolveAttack(attacker, defender, weaponEfficiency, randomRoll)
+  rawDamage = attacker.relevantAttack * weaponEfficiency
+  levelScale = 50 + attacker.level * 5
+  mitigation = defender.relevantDefense
+               / (defender.relevantDefense + levelScale)
+  finalDamage = FLOOR(rawDamage * (1 - mitigation))
+
+  IF randomRoll is below attacker.criticalChance:
+    finalDamage = FLOOR(finalDamage * attacker.criticalMultiplier)
+
+  RETURN finalDamage
+
+For a magic attack, use magic attack and magic defense as the relevant stats.
 ```
-(namicry.gacha_crawler: Code/GameManager.cs:167 OnUpdate dispatch, :1137 UpdateBattle phases, :1288 ExecutePlayerAttack damage + dodge-vs-accuracy + crit; Code/Enums/GameEnums.cs:93 BattlePhase.) **All battle state is mutable fields on the one GameManager** — single-fight-at-a-time, each client simulates its own (not networked). Lift the formula + timers into a standalone `CombatResolver` if you want concurrent or server-validated fights.
+(namicry.gacha_crawler: Code/GameManager.cs:167 OnUpdate dispatch, :1137 UpdateBattle phases, :1288 ExecutePlayerAttack damage + dodge-vs-accuracy + crit; Code/Enums/GameEnums.cs:93 BattlePhase.) **All battle state is mutable fields on the one GameManager** — single-fight-at-a-time, each client simulates its own (not networked). Put the formula and timers in a standalone `CombatResolver` if you want concurrent or server-validated fights.
 
 ## The defining UI-binding pattern: one Component, `event Action`, Razor reads it
 
@@ -185,7 +219,7 @@ void RequestSpin( string caseId, long declaredCost )
 **Async snapshot PvP (the elegant crawler reuse).** Don't write a PvP combat path. Fetch an opponent's serialized stats, synthesize a **one-Monster dungeon** from them, and call the exact same `StartDungeon` flow. "PvP" becomes "fight a snapshot" — no live opponent, no netcode, full reuse of the battle state machine.
 (namicry.gacha_crawler: Code/GameManager.cs:974 StartArenaBattle builds a DungeonQuest from opponent TotalStats; win-chance from a symmetric power ratio `p/(p+o)`.) **Do not copy its security** — it mutates and re-uploads the *opponent's* save from the attacker's client (no server authority); trivially cheatable. Treat as a design idea only.
 
-## Standout patterns worth copying
+## Standout implementation patterns
 
 - **Decide-then-animate gacha:** roll the real winner first, drop it at a fixed strip index, ease the scroll analytically in OnUpdate — animation is cosmetic and can't change odds (namicry: GameManager.cs:2181, :2307).
 - **Pity as consumable bools:** first-time `Has*PityBonus` flags the roll reads + reports-consumed via a tuple; ties UX (must-watch reveal) to the flag, no counter, save-trivial (namicry: ItemGenerator.cs:953).
@@ -201,7 +235,7 @@ void RequestSpin( string caseId, long declaredCost )
 ## Things NOT to copy
 
 - A **hardcoded Bearer API token** is committed in the crawler's GameManager — never copy that; use a backend the player can't read the key for, or s&box's own services (namicry: summary).
-- The `RollRarity` **overlapping-threshold bug** (Legendary/Rare unreachable) — copy `RollLootboxRarity`'s ordering (namicry: ItemGenerator.cs:912 vs :936).
+- The `RollRarity` **overlapping-threshold bug** (Legendary/Rare unreachable) — use ascending cumulative thresholds (namicry: ItemGenerator.cs:912 vs :936).
 - **Client-authoritative economy/streaks/arena** — fine for free single-player QoL, never for anything with value. The sim game shows the host-authoritative alternative.
 - `Game.Random` vs `new Random()` used inconsistently — pick **seeded `Random`** for anything host-validated/replayable, `Game.Random` only for cosmetic local picks.
 
@@ -404,21 +438,25 @@ async Task VerifyServer() {
 
 The existing file covers newcomer pity as consumable bools on the character. Murder's ticket system is a **cross-session persisted weighted pity** pattern — more general than a per-session bool:
 
-```csharp
-// MurdererTicketManager.cs — fairness tickets persisted by SteamId across sessions
-// Each unchosen player gains tickets; chosen player's tickets are heavily reduced
-void AfterRoleAssign( ulong[] chosen ) {
-    foreach ( var id in _allPlayerIds ) {
-        int delta = chosen.Contains( id ) ? -LargeReduction : +SmallGain;
-        _tickets[id] = Math.Max( 1, _tickets[id] + delta );
-    }
-    SaveToFile();   // FileSystem.Data JSON keyed by SteamId
-}
-// Strategy interface: swap the whole fairness policy at config time
-interface ITicketStrategy { int GetTickets(ulong id); void AfterAssign(ulong[] chosen); }
+```text
+FAIRNESS POLICY INTERFACE
+  weightFor(playerId)
+  updateAfterSelection(selectedPlayerIds)
+
+PROCEDURE updatePersistentWeights(allPlayerIds, selectedPlayerIds)
+  FOR EACH playerId IN allPlayerIds:
+    IF playerId was selected:
+      adjustment = a large negative amount
+    ELSE:
+      adjustment = a small positive amount
+
+    newWeight = previousWeight(playerId) + adjustment
+    store MAXIMUM(1, newWeight) for playerId
+
+  persist the SteamId-keyed weight table to writable game data
 ```
 
-Lift this for any "who gets the rare role / the jackpot / the guaranteed legendary this session" mechanic. The `Strategy` interface lets you A/B-test fairness policies.
+This policy shape works for rare-role selection, jackpots, or session-level guaranteed rewards. The strategy interface lets you A/B-test fairness policies.
 
 (despawn.murder: `murder/Code/Systems/Rounds/MurdererTicketManager.cs`; Standout #2 in the mining file)
 
@@ -459,4 +497,4 @@ For the gacha-crawler genre, the authoritative reference set is now:
 - **`facepunch.ss2`** — reflection-driven weighted gacha pool + per-source stat-modifier stack + meta-progression + single-axis leaderboard encoding (best roguelite-gacha hybrid)
 - **`despawn.murder`** — persisted cross-session pity/fairness tickets + Strategy-pattern role assignment (narrow but solves the "bad luck protection" problem cleanly)
 
-Per-game mining notes: `sbox-lessons/mining-v2/games/namicry.gacha_crawler.md`, `lavagame.multis_cases.md`, `facepunch.ss2.md`, `despawn.murder.md`.
+See the package entries for `namicry.gacha_crawler`, `lavagame.multis_cases`, `facepunch.ss2`, and `despawn.murder` in [`SOURCE-PROVENANCE.md`](../SOURCE-PROVENANCE.md).

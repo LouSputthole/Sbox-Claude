@@ -1,5 +1,34 @@
 # Economy & Currency
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it is / when you need it](#what-it-is--when-you-need-it)
+- [Canonical approach: host-authoritative wallet](#canonical-approach-host-authoritative-wallet)
+  - [Client-initiated change: the request → apply → confirm triad](#client-initiated-change-the-request--apply--confirm-triad)
+  - [Shops & upgrades: the geometric cost curve](#shops--upgrades-the-geometric-cost-curve)
+  - [Sending purchases over the wire: Ids, never resource refs](#sending-purchases-over-the-wire-ids-never-resource-refs)
+- [Variations seen across games](#variations-seen-across-games)
+- [Gotchas](#gotchas)
+- [Seen in](#seen-in)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Reason-tagged transactions = a self-instrumenting economy](#reason-tagged-transactions--a-self-instrumenting-economy)
+  - [Derived running costs + a daily-upkeep tick (don't store what you can compute)](#derived-running-costs--a-daily-upkeep-tick-dont-store-what-you-can-compute)
+  - [Centralize balance in a pure static class (the cleanest tuning sheet)](#centralize-balance-in-a-pure-static-class-the-cleanest-tuning-sheet)
+  - [Polymorphic currency: one product, multiple cost types](#polymorphic-currency-one-product-multiple-cost-types)
+  - [Dynamic price-elasticity demand curve (sim-driven income, not idle timers)](#dynamic-price-elasticity-demand-curve-sim-driven-income-not-idle-timers)
+  - [The "currency is a physics object" economy (selling as a collision event)](#the-currency-is-a-physics-object-economy-selling-as-a-collision-event)
+  - [Three host-only spend semantics, made auditable](#three-host-only-spend-semantics-made-auditable)
+  - [Bit-packed upgrade levels (when many small ladders share a save)](#bit-packed-upgrade-levels-when-many-small-ladders-share-a-save)
+  - [Transactional upgrade purchase with rollback](#transactional-upgrade-purchase-with-rollback)
+  - [Meta-progression as ONE proven file (currency + shop + save + versioning)](#meta-progression-as-one-proven-file-currency--shop--save--versioning)
+  - [In-round / consumable currency (clues, ammo, time)](#in-round--consumable-currency-clues-ammo-time)
+  - [Engine-as-renderer: hold the ledger off the s&box host entirely](#engine-as-renderer-hold-the-ledger-off-the-sbox-host-entirely)
+  - [Cosmetic juice: the debounced value floater](#cosmetic-juice-the-debounced-value-floater)
+  - [Read these games (economy)](#read-these-games-economy)
+<!-- reference-toc:end -->
+
 How to build money/coins/credits, shops, upgrades, lootboxes and persistence in modern s&box — host-authoritative where it matters, client-trusted where it's cheap.
 
 ## What it is / when you need it
@@ -313,11 +342,12 @@ despawn.murder proves the wallet doesn't have to be cash or persistent: **clues 
 
 sino.s_sino is the corpus's cleanest "server-as-truth" economy: **no money math in s&box at all.** Balance lives on an external Node/WebSocket backend as **cents in decimal strings** (never floats, never an int a gambler's bankroll could overflow); the client only displays a balance it was pushed.
 
-```csharp
-// Code/UI/BalanceHud.razor — the single client mirror
-_subs.Add( mgr.On( "balance", msg => UpdateBalance( msg.balance ) ) ); // string cents
-// balance_cache.txt (FileSystem.Data) seeds the HUD on boot so $0 doesn't flash —
-// regex-validated ^\d+$, treated as COSMETIC; the server's first 'init' overwrites it.
+```text
+client display cache:
+  listen for authority-sent balance messages
+  store cents as a decimal string
+  optionally seed presentation from a digits-only local cache
+  replace that cache as soon as the authority sends initialization state
 ```
 This sidesteps the entire `[Sync]`/`[Rpc.Host]` re-validation discipline by simply not trusting the host with money. **Use it when money has real economic value (gambling, trading) or must survive across servers** — the save becomes a corrected cache, never the authority. (Contrast lavagame.sandmoney_, which keeps the same trading-sim genre fully host-authoritative + locally hash-signed; pick backend-truth only if you can run the server.) See **save-persistence** / leaderboards for the WebSocket reconnect + `Services.Auth.GetToken` plumbing.
 

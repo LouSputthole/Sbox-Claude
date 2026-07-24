@@ -27,7 +27,7 @@ The one wrinkle: **six tools were dropped from the bridge surface** because the 
 ships built-ins with the *same names and semantics* —
 `spawn_model`, `list_scenes`, `save_scene`, `undo`, `redo`, `remove_component`. Your workflows
 keep the same names; Facepunch's implementations serve them. (All six also still work over the
-legacy file-IPC path until v2.1.0.) Full details in [V2-MIGRATION.md](V2-MIGRATION.md).
+retained legacy file-IPC compatibility path.) Full details in [V2-MIGRATION.md](V2-MIGRATION.md).
 
 ---
 
@@ -61,7 +61,7 @@ lifeline.
 **Yes, it can modify your project — that's the point** — and v2 has a real set of protections
 so it does so safely:
 
-- **Read-only hints.** 53 tools are marked `[McpTool.ReadOnly]` — inspection, search, lints,
+- **Read-only hints.** 56 tools are marked `[McpTool.ReadOnly]` — inspection, search, lints,
   read screenshots. The client can run them without prompting *because they promise not to
   change anything.* Everything that *can* change your project is a mutating tool and prompts.
 - **Play-mode guards.** Scene-mutating tools **refuse while the game is running**, with a clear
@@ -105,23 +105,22 @@ documentation standards a good tool description must meet) is in
 
 ---
 
-### What's coming next?
+### What's on the current roadmap?
 
-Planned for **v2.1.0** and beyond (tracked in [TOOL_BACKLOG.md](TOOL_BACKLOG.md)):
+Tracked in [TOOL_BACKLOG.md](TOOL_BACKLOG.md):
 
-- **Retiring the legacy path** — the v1.x file-IPC transport and the full stdio TS tool layer
-  (everything except the lifeline) are compiled-in as a fallback through v2.0.x and retire in
-  v2.1.0.
+- **Compatibility fallback** — the v1.x file-IPC transport and the full stdio TS tool layer
+  (everything except the lifeline) remain compiled-in as a retained fallback. Any future
+  retirement requires a separate compatibility decision.
 - **Remaining Tier-2 scaffolds** — ✅ done: the staged `[Unreleased]` waves (2026-07-12/13)
   complete the Tier-2 backlog — 30 new tools across economy & saves, stats & achievements,
   round-flow & UI, world & render, AI & systems, gameplay recording, and the cinematic wave
   (lipsync dialogue, camera effects, cutscene authoring, recorded playtests, killcams) —
   with the few leftovers deliberately skipped for verified reasons.
-- **A multiplayer test harness** — spawn N clients, drive each via `playtest`, assert sync.
-  Likely unblocked: the official docs now describe local multi-instance testing ("Join via
-  new instance" + `connect local`), one live verification session away — the top next-wave
-  candidate.
-- **Typed DTO returns** for hot read tools, so agents plan around fields instead of parsing text.
+- **Local multiplayer test harness** — ✅ upstreamed in `[Unreleased]`: launch up to two
+  real `sbox.exe -joinlocal` clients, poll host-side joins, and clean up tracked processes.
+  The engine path was live-proven; this canonical registration/wrapper patch has passed
+  source and offline gates, with release smoke still tracked in [TESTING.md](../TESTING.md).- **Typed DTO returns** for hot read tools, so agents plan around fields instead of parsing text.
 - **`MovieRecorder`** — ✅ done: the engine shipped `MovieRecorder` (2026-07-12) and the
   staged wave covers it end to end (`record_gameplay_clip` / `stop_gameplay_recording` /
   `gameplay_recording_status`) — record live gameplay, replay it with `play_movie`.

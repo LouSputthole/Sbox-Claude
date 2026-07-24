@@ -3,7 +3,7 @@
 **Date:** 2026-06-04
 **Status:** DESIGN ONLY — not implemented. No code edits made.
 **Feature wave:** #2 "Playable game in one ask" (the non-coder mission)
-**Repo:** `C:\Users\cargi\Desktop\sbox-claude`
+**Repo:** repository root
 **Target version:** proposed v1.7.0 (additive; no breaking changes)
 
 ---

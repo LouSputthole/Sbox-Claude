@@ -8,7 +8,8 @@
  *   3. Every bridge.send() command has a matching C# handler
  *      (allowlist: "get_bridge_status" — special-cased in dispatcher, not via Register).
  *   4. Every C# handler is referenced by at least one bridge.send().
- *   5. Version lock: package.json, plugin.json, BridgeVersion const, CHANGELOG.md
+ *   5. Every concrete IBridgeHandler class is registered (except explicit superseded-handler allowlist).
+ *   6. Version lock: package.json, plugin.json, BridgeVersion const, CHANGELOG.md
  *      first "## [X.Y.Z]" heading, marketplace.json plugins[0].version, and the
  *      plugin .mcp.json npm pin must all match. (marketplace.json drifted to
  *      v1.16.0 unnoticed for two releases before it joined this set.)
@@ -28,7 +29,8 @@ const __dir = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dir, "..");
 
 const TS_TOOLS_DIR   = join(ROOT, "sbox-mcp-server", "src", "tools");
-const CS_FILE        = join(ROOT, "sbox-bridge-addon", "Editor", "MyEditorMenu.cs");
+const CS_EDITOR_DIR  = join(ROOT, "sbox-bridge-addon", "Editor");
+const CS_FILE        = join(CS_EDITOR_DIR, "MyEditorMenu.cs");
 const PKG_JSON       = join(ROOT, "sbox-mcp-server", "package.json");
 const PLUGIN_JSON    = join(ROOT, "plugins", "sbox-claude", ".claude-plugin", "plugin.json");
 const CHANGELOG_MD   = join(ROOT, "CHANGELOG.md");
@@ -62,6 +64,17 @@ function duplicates(arr) {
   return [...seen.entries()].filter(([, n]) => n > 1).map(([v]) => v);
 }
 
+/** Recursively collect files with a suffix, in stable path order. */
+function filesWithSuffix(dir, suffix) {
+  const files = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) files.push(...filesWithSuffix(path, suffix));
+    else if (entry.isFile() && entry.name.endsWith(suffix)) files.push(path);
+  }
+  return files.sort();
+}
+
 // ---------------------------------------------------------------------------
 // 1. Collect tool names and bridge.send targets from all .ts files
 // ---------------------------------------------------------------------------
@@ -83,6 +96,15 @@ for (const f of tsFiles) {
 // ---------------------------------------------------------------------------
 const csSrc      = readFile(CS_FILE);
 const handlerNames = allMatches(/Register\(\s*"([a-z_0-9]+)"/, csSrc);
+const registeredFactories = [...csSrc.matchAll(
+  /Register\(\s*"([a-z_0-9]+)"\s*,\s*\(\)\s*=>\s*new\s+(\w+)\s*\(/g
+)].map((match) => ({ command: match[1], type: match[2] }));
+const registeredFactoryTypes = new Set(registeredFactories.map(({ type }) => type));
+const declaredHandlerTypes = filesWithSuffix(CS_EDITOR_DIR, ".cs").flatMap((file) =>
+  [...readFile(file).matchAll(
+    /\b(?:public|internal)\s+(?:sealed\s+)?class\s+(\w+)\s*:\s*IBridgeHandler\b/g
+  )].map((match) => match[1])
+);
 
 // ---------------------------------------------------------------------------
 // 3. Version lock
@@ -124,7 +146,23 @@ if (dupHandlers.length > 0) {
   failures.push(`DUPLICATE handler names (${dupHandlers.length}): ${dupHandlers.join(", ")}`);
 }
 
-// 4c. bridge.send commands with no matching C# handler
+// 4c. Concrete handler classes must not disappear from RegisterHandlers unnoticed.
+// These three legacy implementations are intentionally superseded by V2 handlers while
+// retained as delegate targets for compatibility paths.
+const UNREGISTERED_HANDLER_ALLOWLIST = new Set([
+  "PlaceAlongPathHandler",
+  "GridDuplicateHandler",
+  "ScatterPropsHandler",
+]);
+const unregisteredHandlerTypes = [...new Set(declaredHandlerTypes)]
+  .filter((type) => !registeredFactoryTypes.has(type) && !UNREGISTERED_HANDLER_ALLOWLIST.has(type));
+if (unregisteredHandlerTypes.length > 0) {
+  failures.push(
+    `IBridgeHandler classes missing RegisterHandlers factories (${unregisteredHandlerTypes.length}): ${unregisteredHandlerTypes.join(", ")}`
+  );
+}
+
+// 4d. bridge.send commands with no matching C# handler
 //     Allowlist: "get_bridge_status" is special-cased in the dispatcher (not via Register).
 const SEND_ALLOWLIST = new Set(["get_bridge_status"]);
 const handlerSet     = new Set(handlerNames);
@@ -139,7 +177,7 @@ if (unmatchedSends.length > 0) {
   );
 }
 
-// 4d. C# handlers never referenced by any bridge.send
+// 4e. C# handlers never referenced by any bridge.send
 const unsentHandlers = [...handlerSet].filter(h => !sendSet.has(h));
 if (unsentHandlers.length > 0) {
   failures.push(
@@ -147,7 +185,7 @@ if (unsentHandlers.length > 0) {
   );
 }
 
-// 4e. Version lock
+// 4f. Version lock
 const versions = {
   "package.json":     pkgVersion,
   "plugin.json":      pluginVersion,

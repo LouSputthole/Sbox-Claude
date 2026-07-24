@@ -1,5 +1,31 @@
 # Gacha / Loot Tables in modern s&box
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it IS / when you need it](#what-it-is--when-you-need-it)
+- [The canonical weighted pick (copy this)](#the-canonical-weighted-pick-copy-this)
+  - [Where the table lives — prefer a GameResource](#where-the-table-lives--prefer-a-gameresource)
+  - [Host-authoritative grant (the multiplayer recipe)](#host-authoritative-grant-the-multiplayer-recipe)
+  - [Decide first, animate second (CS:GO-style spin)](#decide-first-animate-second-csgo-style-spin)
+- [Notable variations](#notable-variations)
+- [Gotchas](#gotchas)
+- [Seen in (open the real code)](#seen-in-open-the-real-code)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Reflection-driven catalog — no hand-list (facepunch.ss2)](#reflection-driven-catalog--no-hand-list-facepunchss2)
+  - [Synergy/prerequisite gates (facepunch.ss2)](#synergyprerequisite-gates-facepunchss2)
+  - [Client-side static-registry hydration (facepunch.ss2)](#client-side-static-registry-hydration-facepunchss2)
+  - [Live cloud stats feeding back into drop tables (facepunch.ss2)](#live-cloud-stats-feeding-back-into-drop-tables-facepunchss2)
+  - [Wear/float as a post-roll value modifier (lavagame.multiscases)](#wearfloat-as-a-post-roll-value-modifier-lavagamemultiscases)
+  - [Collection album — completing a set gives a persistent multiplier (lavagame.multiscases)](#collection-album--completing-a-set-gives-a-persistent-multiplier-lavagamemultiscases)
+  - [Jackpot pending-win-until-ACK (lavagame.multiscases)](#jackpot-pending-win-until-ack-lavagamemultiscases)
+  - [Per-source layered rarity curves (namicry.gachacrawler)](#per-source-layered-rarity-curves-namicrygachacrawler)
+  - [Class-weighted generation — biasing drops toward the player's build (namicry.gachacrawler)](#class-weighted-generation--biasing-drops-toward-the-players-build-namicrygachacrawler)
+  - [Ingredient-modified procedural roll (namicry.gachacrawler)](#ingredient-modified-procedural-roll-namicrygachacrawler)
+  - ["Server-as-truth" anti-pattern (sino.ssino)](#server-as-truth-anti-pattern-sinossino)
+  - [Updated "read these games" pointer](#updated-read-these-games-pointer)
+<!-- reference-toc:end -->
+
 How to build weighted random loot — drop tables, lootboxes, CS:GO-style case spins, daily/timed cases, pity — host-authoritative and reusable across drops/shops/spawns.
 
 ## What it IS / when you need it

@@ -1,5 +1,5 @@
 {
-  "toolCount": 275,
+  "toolCount": 286,
   "tools": [
     {
       "module": "aisystems",
@@ -386,6 +386,21 @@
     },
     {
       "module": "assets",
+      "name": "inspect_model_geometry",
+      "description": "Inspect a mounted model before placement without creating a GameObject. Returns model-local/default-pose aggregate, render, and physics bounds with provenance; footprint, height, pivot-to-bottom grounding offset; and capped model metadata. Rejects missing/error models. Use placement.groundingOffsetZ for an unrotated scale-1 ground offset, then verify the placed object with get_bounds.",
+      "params": [
+        {
+          "name": "path",
+          "description": "Mounted model path, e.g. 'models/dev/box.vmdl'",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "assets",
       "name": "install_asset",
       "description": "Install a community asset package into the project by its ident (e.g. 'facepunch.flatgrass'). Adds it as a project dependency. Returns { installed, ident, name, path, relativePath, restartRecommended, note } — pass the returned path to spawn_model / assign_model. CAUTION: if the package is a code LIBRARY (adds a PackageReference), trigger_hotload will NOT surface its types — call restart_editor so the new package compiles into the project",
       "params": [
@@ -588,7 +603,7 @@
     {
       "module": "audit",
       "name": "batch_set_property",
-      "description": "Set ONE component property to the same value across MANY GameObjects in a single call (e.g. Tint on 40 props, Enabled on every light). Pass dryRun:true first to validate — it reports each object's current value and what would change WITHOUT applying anything. Returns { total, succeeded, failed, dryRun, results } with per-object ok/error and the previous value on success. Get ids from find_objects or get_selected_objects. Scene-mutating: refused during play mode. Value coercion matches set_property (numbers, bools, enums, 'x,y,z' vectors, colors, asset paths)",
+      "description": "Set ONE component property to the same value across MANY GameObjects in a single call. Pass dryRun:true first: it performs the same type coercion and reference resolution as apply, reports current/proposed values, and sets wouldChange:false when they already match. Apply skips no-op setters. Returns { total, succeeded, failed, dryRun, changed, unchanged, results }. Scene-mutating: refused during play mode. Value coercion matches set_property.",
       "params": [
         {
           "name": "ids",
@@ -770,6 +785,211 @@
           "optional": true,
           "type": {
             "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "camera",
+      "name": "capture_camera_set",
+      "description": "Capture 1-8 saved camera bookmarks in exact order. Returns a labeled manifest followed by ordered inline PNGs. Every successful run transactionally becomes the previous session baseline within a 64-entry/64 MiB memory budget; comparePrevious reports SkiaSharp RGBA delta metrics. renderUI defaults false for stable comparisons. Physics-trace occlusion is diagnostic and never moves the camera.",
+      "params": [
+        {
+          "name": "names",
+          "description": "Ordered bookmark names; duplicates are rejected",
+          "optional": false,
+          "type": {
+            "kind": "array",
+            "items": {
+              "kind": "string"
+            }
+          }
+        },
+        {
+          "name": "comparePrevious",
+          "description": "Compare against the previous capture with identical name/settings",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "diffThreshold",
+          "description": "Changed-pixel RGBA threshold (default 8)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "width",
+          "description": "Image width (default 960)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "height",
+          "description": "Image height (default 540)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "renderUI",
+          "description": "Include screen-space UI (default false)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "checkOcclusion",
+          "description": "Report blocking physics geometry (default true)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "camera",
+      "name": "capture_topdown",
+      "description": "Capture a deterministic orthographic top-down inline PNG over targetId or an explicit center. Returns camera pose, fixed screen axes, ground-plane bounds, and world-units-per-pixel for measurement/placement. renderUI defaults false; output is capped at 1600x1200.",
+      "params": [
+        {
+          "name": "targetId",
+          "description": "GameObject GUID whose bounds determine framing",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "center",
+          "description": "Explicit world center; use instead of targetId",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "worldHeight",
+          "description": "Screen-vertical ground span in world units (max 100,000)",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "cameraHeight",
+          "description": "Requested camera height above center (max 1,000,000); raised when needed to clear the target top",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "width",
+          "description": "Image width (default 1024)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "height",
+          "description": "Image height (default 1024)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "renderUI",
+          "description": "Include screen-space UI (default false)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "camera",
+      "name": "delete_camera_bookmark",
+      "description": "Delete one session-scoped camera bookmark and its comparison baselines. Returns deleted=false when already absent. Use list_camera_bookmarks to inspect remaining names.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Case-insensitive bookmark name",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "camera",
+      "name": "list_camera_bookmarks",
+      "description": "List all session-scoped camera bookmarks in stable name order. Returns resolved pose, optional target/lookAt, FOV, and saved time. Read-only; feed returned names into capture_camera_set. State resets on addon hotload or editor restart.",
+      "params": []
+    },
+    {
+      "module": "camera",
+      "name": "save_camera_bookmark",
+      "description": "Save or replace a named camera bookmark in editor-session memory. Pass targetId for a deterministic framed object pose, position plus lookAt/rotation for an explicit pose, or omit both to snapshot the main camera. Returns the resolved pose; bookmarks reset on hotload/restart. Follow with list_camera_bookmarks or capture_camera_set.",
+      "params": [
+        {
+          "name": "name",
+          "description": "Case-insensitive bookmark name",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "targetId",
+          "description": "GameObject GUID to frame",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "position",
+          "description": "Explicit camera position",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "lookAt",
+          "description": "World point to aim at; pair with position",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "rotation",
+          "description": "Explicit rotation; alternative to lookAt",
+          "optional": true,
+          "type": {
+            "kind": "rotation"
+          }
+        },
+        {
+          "name": "fov",
+          "description": "Field of view in degrees (1-179)",
+          "optional": true,
+          "type": {
+            "kind": "number"
           }
         }
       ]
@@ -1957,7 +2177,7 @@
     {
       "module": "diagnostics",
       "name": "capture_view",
-      "description": "Capture a PNG of the scene from a camera — and crucially this WORKS IN PLAY MODE, capturing the RUNNING game (via CameraComponent.RenderToBitmap, unlike take_screenshot/screenshot_from which are edit-only). With no args it renders the live main camera = the player's POV (incl. HUD). Pass position {x,y,z} (+ lookAt or rotation) or id (a GameObject to frame) to capture from a temporary camera that never disturbs the game's own camera. Returns the saved PNG's absolute 'path' — READ it to see the result.",
+      "description": "Capture an inline PNG in edit or play mode. With no pose it renders the live main camera; pass exactly one id or position (+ lookAt or rotation) to use a temporary disabled/non-main camera that is removed afterwards. Returns a labeled manifest followed by the image block.",
       "params": [
         {
           "name": "id",
@@ -2073,6 +2293,77 @@
     },
     {
       "module": "diagnostics",
+      "name": "find_objects_near",
+      "description": "Find GameObjects within a world-space radius of exactly one explicit position or originId, sorted nearest first. Optional name/component/tag filters are applied before the capped result, and the Scene root is excluded. Returns pivot-distance results plus requestedRadius/radiusClamped and total/showing/truncated/scanned; it deliberately does not pretend render or collider overlap is pivot distance. Read-only and play-aware.",
+      "params": [
+        {
+          "name": "position",
+          "description": "World-space search center; use instead of originId",
+          "optional": true,
+          "type": {
+            "kind": "vector3"
+          }
+        },
+        {
+          "name": "originId",
+          "description": "GameObject GUID whose world position is the center",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "radius",
+          "description": "Search radius in world units (default 256, max 1,000,000)",
+          "optional": true,
+          "type": {
+            "kind": "number"
+          }
+        },
+        {
+          "name": "limit",
+          "description": "Maximum results (default 50)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "name",
+          "description": "Case-insensitive GameObject name substring",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "component",
+          "description": "Required component type name",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "tag",
+          "description": "Required GameObject tag",
+          "optional": true,
+          "type": {
+            "kind": "string"
+          }
+        },
+        {
+          "name": "includeOrigin",
+          "description": "Include originId itself (default false)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "module": "diagnostics",
       "name": "frame_camera",
       "description": "Aim the s&box EDITOR viewport camera at a GameObject (by id) or a world point (position + optional radius), then call take_screenshot to capture that view. This is how Claude points its own screenshots at what it's working on — frame a spawned object, then screenshot to verify it actually looks right.",
       "params": [
@@ -2105,7 +2396,7 @@
     {
       "module": "diagnostics",
       "name": "get_bounds",
-      "description": "Get a GameObject's world-space bounding box. Returns { id, name, center, size, extents, mins, maxs, radius, position, empty } — objects with no renderer report empty:true (bounds collapse to the world position) plus an explanatory note. Feed center/radius into screenshot_from or frame_camera to frame the object, or use mins/maxs for placement math (screenshot_orbit calls this internally).",
+      "description": "Get provenance-rich world bounds for a GameObject. Preserves legacy top-level center/size/extents/mins/maxs/radius/position/empty for compatibility, and adds render plus independent physics and solidPhysics aggregates. Collider outputs include trigger policy, capped contributor GameObject IDs and component type names, unsupported counts, and the exact API source. Read-only and play-aware.",
       "params": [
         {
           "name": "id",
@@ -2158,7 +2449,7 @@
     {
       "module": "diagnostics",
       "name": "screenshot_from",
-      "description": "Take a screenshot from a chosen angle. take_screenshot is locked to the scene's main camera; this temporarily moves that camera to frame your target, captures, then restores it — so Claude can finally AIM its own screenshots. Pass id (frame an object) OR position {x,y,z} with optional lookAt {x,y,z} or rotation {pitch,yaw,roll}. After it returns, read the newest PNG in the editor's screenshots folder.",
+      "description": "Historical alias of capture_view. Frame a GameObject or use an explicit position with optional lookAt/rotation, then return a labeled inline PNG. Uses a temporary non-main camera, works in edit or play mode, and never moves the scene's real camera.",
       "params": [
         {
           "name": "id",
@@ -2170,7 +2461,7 @@
         },
         {
           "name": "position",
-          "description": "Camera world position (use instead of id) — object {x,y,z} or comma string \"x,y,z\"",
+          "description": "Camera world position (use instead of id) — object {x,y,z} or exact comma string \"x,y,z\"",
           "optional": true,
           "type": {
             "kind": "vector3"
@@ -2178,7 +2469,7 @@
         },
         {
           "name": "lookAt",
-          "description": "World point to look at (pair with position) — object {x,y,z} or comma string \"x,y,z\"",
+          "description": "World point to look at (pair with position) — object {x,y,z} or exact comma string \"x,y,z\"",
           "optional": true,
           "type": {
             "kind": "vector3"
@@ -2186,7 +2477,7 @@
         },
         {
           "name": "rotation",
-          "description": "Explicit camera rotation (pair with position)",
+          "description": "Explicit finite camera rotation (pair with position; alternative to lookAt)",
           "optional": true,
           "type": {
             "kind": "rotation"
@@ -2194,7 +2485,7 @@
         },
         {
           "name": "width",
-          "description": "Screenshot width (default 1920)",
+          "description": "Screenshot width (default 1280)",
           "optional": true,
           "type": {
             "kind": "integer"
@@ -2202,7 +2493,7 @@
         },
         {
           "name": "height",
-          "description": "Screenshot height (default 1080)",
+          "description": "Screenshot height (default 720)",
           "optional": true,
           "type": {
             "kind": "integer"
@@ -2213,7 +2504,7 @@
     {
       "module": "diagnostics",
       "name": "screenshot_orbit",
-      "description": "Capture a GameObject from several angles in ONE call — orbits the scene's main camera around the object and screenshots each angle, so Claude can verify 3D work from multiple sides instead of guessing from one. Drives get_bounds (framing) + screenshot_from per angle (each its own frame, the reliable capture path). Returns the saved PNG paths in order — READ them to inspect.",
+      "description": "Capture a GameObject from several angles in one call without moving the real camera. Uses get_bounds for framing and capture_view temporary cameras for each angle, returning a labeled manifest followed by ordered inline PNG image blocks.",
       "params": [
         {
           "name": "id",
@@ -2225,7 +2516,7 @@
         },
         {
           "name": "shots",
-          "description": "Number of angles around the object (default 4, clamped 2-8)",
+          "description": "Number of angles (default 4)",
           "optional": true,
           "type": {
             "kind": "integer"
@@ -2233,7 +2524,7 @@
         },
         {
           "name": "elevation",
-          "description": "Camera height factor: 0 = level, 1 = high (default 0.4)",
+          "description": "Camera height factor from 0 to 1 (default 0.4)",
           "optional": true,
           "type": {
             "kind": "number"
@@ -2241,7 +2532,7 @@
         },
         {
           "name": "distance",
-          "description": "Camera distance in units (default: auto from bounds)",
+          "description": "Positive camera distance in units (default: auto from bounds)",
           "optional": true,
           "type": {
             "kind": "number"
@@ -3487,7 +3778,7 @@
     {
       "module": "gameobjects",
       "name": "set_transform",
-      "description": "Set position, rotation, and/or scale on a GameObject. Only provided values are changed; values apply in world space unless local=true. Returns { transformed, gameObject } with the full serialized object (id, name, position, rotation, scale, components) so you can verify what actually applied.",
+      "description": "Atomically set position, rotation, and/or scale on a GameObject. All supplied values are parsed before mutation; values apply in world space by default. Prefer space='local' or space='world'; local remains a legacy alias. Returns legacy { transformed, gameObject } plus before/after transform and bounds receipts.",
       "params": [
         {
           "name": "id",
@@ -3523,10 +3814,22 @@
         },
         {
           "name": "local",
-          "description": "If true, values are in local space. Default is world space",
+          "description": "Legacy alias: true selects local space and false selects world space",
           "optional": true,
           "type": {
             "kind": "boolean"
+          }
+        },
+        {
+          "name": "space",
+          "description": "Explicit transform space. If supplied with local, both values must agree",
+          "optional": true,
+          "type": {
+            "kind": "enum",
+            "values": [
+              "world",
+              "local"
+            ]
           }
         }
       ]
@@ -4897,6 +5200,21 @@
     },
     {
       "module": "leveltools",
+      "name": "commit_placement_plan",
+      "description": "Commit a dry-run plan returned by place_along_path, grid_duplicate, or scatter_props. Plans are scene-scoped, capped, and expire after 10 minutes. Success consumes the plan; a complete rollback restores it for retry. The stored transforms are applied without rerolling randomness or repeating ground traces. Creation rolls back on failure; grid commits reject a changed/missing source before creating anything. Returns slot-to-GUID receipts.",
+      "params": [
+        {
+          "name": "planId",
+          "description": "Plan id returned by a placement tool with dryRun:true",
+          "optional": false,
+          "type": {
+            "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "leveltools",
       "name": "distribute_objects",
       "description": "Evenly space GameObjects along an axis between the lowest and highest (keeps the two ends fixed, spreads the rest evenly). Returns { distributed, axis, from, to } — the object count and the fixed end coordinates the rest were spread between.",
       "params": [
@@ -4929,7 +5247,7 @@
     {
       "module": "leveltools",
       "name": "grid_duplicate",
-      "description": "Clone a GameObject into an X/Y/Z grid with fixed spacing (the original stays in place). Each count is clamped to 50 and total clones to 500. Great for fences, crates, pillars, foliage rows.",
+      "description": "Clone a GameObject into an X/Y/Z grid. Existing calls mutate immediately and keep the legacy result. Use dryRun:true to preview exact capped transforms and receive a planId; commit_placement_plan then clones atomically and rejects the commit if the source transform or parent changed after preview.",
       "params": [
         {
           "name": "id",
@@ -4969,6 +5287,14 @@
           "optional": true,
           "type": {
             "kind": "vector3"
+          }
+        },
+        {
+          "name": "dryRun",
+          "description": "Preview only: return deterministic transforms and planId without cloning",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
           }
         }
       ]
@@ -5091,7 +5417,7 @@
     {
       "module": "leveltools",
       "name": "scatter_props",
-      "description": "Scatter N copies of a model randomly within a radius around a center point — instant foliage, rocks, debris. Each copy gets a random yaw and (by default) is snapped to the ground. Seeded for reproducibility; copies are grouped under one parent by default. Count capped at 300. Returns { scattered, groupId, seed } — individual prop GUIDs are not returned, so use groupId with get_scene_hierarchy (rootId) to enumerate them, or with set_transform/delete_gameobject to move/remove the whole batch.",
+      "description": "Scatter seeded model copies inside a radius. Existing calls mutate immediately and keep the legacy { scattered, groupId, seed } result. Use dryRun:true to resolve random transforms and ground traces once, returning per-slot transforms, ground status, warnings, model bounds, and planId; commit_placement_plan creates exactly that preview with rollback on failure.",
       "params": [
         {
           "name": "model",
@@ -5187,6 +5513,14 @@
           "optional": true,
           "type": {
             "kind": "string"
+          }
+        },
+        {
+          "name": "dryRun",
+          "description": "Preview only: return deterministic transforms and planId without creating props",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
           }
         }
       ]
@@ -6164,6 +6498,12 @@
     },
     {
       "module": "networking",
+      "name": "multiplayer_test_status",
+      "description": "Read the host-side state of the local multiplayer test harness without changing it: play/network state, connection roster, tracked client PIDs and uptime, and join-wait progress. The bridge cannot inspect or drive the separate client windows; use host-side replication inspectors for assertions.",
+      "params": []
+    },
+    {
+      "module": "networking",
       "name": "network_spawn",
       "description": "Network-enable a GameObject so it is synchronized across all connected clients. Calls NetworkSpawn(). Returns { spawned, id } on success — follow with inspect_networked_object to confirm the Network state, or set_ownership to hand it to a connection",
       "params": [
@@ -6196,6 +6536,60 @@
           "optional": true,
           "type": {
             "kind": "string"
+          }
+        }
+      ]
+    },
+    {
+      "module": "networking",
+      "name": "start_multiplayer_test",
+      "description": "Start a real local multiplayer test from PLAY MODE. Creates an explicitly private, hidden lobby when needed, validates capacity, launches 1-2 sbox.exe clients with -joinlocal, and tracks joins from the pre-spawn host-side connection baseline. Overlapping tracked runs are rejected so unrelated connections cannot falsely satisfy a join wait. Each client can use about 4.5 GB RAM and take about 80 seconds to join. Returns spawned PIDs, baseline/expected connection counts, and an optional join-wait job; poll multiplayer_test_status and always finish with stop_multiplayer_test.",
+      "params": [
+        {
+          "name": "clients",
+          "description": "Real client processes to launch (default 1; hard cap 2 per run; stop an existing tracked run first)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "maxPlayers",
+          "description": "Lobby capacity when this call creates it (default 4; must fit the host plus all requested clients). Existing lobby capacity is validated instead",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        },
+        {
+          "name": "waitForJoinSeconds",
+          "description": "Host-side join-wait timeout (default 120; 0 returns immediately after launch)",
+          "optional": true,
+          "type": {
+            "kind": "integer"
+          }
+        }
+      ]
+    },
+    {
+      "module": "networking",
+      "name": "stop_multiplayer_test",
+      "description": "Stop every client process launched by start_multiplayer_test; exited clients are cleared while failed live kills remain tracked for retry. Optionally disconnect the host lobby. alsoStrays is an explicit recovery switch that kills every sbox.exe game client, including clients not launched by this harness; it never targets the sbox-dev editor process. Returns truthful stopped/remainingPids, per-process cleanup results, and disconnect status.",
+      "params": [
+        {
+          "name": "disconnect",
+          "description": "Also disconnect the running host from its networking session (default false)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "alsoStrays",
+          "description": "Also kill untracked sbox.exe game clients (default false; use only for explicit cleanup)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
           }
         }
       ]
@@ -10618,7 +11012,7 @@
     {
       "module": "world",
       "name": "place_along_path",
-      "description": "Drop instances of a model along a path (list of points). Useful for fences, lampposts, road markers, lined-up rocks. Returns `placed` (instance count) and `folder` — the GUID of the new parent GameObject grouping the instances; pass `folder` to delete_gameobject to remove the whole run, or to set_parent/set_transform to move it.",
+      "description": "Place up to 2,048 model instances along a waypoint path. Existing calls mutate immediately and keep the legacy { placed, folder } result, but reject larger paths before creating anything. Use dryRun:true for a deterministic, non-mutating preview with exact transforms, model-local bounds, warnings, and a 10-minute planId; then call commit_placement_plan to create those exact placements atomically with slot-to-GUID receipts. align follows path direction; randomizeYaw is used only when align is false.",
       "params": [
         {
           "name": "model",
@@ -10641,7 +11035,7 @@
         },
         {
           "name": "spacing",
-          "description": "Distance between placements (world units)",
+          "description": "Distance between placements (world units; must be > 0)",
           "optional": true,
           "default": 200,
           "type": {
@@ -10650,7 +11044,7 @@
         },
         {
           "name": "jitter",
-          "description": "Max random offset perpendicular to path",
+          "description": "Max random XY offset (must be >= 0)",
           "optional": true,
           "default": 0,
           "type": {
@@ -10659,7 +11053,7 @@
         },
         {
           "name": "min_scale",
-          "description": "Minimum uniform scale per instance (random between min and max). Default 1.",
+          "description": "Minimum positive uniform scale per instance. Default 1.",
           "optional": true,
           "default": 1,
           "type": {
@@ -10668,7 +11062,7 @@
         },
         {
           "name": "max_scale",
-          "description": "Maximum uniform scale per instance. Default 1.",
+          "description": "Maximum positive uniform scale per instance; must be >= min_scale. Default 1.",
           "optional": true,
           "default": 1,
           "type": {
@@ -10691,6 +11085,30 @@
           "default": "PathItem",
           "type": {
             "kind": "string"
+          }
+        },
+        {
+          "name": "align",
+          "description": "Face each instance along its path segment (default false)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "randomizeYaw",
+          "description": "Randomize yaw when align is false (default false)",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
+          }
+        },
+        {
+          "name": "dryRun",
+          "description": "Preview only: return deterministic transforms and planId without creating objects",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
           }
         }
       ]

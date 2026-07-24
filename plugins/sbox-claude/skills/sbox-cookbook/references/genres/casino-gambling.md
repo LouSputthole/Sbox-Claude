@@ -1,5 +1,22 @@
 # Casino-Gambling Genre Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [Build order](#build-order)
+- [Provably-fair rolls (the trust layer)](#provably-fair-rolls-the-trust-layer)
+- [Currency & money-sink design](#currency--money-sink-design)
+- [Anti-cheat & server legitimacy](#anti-cheat--server-legitimacy)
+- [Save / persistence](#save--persistence)
+- [Embedding web-app screens (external-backend posture)](#embedding-web-app-screens-external-backend-posture)
+- [Standout implementation patterns](#standout-implementation-patterns)
+- [Things NOT to copy](#things-not-to-copy)
+- [Which games to read](#which-games-to-read)
+- [Verify live](#verify-live)
+<!-- reference-toc:end -->
+
 How to build a server-authoritative casino / case-opening hub in modern s&box (GameObject/Component/Scene): walk up to a machine, place a stake, watch a provably-fair roll, win or lose currency you never controlled — case opening with weighted rarity, PvP case battles, a jackpot pool, a recent-wins feed, and a deliberate house edge. Distilled from shipped titles `sino.s_sino`, `lavagame.multis_cases`, plus `artisan.darkrpog` and `emg.everything_must_go`.
 
 ## What defines the genre
@@ -20,7 +37,7 @@ The single hardest discipline: **the roll must be server-side and the reveal mus
 
 Compose in roughly this order. Each maps to a deeper system reference where one exists.
 
-1. **Trust boundary first** (`references/systems/networking-authority.md`) — external-backend vs host-authoritative. Everything below changes shape based on this.
+1. **Trust boundary first** (`references/engine/networking-authority.md`) — external-backend vs host-authoritative. Everything below changes shape based on this.
 2. **Currency as a server-held, client-mirrored balance** (`references/systems/economy-currency.md`) — cents-as-strings; the client is a *corrected cache*, never the ledger.
 3. **Weighted loot roll + house-edge / EV tuning** (`references/systems/gacha-loot.md`) — the case open: weighted draw, rarity tiers, and the value normalization that sets the payout %.
 4. **Provably-fair commit/reveal** (pattern below; no dedicated ref) — server-seed-hash + client-seed + nonce so a suspicious player can verify a roll wasn't rigged.
@@ -38,13 +55,12 @@ Build the money pipe and one machine before any second game mode. Vertical-slice
 
 **1. Pick the trust posture and stand up the balance pipe.** The client *displays* a balance it was pushed; it never computes one. Hold money as **cents in a string** so a 12-digit jackpot never touches `long`/`float`.
 
-```csharp
-// sino.s_sino: the client's ONLY balance mirror. Subscribes to every server
-// message that may carry a fresh balance; never does money math itself.
-_subs.Add( mgr.On( "init",    HandleInit ) );      // first push overwrites the cache
-_subs.Add( mgr.On( "balance", HandleBalance ) );   // p.Balance is a cents STRING
-_subs.Add( mgr.On( "levelUpdate", HandleLevelUpdate ) );
-void HandleBalance( JsonElement p ) => UpdateBalance( p.GetProperty("balance").GetString() );
+```text
+client balance mirror:
+  subscribe to initialization, balance, and level-update messages
+  when a balance payload arrives, read cents as a decimal string
+  replace the display cache with the authority-provided value
+  never calculate or mutate authoritative money in the client mirror
 ```
 (sino.s_sino: Code/UI/BalanceHud.razor — subscribes a dozen messages, `UpdateBalance(string cents)`; `CompareCentsStrings` compares by length-then-ordinal so cents never parse to a number.) A validated local `balance_cache.txt` (`^\d+$`) seeds the HUD instantly on boot so the player doesn't see `$0` flash, but it is **cosmetic only** — the first server `init` overwrites it. Details in `references/systems/economy-currency.md`.
 
@@ -67,15 +83,25 @@ public ItemDefinition RollWinner( System.Random rng )
 
 **3. Set the house edge — EV normalization (the money-sink math).** A casino is a money sink by design: the *expected value* of a case must be below its price. Set a target ratio (~0.75 = 25% house edge), scale all item values so the weighted EV lands exactly there, then redistribute anything clipped by a per-item value cap back onto the uncapped items so rarity ratios survive.
 
-```csharp
-// lavagame.multis_cases (paraphrased): make weighted EV == Price * targetRatio.
-float ev = caseDef.PossibleDrops.Sum( i => i.Value * (i.Weight / (float)totalWeight) );
-float scale = (caseDef.Price * targetRatio) / ev;          // e.g. targetRatio 0.75
-foreach ( var i in caseDef.PossibleDrops ) i.Value *= scale;
-// then 3-pass overflow: clamp anything over maxOverride, push the lost EV
-// proportionally onto the uncapped items so the weighted EV still lands.
+```text
+PROCEDURE normalizePayoutPool(casePrice, targetPayoutRatio, weightedItems, valueCap)
+  currentExpectedValue = SUM for each item:
+    item.value * item.weight / totalWeight
+
+  targetExpectedValue = casePrice * targetPayoutRatio
+  scaleFactor = targetExpectedValue / currentExpectedValue
+
+  FOR EACH item:
+    item.value = item.value * scaleFactor
+
+  REPEAT for at most three redistribution passes:
+    clamp values above valueCap
+    measure the weighted expected value lost to clamping
+    IF no weighted value was lost:
+      STOP
+    distribute that loss proportionally across items still below the cap
 ```
-(lavagame.multis_cases: Code/Game/Economy/Cs2CaseApiBuilder.cs NormalizeCaseExpectedValue + RebalanceKnifeValue — the most sophisticated loot-economy math in the corpus; redistributes Gold-pool value onto other rarities so total case EV is unchanged.) This is THE reusable "set the payout %" routine for any gacha/casino. See `references/systems/gacha-loot.md` for the full treatment.
+(lavagame.multis_cases: Code/Game/Economy/Cs2CaseApiBuilder.cs NormalizeCaseExpectedValue + RebalanceKnifeValue — redistributes Gold-pool value onto other rarities so total case EV is unchanged.) This normalization structure applies to any gacha or casino with a target payout percentage. See `references/systems/gacha-loot.md` for the full treatment.
 
 **4. The machine (interaction station → opens a panel).** Every gambling device is the same shape: a world prop + an interactable that just opens the matching panel; the real logic lives in the panel (and on the server).
 
@@ -167,9 +193,9 @@ Because the whole genre is "the client wants to mint money," the security postur
 ## Embedding web-app screens (external-backend posture)
 
 If the real gambling UIs live on the web (sino.s_sino runs React minigames), embed them as in-world `WebPanel`s via **signed one-time ticket URLs**: press the machine → `await` a `panelTicket` from the server over the socket → build `origin?panelTicket=...&lang=xx#/route` → render `<WebPanel Url=@Url />` once it parses. The web app authenticates itself with the ticket.
-(sino.s_sino: `WebPanelUrlBuilder.cs` builds the URL, `GamingTerminalScreenPanel.razor` renders the `WebPanel`, `WebSocketManager.RequestPanelSessionAsync` correlates a `requestId` → `TaskCompletionSource` to turn the pub/sub socket into an awaitable RPC.) This is the pattern for "the real product is a web app on a diegetic monitor." See `references/engine/web-panel-embedding.md` if present, else the `sbox-api` skill for `WebPanel`.
+(sino.s_sino: `WebPanelUrlBuilder.cs` builds the URL, `GamingTerminalScreenPanel.razor` renders the `WebPanel`, `WebSocketManager.RequestPanelSessionAsync` correlates a `requestId` → `TaskCompletionSource` to turn the pub/sub socket into an awaitable RPC.) This is the pattern for "the real product is a web app on a diegetic monitor." See `references/systems/services-backend.md` for the socket/auth plumbing, then use the `sbox-api` skill to verify the installed `WebPanel` API.
 
-## Standout patterns worth copying
+## Standout implementation patterns
 
 - **Engine-as-renderer, server-as-truth:** ship the s&box build with **zero money math** and relay intent over a resilient socket (Disconnected→Connecting→Authenticating→Ready state machine, exponential backoff + jitter, outbound queue flushed on `init`, `On(type,handler)→IDisposable` pub/sub, request/response by `requestId`). The cleanest "real backend" template in the corpus (sino.s_sino: WebSocketManager.cs).
 - **Client is a corrected cache, never the ledger:** money is a server-pushed cents-string the HUD mirrors; a validated local file is cosmetic boot-display only (sino.s_sino: BalanceHud.razor).

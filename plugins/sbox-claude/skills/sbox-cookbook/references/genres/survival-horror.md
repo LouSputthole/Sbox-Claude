@@ -1,5 +1,43 @@
 # Survival-Horror Recipe
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What defines the genre](#what-defines-the-genre)
+- [The system stack to compose](#the-system-stack-to-compose)
+- [The authority idiom that makes it work](#the-authority-idiom-that-makes-it-work)
+- [Build order](#build-order)
+- [How the real games do each piece](#how-the-real-games-do-each-piece)
+  - [Atmosphere — a per-instance flicker FSM, no networking](#atmosphere--a-per-instance-flicker-fsm-no-networking)
+  - [Vitals — owner-local depletion + grace-then-DoT](#vitals--owner-local-depletion--grace-then-dot)
+  - [Round / phase FSM — host enum + entry hooks](#round--phase-fsm--host-enum--entry-hooks)
+  - [The threat — physics-force hazard OR stalking creature](#the-threat--physics-force-hazard-or-stalking-creature)
+  - [Escalating spawner — pity-weighted pick + curve-driven cadence](#escalating-spawner--pity-weighted-pick--curve-driven-cadence)
+  - [Interactor + inventory — hold-to-use eye-trace + tag-as-mutex pickup](#interactor--inventory--hold-to-use-eye-trace--tag-as-mutex-pickup)
+  - [Reward loop — escalating quota with carry-over, or survive-cash + meta-shop](#reward-loop--escalating-quota-with-carry-over-or-survive-cash--meta-shop)
+  - [Death → spectate, and reconnect into a sleeping body](#death--spectate-and-reconnect-into-a-sleeping-body)
+- [Pitfalls (from the mined code)](#pitfalls-from-the-mined-code)
+- [Verify live](#verify-live)
+- [Corpus refresh (2026): more reference implementations](#corpus-refresh-2026-more-reference-implementations)
+  - [Sanity / vitals — frame-rate-independent discrete ticks](#sanity--vitals--frame-rate-independent-discrete-ticks)
+  - [Disaster / threat cascading — sub-disasters and meteor shards](#disaster--threat-cascading--sub-disasters-and-meteor-shards)
+  - [Homing hazard — orbital laser that targets nearest LOS player](#homing-hazard--orbital-laser-that-targets-nearest-los-player)
+  - [Async death with validity re-check (avoid the destroyed-during-await crash)](#async-death-with-validity-re-check-avoid-the-destroyed-during-await-crash)
+  - [Coroutine-based monster AI (IEnumerator as per-actor state machine)](#coroutine-based-monster-ai-ienumerator-as-per-actor-state-machine)
+  - [Runtime procedural mesh with walkable collision (ModelBuilder pattern)](#runtime-procedural-mesh-with-walkable-collision-modelbuilder-pattern)
+  - [Host-migration-safe round timer re-arm](#host-migration-safe-round-timer-re-arm)
+  - [AI Director for adaptive spawn pacing (composed multipliers)](#ai-director-for-adaptive-spawn-pacing-composed-multipliers)
+  - [Bad-luck protection (pity tickets) for role/threat assignment](#bad-luck-protection-pity-tickets-for-rolethreat-assignment)
+  - [Per-recipient outline via ghost clone (wallhack for specific clients only)](#per-recipient-outline-via-ghost-clone-wallhack-for-specific-clients-only)
+  - [First-round grace period using persisted round count](#first-round-grace-period-using-persisted-round-count)
+  - [Parallel-array networking as NetDictionary workaround](#parallel-array-networking-as-netdictionary-workaround)
+  - [Priority-gated transient HUD announcements](#priority-gated-transient-hud-announcements)
+  - [SoundStream — streaming raw PCM audio positionally](#soundstream--streaming-raw-pcm-audio-positionally)
+  - [Tween library as GameObjectSystem](#tween-library-as-gameobjectsystem)
+  - [Per-map disaster tuning via a scene component](#per-map-disaster-tuning-via-a-scene-component)
+  - [Read these games](#read-these-games)
+<!-- reference-toc:end -->
+
 How to build a survival-horror game in modern s&box (GameObject/Component/Scene), distilled from three mined games: `goders.natural_disaster_survival` (a round-based "survive the environmental threat" party game), `mishmaps.backrooms` (a near-pure-atmosphere flickering-maze), and `treehaven.sdiver` (a networked co-op underwater extraction run in the Lethal Company mold).
 
 ## What defines the genre
@@ -118,10 +156,10 @@ public abstract class EnemyBase : Component {
     public virtual void OnAttackPlayer() => Renderer?.Set( "IsAttacking", true );
 }
 ```
-(sdiver: Code/Enemies/BaseEnemy.cs:6.) For a heavier creature brain (chase/missile/melee/death states), the deathmatch-arena recipe's `IEnumerator`-as-state-machine monster AI is the reusable pattern (see `references/genres/deathmatch-arena.md`). **Cap your hazards:** NDS hard-limits live disasters and funnels broken props into a `DebrisManager` that expires them (two index-aligned `NetList`s + `TimeUntil`) so physics load can't blow up (NDS: Code/globals/DebrisManager.cs).
+(sdiver: Code/Enemies/BaseEnemy.cs:6.) For a heavier creature brain with chase, missile, melee, and death states, see the deathmatch-arena recipe's `IEnumerator` state-machine design (`references/genres/deathmatch-arena.md`). **Cap your hazards:** NDS hard-limits live disasters and funnels broken props into a `DebrisManager` that expires them (two index-aligned `NetList`s + `TimeUntil`) so physics load can't blow up (NDS: Code/globals/DebrisManager.cs).
 
 ### Escalating spawner — pity-weighted pick + curve-driven cadence
-Two reusable kernels. **(1) Anti-streak pity table:** roll over a `NetDictionary<T,int>` of weights; after picking, increment *every other* option's weight by 1 and zero the chosen one — self-balancing variety with no permanent exclusion (weight 0 = manual disable).
+Two useful kernels. **(1) Anti-streak pity table:** roll over a `NetDictionary<T,int>` of weights; after picking, increment *every other* option's weight by 1 and zero the chosen one — self-balancing variety with no permanent exclusion (weight 0 = manual disable).
 
 ```csharp
 float roll = Game.Random.Float() * sum;  int acc = 0;
@@ -238,7 +276,7 @@ void AdjustAimDir()
 }
 ```
 
-**Reuse:** `NetDictionary<GameObject, T>` as "per-object state attached by a separate authority component" avoids putting melt data on the target itself — the hazard owns its own bookkeeping. Combine with `ApplyForce` (never transform-set) and a `[Sync] TimeUntil` cleanup gate.
+**State ownership:** a `NetDictionary<GameObject, T>` held by the authoritative hazard keeps per-object melt data off the target itself. Combine it with `ApplyForce` (never transform-set) and a `[Sync] TimeUntil` cleanup gate.
 
 ### Async death with validity re-check (avoid the destroyed-during-await crash)
 
@@ -261,29 +299,22 @@ async void SetIncapacitate()
 
 `ataco.sdoomresurrection` drives all 50+ Doom monster types with `IEnumerator`-per-state methods advanced by `MoveNext()` each animation tic — a net-new pattern not seen elsewhere in the corpus:
 
-```csharp
-// sdoomresurrection: Code/entities/monsters/Monster.cs (condensed)
-IEnumerator currentState;
-void SetState( IEnumerator newState ) { currentState = newState; }
-void OnAnimationTick()                // called each Doom tic (~1/35s)
-{
-    if ( currentState != null && !currentState.MoveNext() )
-        SetState( StateIdle() );
-}
-IEnumerator StateSee()
-{
-    while ( true )
-    {
-        NewChaseDir();
-        yield return null;             // one tic per move step
-    }
-}
-IEnumerator StateMissile()
-{
-    SpawnProjectile();
-    yield return null; yield return null;   // brief windup ticks
-    SetState( StateSee() );
-}
+```text
+state: the actor's current state iterator
+
+set-state(next) replaces the current iterator
+on each animation tic:
+  advance the current iterator once
+  if it finishes, enter the idle iterator
+
+chase iterator:
+  forever choose the next chase direction
+  yield after each movement tic
+
+missile iterator:
+  spawn the projectile
+  yield for the configured windup/recovery tics
+  transition back to chase
 ```
 
 **Why it works:** each "actor state" is an `IEnumerator` you swap in via `SetState()`; `MoveNext()` advances it one step per tick. Multi-step sequences (windup → fire → recover) are just `yield return null` chains with no explicit timer state. This is lighter than a full `IEnumerator`-based coroutine system (no coroutine scheduler needed) and avoids `switch`-on-enum spaghetti for per-state logic. Use it for sprite-based or simple AI enemies where the state machine has many small phases.
@@ -292,16 +323,12 @@ IEnumerator StateMissile()
 
 sdoomresurrection generates Doom's BSP sectors as live s&box geometry with full trace/collision — no `.vmdl` assets at all:
 
-```csharp
-// sdoomresurrection: Code/entities/DoomMap.cs (condensed)
-var mesh = new Mesh();
-mesh.CreateVertexBuffer( verts.Length, MeshLayout, verts );
-var mb = new ModelBuilder();
-mb.AddMesh( mesh );                        // render mesh
-mb.AddCollisionMesh( triVerts, triIdx );   // physics hull
-mb.AddTraceMesh( traceVerts, traceIdx );   // raytrace surface
-go.GetOrAddComponent<ModelRenderer>().Model  = mb.Create();
-go.GetOrAddComponent<ModelCollider>().Model  = mb.Create();
+```text
+create a render mesh and upload the generated vertices with the matching layout
+create one model builder
+add the render mesh, physical collision triangles, and trace triangles
+build the model once
+assign that model to both the target object's ModelRenderer and ModelCollider
 ```
 
 **Note:** `MeshCollider` does NOT exist in s&box — use `ModelCollider` fed a `ModelBuilder`-built model, or `HullCollider` for convex shapes. `AddCollisionMesh` + `AddTraceMesh` on the same builder gives you both physics and `Scene.Trace` in one model. This is the canonical recipe for any dungeon/cave/sector generator that must also be shootable and walkable.
@@ -327,20 +354,14 @@ void ValidateStateAfterMigration()
 
 `despawn.murder`'s `RoundDirector` computes next-spawn time as a base interval multiplied by several independent factors. Each factor returns a float near `1.0`:
 
-```csharp
-// despawn.murder: Systems/Rounds/RoundDirector/RoundDirector.Multipliers.cs (condensed)
-float GetNextSpawnTime()
-{
-    float t = DirectorBaseInterval;
-    t *= PlayerCountMultiplier();       // more players → faster
-    t *= KillInactivityMultiplier();    // nobody dying → faster
-    t *= MilestoneProximityMultiplier();// someone near objective → faster
-    t *= TimePressureMultiplier();      // final 40% of round → faster
-    t *= DiscoveryRateMultiplier();     // found too few recently → faster
-    t = MathX.Clamp( t, MinInterval, MaxInterval );
-    t *= PerMapPenalty;                 // applied AFTER clamp for predictability
-    return t;
-}
+```text
+next spawn interval:
+  start with the director's base interval
+  multiply by independent factors for player count, kill inactivity, objective proximity,
+    late-round pressure, and recent discovery rate
+  clamp the combined interval to global minimum and maximum bounds
+  apply the map-specific factor after clamping
+  return the resulting interval
 ```
 
 **Why composed multipliers beat a single curve:** each axis is independently tunable; disabling one (`return 1f`) has no side effects. Per-map tuning goes in `PerMapPenalty` (or a `MapResource`-style asset component) applied after the clamp so map balance doesn't fight the global range. This pattern directly extends NDS's `IntensityCurve` approach and works for any survival-horror wave cadence — not just clues.
@@ -349,19 +370,16 @@ float GetNextSpawnTime()
 
 `despawn.murder` persists pity ticket counts across sessions:
 
-```csharp
-// despawn.murder: Systems/MurdererTickets/MurdererTicketManager.cs (condensed)
-Dictionary<ulong, int> tickets;   // SteamId → ticket count, loaded from FileSystem.Data JSON
-ulong PickMurderer( List<ulong> candidates )
-{
-    float total = candidates.Sum( id => MathX.Max( 1, tickets[id] ) );
-    float roll  = Game.Random.Float() * total;
-    // cumulative-weight selection → winner
-    foreach ( var id in candidates ) { tickets[id]--; }   // winner loses tickets
-    foreach ( var id in candidates ) { if (id!=winner) tickets[id]++; }
-    Save();
-    return winner;
-}
+```text
+persistent state: ticket count keyed only by player platform identifier
+
+to choose among candidates:
+  assign each candidate a weight equal to at least one ticket
+  perform cumulative weighted selection
+  reduce the selected player's ticket count according to policy
+  increment each non-selected candidate's ticket count
+  persist the updated map
+  return the selected identifier
 ```
 
 **Survival horror application:** use the same pattern to ensure the same player isn't always targeted by the disaster first or always assigned the "it" role in asymmetric horror. The `MathX.Max(1, ...)` floor means even a brand-new player has a baseline chance. Save to `FileSystem.Data` JSON for persistence across sessions — but only store SteamIds, not personal data.
@@ -370,17 +388,13 @@ ulong PickMurderer( List<ulong> candidates )
 
 `despawn.murder`'s radar item shows an outline only to the buyer and dead spectators — no global recolor:
 
-```csharp
-// despawn.murder: Radar.cs (condensed)
-void CreateOutlineForTarget( Diver target )
-{
-    var ghost = target.GetComponent<SkinnedModelRenderer>().GameObject.Clone();
-    ghost.Tags.Add( "outline_ghost" );
-    ghost.GetOrAddComponent<HighlightOutline>().Color = outlineColor;
-    // send ONLY to the buyer and spectators:
-    using var filter = Rpc.FilterInclude( buyerConnection, spectatorConnections );
-    BroadcastSpawnGhost( ghost.Id );
-}
+```text
+to create a scoped target outline:
+  clone only the target's renderer object into a ghost
+  tag the ghost for deterministic cleanup
+  attach or configure its highlight outline
+  build an RPC audience containing the buyer and eligible spectators
+  broadcast the ghost-spawn presentation only inside that audience filter
 ```
 
 **Key technique:** clone the target's renderer into a tagged ghost, apply `HighlightOutline`, then use `Rpc.FilterInclude(...)` so only those specific connections receive the spawn broadcast. Use `Rpc.FilterInclude` + a ghost clone whenever "show this visual hint to only N clients" — never recolor the real object which all clients see. Time-based alpha fade + `Tags`-based cleanup on round end.
@@ -433,19 +447,18 @@ void BroadcastMessage( string msg, int priority )
 
 `ataco.sdoomresurrection` decodes DMX sound lumps to `short[]` and plays them via `SoundStream`:
 
-```csharp
-// sdoomresurrection: Code/doomwad/SoundLoader.cs (condensed)
-short[] samples = DecodeDmxToSigned16( lumpBytes );       // unsigned 8-bit → signed 16-bit
-var stream = new SoundStream( sampleRate, channels: 1 );
-stream.WriteData( samples );
-var snd = stream.Play();
-snd.Position = worldPosition;                              // positional 3D audio
-// schedule disposal: await Task.Delay((int)(samples.Length / sampleRate * 1000));
+```text
+decode the source bytes into signed 16-bit PCM samples
+create a mono SoundStream at the decoded sample rate
+write the samples before playback
+start playback and assign the desired world position
+derive clip duration from sample count and sample rate
+dispose the stream after that duration, with validity checks around the delayed cleanup
 ```
 
 **Why it matters for survival-horror:** you can generate or decode *any* audio format (procedural groans, decoded monster sounds, custom synthesizer output) and play it positionally without a `.vsnd` asset. The `SoundStream` push pattern is the only way to play raw PCM in s&box. Note: dispose the `SoundStream` after the clip finishes — use `Task.Delay` scheduled from the caller (or `TimeSince` polling) since there is no completion callback.
 
-### Tween library as GameObjectSystem (reusable juice layer)
+### Tween library as GameObjectSystem
 
 NDS ships `Braxnet.TweenManager` — a ~340-line `GameObjectSystem` with a sequential+parallel chaining API:
 
@@ -458,7 +471,7 @@ tween.AddFloat( t => myPanel.Opacity = t, from: 0f, to: 1f, duration: 0.3f )
 await tween.Wait();   // TaskCompletionSource-backed, auto-skips if !GameObject.IsValid()
 ```
 
-`.Parallel` marks the next step as concurrent with the previous one (they start at the same time); without it steps run in sequence. `await tween.Wait()` blocks the calling async method. Auto-skips invalid objects so a round-end destroy doesn't throw. **Drop this in instead of per-effect lerp loops** — use it for HUD fades, damage flash, disaster despawn dissolve, "you survived" slide-in.
+`.Parallel` marks the next step as concurrent with the previous one (they start at the same time); without it steps run in sequence. `await tween.Wait()` blocks the calling async method. Auto-skipping invalid objects prevents a round-end destroy from throwing. A centralized tween system can drive HUD fades, damage flashes, disaster despawn dissolves, and "you survived" slide-ins.
 
 ### Per-map disaster tuning via a scene component
 

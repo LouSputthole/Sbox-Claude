@@ -1,5 +1,21 @@
 # Cutscenes, Cinematics & Dialogue (bridge scaffolds)
 
+<!-- reference-toc:start -->
+## Contents
+
+- [What it IS (and when)](#what-it-is-and-when)
+- [Path A — hand-authored camera-shot cutscene (createcutscenedirector)](#path-a--hand-authored-camera-shot-cutscene-createcutscenedirector)
+- [Path B — keyframed .movie clip (Sandbox.MovieMaker)](#path-b--keyframed-movie-clip-sandboxmoviemaker)
+- [Dialogue (createdialoguesystem)](#dialogue-createdialoguesystem)
+- [Multiplayer semantics](#multiplayer-semantics)
+- [Recipes](#recipes)
+  - [1. Intro cinematic on round start (director → unlock input)](#1-intro-cinematic-on-round-start-director--unlock-input)
+  - [2. NPC conversation (interactable → dialogue → reward)](#2-npc-conversation-interactable--dialogue--reward)
+  - [3. Keyframed MovieMaker cutscene from a trigger zone](#3-keyframed-moviemaker-cutscene-from-a-trigger-zone)
+- [Gotchas](#gotchas)
+- [Grounded in](#grounded-in)
+<!-- reference-toc:end -->
+
 Staged story beats, camera flythroughs, and talking NPCs — with the bridge's own scaffolds. Two of these are HAND-AUTHORED, no-asset C# components you generate and tune in the inspector; one is the keyframed `Sandbox.MovieMaker` path that plays a `.movie` clip you author in the editor. Use this whenever you need an intro cinematic, a scripted camera move, a VN-style conversation, or a cutscene triggered from gameplay.
 
 Everything here is grounded in two bridge handler files, not mined games:
