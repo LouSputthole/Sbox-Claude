@@ -372,7 +372,7 @@ codex plugin add ${IDENT}@sboxskins
 
 ### Immutable release
 
-After ${codexTag} is published, pin that tag for a reproducible 2.1.0 install. A pinned marketplace does not advance when main changes.
+After ${codexTag} is published, pin that tag for a reproducible 2.2.0 install. A pinned marketplace does not advance when main changes.
 
 ~~~bash
 codex plugin marketplace add LouSputthole/Sbox-Claude --ref ${codexTag}

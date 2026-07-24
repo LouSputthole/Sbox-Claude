@@ -5,7 +5,7 @@
 First public Codex distribution of the s&box Bridge product family.
 
 - Added the GitHub-backed `sboxskins` Codex marketplace and `sbox-codex-bridge` plugin.
-- Bundled the enabled native s&box MCP endpoint and the pinned, opt-in `sbox-mcp-server@2.1.0` lifeline.
+- Bundled the enabled native s&box MCP endpoint and the pinned, opt-in `sbox-mcp-server@2.2.0` lifeline.
 - Bundled the API brain, code-grounded cookbook, setup, design, build/verify, scaffold, and focused game-development skills.
 - Added reproducible generation, parity checks, product licensing, third-party notices, and install troubleshooting.
 

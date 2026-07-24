@@ -39,7 +39,7 @@ If no lifeline entry exists, add the optional **lifeline** so `read_log`,
 dies with the editor):
 
 ```
-codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.1.0 --lifeline
+codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.2.0 --lifeline
 ```
 
 If the endpoint doesn't answer, stop and help fix it first:

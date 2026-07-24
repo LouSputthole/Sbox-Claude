@@ -30,6 +30,30 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 
 > Source and offline gates are verified; live editor smoke coverage remains pending and is tracked in `TESTING.md`.
 
+## [2.2.0] -- 2026-07-24
+
+### Fixed
+- Rotation/vector arguments arriving through the native MCP gate as stringified JSON
+  objects/arrays are now unwrapped before parsing (shared + strict paths). Comma strings,
+  arrays, and objects all parse; `add_component_to_new_object`/`set_transform` rotation
+  works end-to-end (live-verified in the s&box editor).
+- `start_multiplayer_test`, `multiplayer_test_status`, and `stop_multiplayer_test` are now
+  actually registered in `RegisterHandlers` (they shipped unregistered in 2.1.0) and are
+  exposed through both the TypeScript and native MCP surfaces with parity coverage.
+
+### Changed
+- Multiplayer test harness hardened: private/hidden lobbies, capacity validation,
+  overlapping-run prevention, false-positive join guards, failed-start rollback, and
+  truthful tracking of dead clients and failed cleanup (live-verified: real second
+  client joined, was tracked, and its death was reported honestly).
+- Prefab `[Property]` values documented as authoritative over code defaults; tuning flows
+  through project helpers (see sbox-build-feature gotchas).
+
+### Codex
+- First Codex distribution ships alongside this release: `plugins/sbox-codex-bridge`
+  (marketplace, native editor MCP, optional lifeline diagnostics, API brain, cookbook,
+  and workflow skills). 286 tools / 278 handlers / zero orphans.
+
 ## Codex distribution [2.1.0] -- 2026-07-16
 
 - Prepared the first Codex distribution: the GitHub-backed marketplace, s&box Codex Bridge plugin 2.1.0, native editor MCP, optional lifeline diagnostics, API brain, cookbook, and workflow skills.

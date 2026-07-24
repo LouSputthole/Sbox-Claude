@@ -9,7 +9,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "sbox-mcp-server@2.1.0",
+        "sbox-mcp-server@2.2.0",
         "--lifeline"
       ],
       "enabled": false

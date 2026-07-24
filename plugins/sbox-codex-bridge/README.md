@@ -107,7 +107,7 @@ The bundled `sbox-lifeline` server is disabled by default. Enable it in Codex's 
 If your Codex surface cannot toggle a plugin-provided MCP server, register the same pinned server as a user-level fallback:
 
 ```bash
-codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.1.0 --lifeline
+codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.2.0 --lifeline
 ```
 
 Remove that user-level fallback separately when you no longer need it:
@@ -127,7 +127,7 @@ codex mcp add sbox --url http://127.0.0.1:7269/mcp
 Optionally add editor-down diagnostics; this separate lifeline command requires Node.js, npm/npx, and registry access:
 
 ```bash
-codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.1.0 --lifeline
+codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.2.0 --lifeline
 ```
 
 ## Editor addon (required)

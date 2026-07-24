@@ -90,7 +90,7 @@ The agent runs the `sbox-build-feature` skill as its default workflow.
 ## What's bundled vs. fetched
 
 - The main tool surface is served by the **editor itself** (native MCP server) — nothing to fetch
-- The `sbox-lifeline` stdio server is fetched from npm on first use via `npx -y sbox-mcp-server@2.1.0 --lifeline` (the only part that needs Node)
+- The `sbox-lifeline` stdio server is fetched from npm on first use via `npx -y sbox-mcp-server@2.2.0 --lifeline` (the only part that needs Node)
 - The skills and agent are bundled with the plugin
 - The bridge **addon** (the s&box-side C# code) is **not bundled** — install it from the s&box Asset Library or via the install script (see above)
 

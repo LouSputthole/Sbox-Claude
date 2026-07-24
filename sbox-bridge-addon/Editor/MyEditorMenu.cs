@@ -32,7 +32,7 @@ public static class ClaudeBridge
 
 	// Bridge build version — surfaced in status.json + the Status menu so a
 	// marketplace-addon-vs-MCP-server skew is visible at a glance.
-	internal const string BridgeVersion = "2.1.0";
+	internal const string BridgeVersion = "2.2.0";
 
 	// status.json doubles as a heartbeat. _startedAtIso is stamped once at start;
 	// the heartbeat timestamp is refreshed from the frame loop at most once per

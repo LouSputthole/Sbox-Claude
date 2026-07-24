@@ -1,6 +1,6 @@
 {
   "name": "sbox-codex-bridge",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Build s&box games with Codex through the native editor MCP bridge, an API brain, a code-grounded cookbook, and screenshot-driven workflows.",
   "author": {
     "name": "sboxskins.gg",

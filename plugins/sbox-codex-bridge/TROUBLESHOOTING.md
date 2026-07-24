@@ -17,7 +17,7 @@ For project `Code/` edits, call `trigger_hotload`, then `compile_status`. If an 
 The native server dies with the editor. The bundled `sbox-lifeline` is disabled by default; enable it in plugin MCP settings. If that surface cannot toggle it, register this user-level fallback:
 
 ```bash
-codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.1.0 --lifeline
+codex mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.2.0 --lifeline
 ```
 
 ## A scene mutation is refused
