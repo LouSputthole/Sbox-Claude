@@ -25,6 +25,11 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 
 ### Fixed
 
+- Multiplayer-test clients now launch with the same working directory, instance id,
+  window preference, and process settings as the editor's built-in "Join via new
+  instance" action. Client liveness is cached by an asynchronous watcher, and cleanup
+  performs OS process discovery/kill/wait work off the editor thread, keeping
+  `multiplayer_test_status` and `stop_multiplayer_test` responsive while a client lives.
 - Rotation arguments now semantically unwrap native-stringified JSON objects/arrays before parsing, preserving `pitch`/`yaw`/`roll` keys regardless of property order across shared, strict `set_transform`, camera-bookmark, character/equipment, capture, and `drive_player` paths.
 - The proven multiplayer-test handlers from the installed library are now present in canonical source, registered, exposed through TypeScript/native MCP wrappers, and covered by discovery/status smoke checks. Starts now reject overlap, validate host-plus-client capacity, count joins from a pre-spawn connection baseline, create private/hidden lobbies, and roll back newly created lobbies when every spawn fails; failed client kills remain tracked for truthful retryable cleanup.
 
