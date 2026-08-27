@@ -26,9 +26,10 @@ using System.Threading.Tasks;
 //     Public + visible, so this harness always supplies a private, hidden config.
 //     The SDK defines Private as invite-only; whether -joinlocal bypasses that policy is
 //     intentionally retained as a live P7 smoke requirement in TESTING.md.
-//   • Second client: launch sbox.exe with -joinlocal → boots a REAL game client in
-//     ~80 seconds that auto-joins the local session. (+instanceid N also exists for
-//     numbering — untested, not passed.) The exe is NEVER hardcoded: the editor IS
+//   • Second client: launch sbox.exe with -joinlocal +instanceid N → boots a REAL game
+//     client in ~80 seconds that auto-joins the local session. Launch settings mirror
+//     the editor's built-in "Join via new instance" action. The exe is NEVER hardcoded:
+//     the editor IS
 //     sbox-dev.exe in the install folder, so Path.GetDirectoryName(Environment.ProcessPath)
 //     finds sbox.exe next to it; fallback = the same Steam libraryfolders.vdf scan the
 //     MCP server's log locator uses (sbox-mcp-server/src/tools/diagnostics.ts).
@@ -64,7 +65,7 @@ internal static class MultiplayerTestRunner
 	{
 		public int Pid;
 		public DateTime StartedUtc;
-		public System.Diagnostics.Process Process;   // handle kept so stop can Kill(entireProcessTree:true)
+		public volatile bool Alive = true;
 	}
 
 	// ── Registry of spawned sbox.exe clients (persists across calls; cleared by stop) ──
@@ -82,9 +83,26 @@ internal static class MultiplayerTestRunner
 
 	internal static List<ClientProc> Snapshot() { lock ( _lock ) { return _clients.ToList(); } }
 
-	internal static int AliveCount() { lock ( _lock ) { return _clients.Count( IsAlive ); } }
+	internal static int AliveCount() { lock ( _lock ) { return _clients.Count( c => c.Alive ); } }
 
-	internal static void Track( ClientProc c ) { lock ( _lock ) { _clients.Add( c ); } }
+	internal static void Track( ClientProc c )
+	{
+		lock ( _lock ) { _clients.Add( c ); }
+
+		// Process inspection can block the editor request loop for a live local client.
+		// Keep all OS process work on the thread pool and expose only cached liveness to
+		// status/overlap checks. WaitForExitAsync does not occupy a worker while waiting.
+		_ = Task.Run( async () =>
+		{
+			try
+			{
+				using var proc = System.Diagnostics.Process.GetProcessById( c.Pid );
+				await proc.WaitForExitAsync();
+			}
+			catch { }
+			finally { c.Alive = false; }
+		} );
+	}
 
 	internal static void ResetAfterStop( IEnumerable<ClientProc> remaining )
 	{
@@ -99,11 +117,101 @@ internal static class MultiplayerTestRunner
 		}
 	}
 
-	internal static bool IsAlive( ClientProc c )
+	internal static bool IsAlive( ClientProc c ) => c.Alive;
+
+	internal static void MarkExited( ClientProc c ) => c.Alive = false;
+
+	internal class ClientStopResult
 	{
-		try { if ( c.Process != null ) return !c.Process.HasExited; } catch { }
-		try { System.Diagnostics.Process.GetProcessById( c.Pid ); return true; }
-		catch { return false; }
+		public ClientProc Client;
+		public bool Killed;
+		public string Note;
+		public bool Alive;
+	}
+
+	internal static ClientStopResult StopClient( ClientProc c )
+	{
+		if ( !c.Alive )
+			return new ClientStopResult { Client = c, Note = "already dead", Alive = false };
+
+		try
+		{
+			using var proc = System.Diagnostics.Process.GetProcessById( c.Pid );
+			proc.Kill( entireProcessTree: true );
+			bool exited = proc.WaitForExit( 2000 );
+			if ( exited )
+			{
+				MarkExited( c );
+				return new ClientStopResult { Client = c, Killed = true, Alive = false };
+			}
+
+			return new ClientStopResult
+			{
+				Client = c,
+				Note = "kill requested but process is still alive after 2 seconds; it remains tracked for retry",
+				Alive = true,
+			};
+		}
+		catch ( ArgumentException ex )
+		{
+			// GetProcessById throws ArgumentException when the process has already gone.
+			MarkExited( c );
+			return new ClientStopResult { Client = c, Note = $"{ex.Message}; process no longer appears alive", Alive = false };
+		}
+		catch ( Exception ex )
+		{
+			return new ClientStopResult
+			{
+				Client = c,
+				Note = c.Alive
+					? $"{ex.Message}; process remains alive and tracked for retry"
+					: $"{ex.Message}; process no longer appears alive",
+				Alive = c.Alive,
+			};
+		}
+	}
+
+	internal static List<object> StopStrayClients()
+	{
+		var strays = new List<object>();
+		int ownPid = System.Environment.ProcessId;
+		try
+		{
+			// GetProcessesByName matches the process name exactly: "sbox" is a game
+			// client, while the editor is "sbox-dev". Keep both guards regardless.
+			foreach ( var proc in System.Diagnostics.Process.GetProcessesByName( "sbox" ) )
+			{
+				try
+				{
+					if ( proc.Id == ownPid ) continue;
+					if ( proc.ProcessName.Contains( "dev", StringComparison.OrdinalIgnoreCase ) ) continue;
+					proc.Kill( entireProcessTree: true );
+					strays.Add( new { pid = proc.Id, killed = true } );
+				}
+				catch ( Exception ex )
+				{
+					strays.Add( new { pid = proc.Id, killed = false, note = ex.Message } );
+				}
+				finally { proc.Dispose(); }
+			}
+		}
+		catch ( Exception ex )
+		{
+			strays.Add( new { error = $"stray scan failed: {ex.Message}" } );
+		}
+
+		return strays;
+	}
+
+	internal static void AddUserCommandLineArgs( System.Diagnostics.ProcessStartInfo startInfo, string argumentString )
+	{
+		if ( string.IsNullOrWhiteSpace( argumentString ) )
+			return;
+
+		var args = argumentString.Split( ' ',
+			StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries );
+		foreach ( var arg in args )
+			startInfo.ArgumentList.Add( arg );
 	}
 
 	internal static string BeginJoinWait( int expected, int waitSeconds )
@@ -358,23 +466,41 @@ public class StartMultiplayerTestHandler : IBridgeHandler
 				var psi = new System.Diagnostics.ProcessStartInfo
 				{
 					FileName = exe,
-					Arguments = "-joinlocal",
-					WorkingDirectory = System.IO.Path.GetDirectoryName( exe ),
+					WorkingDirectory = System.Environment.CurrentDirectory,
+					CreateNoWindow = true,
+					RedirectStandardOutput = true,
+					RedirectStandardError = true,
 					UseShellExecute = false,
 				};
+
+				// Match the engine's built-in "Join via new instance" launcher. Each
+				// client needs a distinct local instance id, and the editor preferences
+				// control whether local clients use the smaller windowed launch mode.
+				int instanceCount = System.Diagnostics.Process.GetProcessesByName( "sbox" ).Length;
+				psi.ArgumentList.Add( "-joinlocal" );
+				psi.ArgumentList.Add( "+instanceid" );
+				psi.ArgumentList.Add( (instanceCount + 1).ToString() );
+				if ( EditorPreferences.WindowedLocalInstances )
+				{
+					psi.ArgumentList.Add( "-sw" );
+					psi.ArgumentList.Add( "-720" );
+				}
+				MultiplayerTestRunner.AddUserCommandLineArgs( psi, EditorPreferences.NewInstanceCommandLineArgs );
+
 				var proc = System.Diagnostics.Process.Start( psi );
 				if ( proc == null )
 				{
 					spawnErrors.Add( $"client {i}: Process.Start returned null" );
 					continue;
 				}
+				int pid = proc.Id;
+				proc.Dispose();
 				MultiplayerTestRunner.Track( new MultiplayerTestRunner.ClientProc
 				{
-					Pid = proc.Id,
+					Pid = pid,
 					StartedUtc = DateTime.UtcNow,
-					Process = proc,
 				} );
-				spawned.Add( proc.Id );
+				spawned.Add( pid );
 			}
 			catch ( Exception ex )
 			{
@@ -513,52 +639,10 @@ public class MultiplayerTestStatusHandler : IBridgeHandler
 /// </summary>
 public class StopMultiplayerTestHandler : IBridgeHandler
 {
-	public Task<object> Execute( JsonElement p )
+	public async Task<object> Execute( JsonElement p )
 	{
 		bool disconnect = p.TryGetProperty( "disconnect", out var dEl ) && dEl.ValueKind == JsonValueKind.True;
 		bool alsoStrays = p.TryGetProperty( "alsoStrays", out var sEl ) && sEl.ValueKind == JsonValueKind.True;
-
-		var results = new List<object>();
-		var survivors = new List<MultiplayerTestRunner.ClientProc>();
-		foreach ( var c in MultiplayerTestRunner.Snapshot() )
-		{
-			if ( !MultiplayerTestRunner.IsAlive( c ) )
-			{
-				results.Add( new { pid = c.Pid, killed = false, note = "already dead" } );
-				continue;
-			}
-
-			try
-			{
-				var proc = c.Process;
-				if ( proc == null || proc.HasExited )
-					proc = System.Diagnostics.Process.GetProcessById( c.Pid );
-				proc.Kill( entireProcessTree: true );
-				bool exited = proc.WaitForExit( 2000 );
-				if ( exited )
-				{
-					results.Add( new { pid = c.Pid, killed = true } );
-				}
-				else
-				{
-					survivors.Add( c );
-					results.Add( new { pid = c.Pid, killed = false, note = "kill requested but process is still alive after 2 seconds; it remains tracked for retry" } );
-				}
-			}
-			catch ( Exception ex )
-			{
-				bool alive = MultiplayerTestRunner.IsAlive( c );
-				if ( alive ) survivors.Add( c );
-				results.Add( new
-				{
-					pid = c.Pid,
-					killed = false,
-					note = alive
-						? $"{ex.Message}; process remains alive and tracked for retry"
-						: $"{ex.Message}; process no longer appears alive"
-				} );
-			}
-		}
 
 		object disconnected = null;
 		if ( disconnect )
@@ -583,52 +667,44 @@ public class StopMultiplayerTestHandler : IBridgeHandler
 			}
 		}
 
-		var strays = new List<object>();
-		if ( alsoStrays )
-		{
-			int ownPid = System.Environment.ProcessId;
-			try
-			{
-				// GetProcessesByName matches the process name EXACTLY: "sbox" = sbox.exe game
-				// clients only; the editor is "sbox-dev". Belt-and-braces guards anyway —
-				// never kill the editor or ourselves.
-				foreach ( var proc in System.Diagnostics.Process.GetProcessesByName( "sbox" ) )
-				{
-					try
-					{
-						if ( proc.Id == ownPid ) continue;
-						if ( proc.ProcessName.Contains( "dev", StringComparison.OrdinalIgnoreCase ) ) continue;
-						proc.Kill( entireProcessTree: true );
-						strays.Add( new { pid = proc.Id, killed = true } );
-					}
-					catch ( Exception ex )
-					{
-						strays.Add( new { pid = proc.Id, killed = false, note = ex.Message } );
-					}
-				}
-			}
-			catch ( Exception ex )
-			{
-				strays.Add( new { error = $"stray scan failed: {ex.Message}" } );
-			}
-		}
+		// GetProcessById, Kill, WaitForExit, and stray enumeration can block the
+		// editor request loop in live local-client sessions. Run the entire OS
+		// process portion on worker threads; Networking.Disconnect above stays on the
+		// editor thread as required by engine APIs.
+		var stopTasks = MultiplayerTestRunner.Snapshot()
+			.Select( c => Task.Run( () => MultiplayerTestRunner.StopClient( c ) ) )
+			.ToArray();
+		var strayTask = alsoStrays
+			? Task.Run( MultiplayerTestRunner.StopStrayClients )
+			: Task.FromResult<List<object>>( null );
 
-		var remaining = survivors.Where( MultiplayerTestRunner.IsAlive ).ToList();
+		var stopResults = await Task.WhenAll( stopTasks );
+		var strays = await strayTask;
+		var remaining = stopResults
+			.Where( r => r.Alive && MultiplayerTestRunner.IsAlive( r.Client ) )
+			.Select( r => r.Client )
+			.ToList();
 		MultiplayerTestRunner.ResetAfterStop( remaining );
 		bool stopped = remaining.Count == 0;
+		var results = stopResults.Select( r => (object)new
+		{
+			pid = r.Client.Pid,
+			killed = r.Killed,
+			note = r.Note,
+		} ).ToList();
 
-		return Task.FromResult<object>( new
+		return new
 		{
 			stopped,
 			clients = results,
 			remainingPids = remaining.Select( c => c.Pid ).ToArray(),
 			disconnected,
-			strays = alsoStrays ? strays : null,
+			strays,
 			note = ( stopped
 				? "No tracked client processes remain; the harness registry was cleared."
 				: $"{remaining.Count} tracked client process(es) remain alive and registered; retry stop_multiplayer_test or use alsoStrays:true for explicit recovery." )
 				+ ( disconnect ? " Host session disconnect attempted (see 'disconnected')." : " Host session left as-is — pass disconnect:true to Networking.Disconnect() it." )
 				+ " Killing a connected client leaves benign TcpChannel.SendThread traces in the log.",
-		} );
+		};
 	}
 }
