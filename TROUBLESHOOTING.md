@@ -239,7 +239,7 @@ List the most-recent file there and read it. (And remember §4 — it's the Main
 
 Not an officially supported configuration, but the file-IPC transport is just files on a shared filesystem, so it works where the native `:7269` server (Facepunch's, hosted by the editor via HTTP.sys — which Wine implements only partially) may not.
 
-1. **Confirm the addon side is alive.** Editor → Claude Bridge → Status should read `Running vX.Y.Z` with an IPC path like `C:\users\steamuser\Temp\sbox-bridge-ipc`. That dialog is separate from Preferences → MCP Server; it's normal for one to say Running while the other says Not Running.
+1. **Confirm the addon side is alive.** Editor → Claude Bridge → Status should read `Running vX.Y.Z` with an IPC path like `C:\<prefix-user>\Temp\sbox-bridge-ipc` (`steamuser` on a stock Proton prefix). That dialog is separate from Preferences → MCP Server; it's normal for one to say Running while the other says Not Running.
 2. **Translate the Wine path.** For a stock Proton prefix (s&box is appid 590830):
    ```bash
    find ~/.steam ~/.local/share/Steam -maxdepth 12 -name sbox-bridge-ipc 2>/dev/null
@@ -248,7 +248,7 @@ Not an officially supported configuration, but the file-IPC transport is just fi
 3. **Point the MCP server at it** — absolute paths, `~` does not expand in MCP configs:
    ```json
    { "mcpServers": { "sbox": { "command": "npx", "args": ["-y", "sbox-mcp-server@2"],
-     "env": { "SBOX_BRIDGE_IPC_DIR": "/home/YOU/.steam/steam/steamapps/compatdata/590830/pfx/drive_c/users/steamuser/Temp/sbox-bridge-ipc" } } } }
+     "env": { "SBOX_BRIDGE_IPC_DIR": "/home/<username>/.steam/steam/steamapps/compatdata/590830/pfx/drive_c/users/steamuser/Temp/sbox-bridge-ipc" } } } }
    ```
 4. `read_log` / `get_compile_errors` auto-detect `sbox-dev.log` under `~/.steam/steam`, `~/.local/share/Steam`, Flatpak and Snap libraries (and every library in `libraryfolders.vdf`); set `SBOX_LOG_PATH` only if that misses. The log lives in the Linux-side Steam library, **not** inside the Wine prefix.
 

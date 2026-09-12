@@ -69,7 +69,7 @@ claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2 --lifeline
 file**, not the project directory — the directory form fails with a blocking native dialog:
 
 ```powershell
-& "C:\Program Files (x86)\Steam\steamapps\common\sbox\sbox-dev.exe" -project "C:\Users\you\Documents\s&box projects\mygame\mygame.sbproj"
+& "C:\Program Files (x86)\Steam\steamapps\common\sbox\sbox-dev.exe" -project "C:\Users\<username>\Documents\s&box projects\mygame\mygame.sbproj"
 ```
 
 ---

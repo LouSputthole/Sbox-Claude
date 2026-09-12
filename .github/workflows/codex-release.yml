@@ -25,14 +25,19 @@ jobs:
             node: "18"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    env:
-      CODEX_HOME: ${{ runner.temp }}/codex-home
 
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      # The `runner` context is not available in job-level `env` (GitHub rejects the
+      # workflow at parse time — every run since the file landed failed with zero jobs),
+      # so resolve CODEX_HOME from a step and export it for the rest of the job.
+      - name: Resolve Codex home
+        shell: bash
+        run: echo "CODEX_HOME=${RUNNER_TEMP}/codex-home" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v5
         with:
