@@ -21,7 +21,7 @@ not an exhaustive pass over every tool. The surface under test: **273 native too
 
 | # | Gate | Command | Needs editor? | What it proves |
 |---|------|---------|---------------|----------------|
-| 1 | Node tests | `cd sbox-mcp-server && npm test` | no | 12 tests over the transport client: heartbeat-staleness classification, timeout diagnostics (which side stalled), `SBOX_BRIDGE_IPC_DIR` override, `isConnected` false-positive regression |
+| 1 | Node tests | `cd sbox-mcp-server && npm test` | no | 31 tests: transport client (heartbeat-staleness, timeout diagnostics, `SBOX_BRIDGE_IPC_DIR` override, `isConnected` regression), an in-process fake editor driving the full file-IPC round-trip (atomic write, `protocolVersion`, modal-stall diagnostics, loud parse failures), a sweep of every registered tool's zod schema + the shared vector contract, and per-platform `sbox-dev.log` detection |
 | 2 | Quality gate | `node scripts/audit-mcp-quality.mjs` | no | no tool-name collisions with native built-ins (collisions are SILENT tool loss — hard fail) + description quality (5-point summary, param docs) |
 | 3 | Parity gate | `node scripts/audit-parity.mjs` | no | TS tools ↔ C# handlers parity, every concrete `IBridgeHandler` has a registration factory, and the 4-way version lock holds while the compatibility fallback ships |
 | 4 | Codegen freshness | `node scripts/extract-manifest.mjs && node scripts/emit-mcp-wrappers.mjs && git diff --exit-code -- scripts/tools-manifest.json sbox-bridge-addon/Editor/Mcp docs/TOOLSETS.md` | no | nobody edited a zod schema without regenerating, or hand-edited a generated file |
@@ -93,6 +93,11 @@ Run after any addon change reaches the live project (sync with absolute paths �
 | 9 | `get_bounds` and `find_objects_near` around the test prop | aggregate/render/physics/solidPhysics provenance is explicit; nearby results are nearest-first pivot distances | [ ] |
 | 10 | Save two camera bookmarks, run `capture_camera_set` twice with `comparePrevious:true`, call `capture_topdown`, then delete the bookmarks | ordered inline PNGs + labeled manifests; second set has comparable RGBA metrics; top-down scale metadata is present; deletion removes baselines | [ ] |
 | 11 | Pass out-of-order `rotation:{yaw:90,roll:0,pitch:0}` objects through `set_transform`, `save_camera_bookmark`, and `capture_view`; also smoke `spawn_citizen`/`equip_model` with a comma string; clean up all artifacts | returned receipts preserve yaw=90 regardless of JSON property order; captures and character/equipment calls avoid string-conversion errors | [ ] |
+| 12 | `get_scene_hierarchy namesOnly:true maxDepth:2` on a dressed scene, then `find_objects name:"a" limit:5` | compact `{id,name,childCount}` nodes only, a few kB; find reports `total` > `showing`, `truncated:true` and a note | [ ] |
+| 13 | Edit an EXISTING project `.cs` (bump a `Log.Info` marker), `trigger_hotload`, poll `get_bridge_status.gameAssembly` | `assemblyBefore.mvid` returned; `gameAssembly.mvid` changes once the recompile lands; `invoke_button` then runs the new marker | [ ] |
+| 14 | `create_sound_event path:"sounds/__verify.sound"` then `read_file` the returned `path`; `get_prefab_info` with both `Assets/prefabs/x.prefab` and `prefabs/x.prefab` | file lands under `Assets/sounds/`, response has `path` + `assetPath`; both prefab forms resolve | [ ] |
+| 15 | With the legacy IPC server: open a modal in the editor (e.g. edit a `.scene` on disk to trigger "External Changes Detected"), call `get_bridge_status` | summary says the PROCESS is alive but the MAIN THREAD is stalled (`blockedBy`), not "not connected"; `status.json` `processHeartbeat` keeps ticking | [ ] |
+| 16 | Legacy IPC: send the same `req_<id>.json` twice (copy the file back after the first response) | second copy is logged as "Ignored replayed request" and never executes; `set_property` on `Terrain.Enabled` is refused with the landmine explanation | [ ] |
 
 ---
 

@@ -34,7 +34,7 @@ export function registerObjectTools(
   // ── find_objects ───────────────────────────────────────────────────
   server.tool(
     "find_objects",
-    "Query the scene for GameObjects by name (case-insensitive substring), component type name, and/or tag — combine filters (AND). Returns {id,name} for matches (limit default 50, max 500). Read-only; works during play. Use it to get GUIDs to feed into align/distribute/set_tint/group/delete/etc.",
+    "Query the scene for GameObjects by name (case-insensitive substring), component type name, and/or tag — combine filters (AND). Returns { count, total, showing, truncated, objects:[{id,name}] } — total is EVERY match in the scene, showing/count how many rows were returned (limit default 50, max 500), truncated:true when rows were cut so you can raise limit or narrow the filter. Read-only; works during play. Use it to get GUIDs to feed into align/distribute/set_tint/group/delete/etc.",
     {
       name: z.string().optional().describe("Name substring (case-insensitive)"),
       component: z

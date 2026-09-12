@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { BridgeClient } from "../transport/bridge-client.js";
+import { BridgeClient, STATUS_STALE_MS, ipcWarn } from "../transport/bridge-client.js";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -20,7 +20,7 @@ try {
 
 /**
  * Diagnostic and health-check tool (get_bridge_status).
- * Reports connection state, latency, host/port, and editor version.
+ * Reports connection state, latency, IPC directory, heartbeats, and editor version.
  */
 export function registerStatusTools(
   server: McpServer,
@@ -29,15 +29,20 @@ export function registerStatusTools(
   // ── get_bridge_status ────────────────────────────────────────────
   server.tool(
     "get_bridge_status",
-    "Check the s&box Bridge connection — call this FIRST in a session. Returns a human summary plus JSON: connected, roundTripOk (heartbeat can be fresh while the editor's request loop is stalled — trust roundTripOk), bridgeVersion vs mcpServerVersion + versionsAligned (a mismatch means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs, latencyMs, and ipcDir (transport is file IPC; host/port are legacy fields).",
+    "Check the s&box Bridge connection — call this FIRST in a session. Returns a human summary plus JSON: connected, roundTripOk (heartbeat can be fresh while the editor's request loop is stalled — trust roundTripOk), bridgeVersion vs mcpServerVersion + versionsAligned (a mismatch means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs, processHeartbeatAgeMs + blockedBy (editor process alive but main thread stalled = a modal dialog is open), gameAssembly (fingerprint that changes on every hotload — compare against trigger_hotload's assemblyBefore), latencyMs, and ipcDir (transport is file IPC).",
     {},
     async () => {
       const connected = bridge.isConnected();
       const ipcDir = bridge.getIpcDir();
-      const heartbeatAgeMs = bridge.getHeartbeatAgeMs();
+      const st = bridge.readStatus();
+      const heartbeatAgeMs = st.heartbeatMs;
+      const processHeartbeatAgeMs = st.processHeartbeatMs;
+      const processAlive =
+        processHeartbeatAgeMs !== null && processHeartbeatAgeMs <= STATUS_STALE_MS;
       let latencyMs: number | null = null;
       let bridgeVersion: string | null = null;
       let handlerCount: number | null = null;
+      let gameAssembly: unknown = null;
       let roundTripOk = false;
 
       if (connected) {
@@ -53,9 +58,11 @@ export function registerStatusTools(
             const data = res.data as Record<string, unknown>;
             bridgeVersion = (data.version as string) ?? null;
             handlerCount = (data.handlerCount as number) ?? null;
+            gameAssembly = data.gameAssembly ?? null;
           }
-        } catch {
-          // Non-fatal
+        } catch (err) {
+          // Non-fatal — reported in the summary as roundTripOk:false.
+          ipcWarn(`get_bridge_status round-trip failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
 
@@ -66,22 +73,25 @@ export function registerStatusTools(
         connected,
         ipcDir,
         heartbeatAgeMs,
+        processHeartbeatAgeMs,
+        blockedBy: st.blockedBy,
+        protocolVersion: st.protocolVersion,
         roundTripOk,
         bridgeVersion,
         mcpServerVersion: SERVER_VERSION,
         versionsAligned,
         handlerCount,
+        gameAssembly,
         latencyMs: connected ? latencyMs : null,
         lastPong: connected
           ? new Date(bridge.getLastPongTime()).toISOString()
           : null,
-        // legacy/cosmetic — there is no socket; transport is file IPC
-        host: bridge.getHost(),
-        port: bridge.getPort(),
       };
 
       let text: string;
-      if (!connected) {
+      if (!connected && processAlive) {
+        text = `Bridge NOT responding — the editor PROCESS is alive (addon poll thread beat ${processHeartbeatAgeMs}ms ago) but its MAIN THREAD has not ticked for ${heartbeatAgeMs ?? "?"}ms${st.blockedBy ? ` (${st.blockedBy})` : ""}. This is almost always a modal dialog (e.g. "External Changes Detected") — bring the editor to the foreground and dismiss it. IPC: ${ipcDir}.`;
+      } else if (!connected) {
         text = `Bridge NOT connected — no recent heartbeat in ${ipcDir}. Is s&box running with the Claude Bridge addon?`;
       } else if (roundTripOk) {
         text = `Bridge connected and responding — addon v${bridgeVersion ?? "?"} / server v${SERVER_VERSION}, ${handlerCount ?? "?"} handlers (IPC: ${ipcDir}, heartbeat ${heartbeatAgeMs ?? "?"}ms ago).${versionsAligned ? "" : ` ⚠️ Version mismatch — restart Claude Code (and/or republish the addon) so the MCP server and addon match.`}`;
@@ -120,8 +130,9 @@ export function registerStatusTools(
       // Fire the restart. The editor closes mid-request, so a timeout/no-response here is EXPECTED.
       try {
         await bridge.send("restart_editor", { save: params.save ?? true }, 5000);
-      } catch {
+      } catch (err) {
         /* editor going down — expected */
+        ipcWarn(`restart_editor: send failed while the editor went down (expected): ${err instanceof Error ? err.message : String(err)}`);
       }
 
       const waitMs = params.waitMs ?? 150000;
@@ -147,8 +158,9 @@ export function registerStatusTools(
                 ],
               };
             }
-          } catch {
+          } catch (err) {
             /* still settling — keep polling */
+            ipcWarn(`restart_editor: bridge still settling: ${err instanceof Error ? err.message : String(err)}`, true);
           }
         }
       }

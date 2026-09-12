@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
+import { Vector3Schema, RotationSchema } from "../shared/schemas.js";
 
 /**
  * Visual & atmosphere tools (Batch 17): lighting, post-processing, fog, sky,
@@ -28,19 +29,6 @@ const ColorSchema = z
     z.string().describe('Comma string "r,g,b,a", e.g. "1,0,0,1"'),
   ])
   .describe('RGBA colour — object {r,g,b,a} (0-1) OR comma string "r,g,b,a"');
-
-const Vector3Object = z.object({ x: z.number(), y: z.number(), z: z.number() });
-
-const Vector3Schema = z
-  .union([
-    Vector3Object,
-    z.string().describe('Comma string "x,y,z", e.g. "0,0,200"'),
-  ])
-  .describe('World position — object {x,y,z} OR comma string "x,y,z"');
-
-const RotationSchema = z
-  .object({ pitch: z.number(), yaw: z.number(), roll: z.number() })
-  .describe("Rotation {pitch,yaw,roll} in degrees");
 
 export function registerVisualTools(server: McpServer, bridge: BridgeClient): void {
   // ── add_light ──────────────────────────────────────────────────────

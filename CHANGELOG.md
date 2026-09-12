@@ -6,6 +6,29 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 
 ### Added
 
+- `get_scene_hierarchy namesOnly:true` — compact `{id,name,childCount,children}` tree (no
+  components/enabled) so a "what is in this scene" overview on a dressed scene stays a few kB
+  instead of overflowing the result budget (#16).
+- `find_objects` now reports `total` / `showing` / `truncated` (+ a note) so a capped list can
+  no longer look complete (#16).
+- `trigger_hotload` returns `assemblyBefore` (the live game-assembly MVID) and `get_bridge_status`
+  returns `gameAssembly`; poll until the MVID changes before trusting `invoke_button` after
+  editing an existing `.cs` — the nudge is asynchronous and successful compiles log nothing (#15).
+- `status.json` heartbeat now runs on the addon's poll-timer thread and publishes `heartbeat`
+  (main thread), `processHeartbeat` (poll thread), `mainThreadStalledMs` and `blockedBy`, so a
+  modal editor dialog ("External Changes Detected") reads as *process alive, main thread
+  blocked* instead of looking identical to a crash. `get_bridge_status` and request-timeout
+  errors say so (#14).
+- IPC `protocolVersion` stamped on every request and in `status.json`; the addon refuses
+  requests from a newer protocol with a readable error (#22).
+- `sbox-dev.log` auto-detection on Linux and macOS (`~/.steam/steam`, `~/.local/share/Steam`,
+  Flatpak, Snap, `~/Library/Application Support/Steam`, plus every library in
+  `libraryfolders.vdf`) — previously gated on Windows so `read_log` was empty off-Windows
+  without `SBOX_LOG_PATH` (#10).
+- 19 new Node tests (31 total): an in-process fake editor drives the full file-IPC round-trip
+  (atomic write, `protocolVersion`, modal-stall diagnostics, loud parse failures), every
+  registered tool's zod schema is swept, the shared vector contract is checked in both wire
+  forms, and log detection is verified per platform (#21).
 - Deterministic `dryRun:true` placement plans for `place_along_path`, `grid_duplicate`, and `scatter_props`, plus `commit_placement_plan` for exact, rollback-protected creation with slot-to-GUID receipts.
 - `inspect_model_geometry` for model-local render/physics bounds, footprint, height, and pivot-to-ground offsets before placement.
 - Provenance-rich `get_bounds` aggregates for render, all physics, and non-trigger physics, plus play-aware `find_objects_near`.
@@ -14,6 +37,29 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 
 ### Changed
 
+- File-IPC request files are renamed to a `req_<id>.json.processing` sentinel when picked up
+  and deleted only AFTER the response is written (was: deleted immediately after reading,
+  before processing). A timeout can now say "picked up, still executing" vs "never picked up",
+  and an editor crash mid-handler leaves the request on disk where the next session sweeps
+  and logs it by command instead of losing it silently. Processed request ids are remembered
+  for 5 minutes so a replayed/duplicate request is a no-op rather than a second
+  `create_gameobject` (#19, #20).
+- Every formerly-silent `catch {}` on the transport path (TS `bridge-client.ts`, C# poller)
+  now logs: malformed `status.json`, unreadable/undeletable IPC files, poll errors (once per
+  distinct message), and an unparseable response fails the request within ~250 ms with the
+  first 200 chars instead of spinning to the 30 s timeout (#18).
+- `create_sound_event`, `create_material` and `create_prefab` resolve relative paths under
+  `Assets/` (a `.sound` written at the project root compiled and previewed but the runtime
+  could not load it) and return both `path` (project-relative) and `assetPath`
+  (engine-relative); `get_prefab_info` / `instantiate_prefab` accept either form (#13).
+- `set_property` refuses `Terrain.ClipMapLodExtentTexels` and `Terrain.Enabled` (both kill
+  terrain rendering until scene reload; the former NREs on every later load once saved) (#12).
+- Screenshot tool descriptions document two engine capture limits: UI text may rasterise as
+  solid boxes, and Terrain renders as a truncated ribbon from any temporary camera (#11, #12).
+- Vector3 / Rotation zod schemas live in `src/shared/schemas.ts` instead of being re-declared
+  in eight tool modules; `camera.ts` / `diagnostics.ts` keep their strict variants on purpose (#22).
+- Removed the dead `host` / `port` fields from `BridgeClient`, `get_bridge_status`, `--help`
+  and the `SBOX_BRIDGE_HOST` / `SBOX_BRIDGE_PORT` env vars — there has never been a socket (#23).
 - `set_transform` now pre-parses every supplied value, supports explicit world/local space, returns before/after receipts, and rolls back if apply or receipt construction fails.
 - `batch_set_property` dry runs now perform the same coercion/reference resolution as apply, distinguish changes from no-ops, and avoid needless setters.
 - Scatter placement now rejects error models and invalid ranges, preserves fixed non-unit scale, and grounds model bottoms using traced end positions plus model-local pivot offsets.

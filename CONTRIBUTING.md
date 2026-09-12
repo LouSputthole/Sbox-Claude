@@ -104,7 +104,8 @@ dependable loop:
 2. **`restart_editor`.** The Libraries file-watcher is unreliable for external edits
    ([docs/BRIDGE_GOTCHAS.md](docs/BRIDGE_GOTCHAS.md) #9) — a restart is THE recompile loop
    (~5–7 min on a real project). If the addon itself is compile-broken (bridge tools dead),
-   kill + relaunch `sbox-dev.exe -project <sbproj>` from the shell.
+   kill + relaunch `sbox-dev.exe -project "<full path to the .sbproj FILE>"` from the shell —
+   the directory form fails with a blocking native dialog.
 3. **Fingerprint:** `get_bridge_status` → `handlerCount` must match the new registration
    count. Successful compiles log NOTHING; only failures log `Compile of 'X' Failed`.
 4. **Live gate:** `node scripts/verify-native-mcp.mjs` against the open editor. See

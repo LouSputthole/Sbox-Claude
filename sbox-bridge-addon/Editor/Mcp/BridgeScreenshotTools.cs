@@ -17,7 +17,9 @@ public static class BridgeScreenshotTools
 	/// <summary>
 	/// Screenshot the scene's main camera view (the player's view in play mode) and return it
 	/// as an inline PNG image. To frame a specific object or position instead, use capture_view
-	/// or screenshot_orbit.
+	/// or screenshot_orbit. KNOWN CAPTURE LIMIT (engine, not bridge): text in ScreenPanel/Razor
+	/// labels may rasterise as solid boxes while images and layout are correct — a blank HUD in
+	/// a capture is NOT a HUD bug; verify text another way (e.g. a Log.Info of the bound value).
 	/// </summary>
 	/// <param name="width">Image width in pixels (16-3840). Default 1280.</param>
 	/// <param name="height">Image height in pixels (16-2160). Default 720.</param>
@@ -31,6 +33,11 @@ public static class BridgeScreenshotTools
 	/// Pass id to auto-frame a GameObject (3/4 elevated view sized to its bounds), or position
 	/// (+ lookAt or rotation) for a free camera. With neither, captures the main camera view.
 	/// Uses a temporary camera that is removed afterwards — the scene is left unchanged.
+	/// KNOWN CAPTURE LIMITS (engine, not bridge): text in ScreenPanel/Razor labels may rasterise as
+	/// solid boxes (the font atlas is not resolved for the capture pass — images and layout are
+	/// correct, so a blank HUD here is NOT a HUD bug; verify text another way), and Terrain
+	/// renders as a truncated ribbon from any temporary camera because its clipmap centres on
+	/// the editor/main camera — verify terrain scenes with take_screenshot or in play mode.
 	/// </summary>
 	/// <param name="id">GUID of a GameObject to auto-frame (from get_scene_hierarchy or find_objects).</param>
 	/// <param name="position">Camera position as "x,y,z".</param>
@@ -49,7 +56,9 @@ public static class BridgeScreenshotTools
 
 	/// <summary>
 	/// Frame a GameObject or a free camera position and return the shot as an inline PNG image.
-	/// Same as capture_view (kept under its historical name — existing workflows use it).
+	/// Same as capture_view (kept under its historical name — existing workflows use it), with the
+	/// same capture limits: UI text may rasterise as boxes, and Terrain renders truncated from a
+	/// temporary camera (clipmap centres on the main camera) — verify terrain via take_screenshot.
 	/// </summary>
 	/// <param name="id">GUID of a GameObject to auto-frame.</param>
 	/// <param name="position">Camera position as "x,y,z".</param>
@@ -67,7 +76,8 @@ public static class BridgeScreenshotTools
 	/// <summary>
 	/// Capture a GameObject from several angles in ONE call — orbits around the object and
 	/// returns every angle as an inline PNG image, so 3D work can be verified from multiple
-	/// sides instead of guessed from one.
+	/// sides instead of guessed from one. Temporary-camera limits apply: Terrain renders as a
+	/// truncated ribbon (clipmap centres on the main camera) and UI text may rasterise as boxes.
 	/// </summary>
 	/// <param name="id">GUID of the GameObject to orbit.</param>
 	/// <param name="shots">Number of angles around the object (2-8). Default 4.</param>

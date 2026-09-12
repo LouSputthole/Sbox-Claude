@@ -517,6 +517,54 @@ the editor was restarted. Engine-internal state; nothing the addon can reach or 
 suddenly NREs everywhere right after a hotload, don't debug your code first — restart,
 then retry.
 
+## 18. Captures render UI text as solid boxes — that is NOT a HUD bug
+
+**Symptom:** `take_screenshot` / `capture_view` / `screenshot_orbit` show every `ScreenPanel`
+label as a filled rectangle with no glyphs; images and layout are fine. Easy to mistake for a
+"HUD text is blank" bug and burn a session on it.
+
+**Why:** The capture pass renders before the font atlas is resolved for that frame — the
+running game draws the text perfectly (a `PrintWindow` grab of the editor shows it). Engine
+behaviour; the tool descriptions now say so.
+
+**Fix:** Verify HUD text another way — `Log.Info` the bound value, `get_runtime_property`, or
+a human look — and treat glyph-less boxes in a capture as *expected*.
+
+## 19. Terrain renders as a truncated ribbon from temporary cameras
+
+**Symptom:** `capture_view` / `screenshot_from` / `screenshot_orbit` show the terrain cut off
+around one spot, with props "floating" beyond it; the same map looks perfect in play mode via
+`take_screenshot`.
+
+**Why:** Terrain's clipmap renderer centres on the **editor / main camera**, not on the
+temporary capture camera, so the high-detail region sits wherever the editor camera is. (SDK
+26.07.22.)
+
+**Fix:** Judge terrain with `take_screenshot` (main camera) or in play mode; use the temp
+cameras for props and layout only. Two related landmines are now refused by `set_property`:
+`Terrain.ClipMapLodExtentTexels` and `Terrain.Enabled` both stop terrain rendering until the
+scene is reloaded, and a scene that *serialises* `ClipMapLodExtentTexels` NREs in
+`CreateClipmapSceneObject` on every load.
+
+## 20. A modal editor dialog starves the bridge — and used to look exactly like a crash
+
+**Symptom:** Every call hits "the editor main thread didn't pick this call up within 30
+seconds" while the game session keeps running (physics/state-machine logs continue). Synthetic
+input can't dismiss the dialog.
+
+**Why:** Tools run on the editor main thread; "External Changes Detected" (a `.scene` modified
+on disk) and similar native dialogs block it while the process stays alive. Before this fix the
+file-IPC heartbeat was written from that same thread, so it went stale and reported the
+editor as dead.
+
+**Fix:** The addon now beats from its poll-timer thread and publishes `blockedBy` /
+`processHeartbeat` in `status.json`; `get_bridge_status` (lifeline) and timeout errors say
+*process alive, main thread stalled*. Dismiss the dialog in the editor. If you must relaunch:
+`sbox-dev.exe -project "<full path to the .sbproj FILE>"` — the directory form fails with
+another blocking dialog. `multiplayer_test_status` is unreachable during such a stall for the
+same reason; the join/spawn lines in `sbox-dev.log` (lifeline `read_log`) remain the reliable
+signal.
+
 ## Quick reference
 
 | Symptom | Not fixable because… | Do this |
@@ -541,3 +589,6 @@ then retry.
 | Panel type resolves oddly / appears twice | Razor panels get a folder-derived namespace; sibling `.cs` stays global | use the fully-qualified name from `search_types`, or pin one with `@namespace` |
 | Hand-rolled camera effect fights a built-in | SDK added `AddShake`/`AddPunch`/`AddTilt` on CameraComponent | `describe_type` before building feel effects; `create_camera_effects` wraps the built-ins — don't stack unknowingly |
 | `MovieRecorder.Start()` NREs from every assembly after a hotload | hotload transiently corrupted the recording machinery globally (seen once) | `restart_editor`, then retry — don't debug your code first |
+| HUD labels are solid boxes in captures | capture pass runs before the font atlas resolves | verify text via `Log.Info` / runtime property; images + layout are still trustworthy |
+| Terrain cut off / props floating in `capture_view` | clipmap centres on the main camera, not the temp one | judge terrain with `take_screenshot` / play mode; never set `Terrain.ClipMapLodExtentTexels` or `Terrain.Enabled` via `set_property` |
+| Every call times out but the game keeps running | a modal dialog blocks the main thread | `get_bridge_status` now says *process alive, main thread stalled*; dismiss it, or relaunch with the full `.sbproj` path |

@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
+import { Vector3Schema, RotationOrStringSchema as RotationSchema } from "../shared/schemas.js";
 
 /**
  * GameObject lifecycle, hierarchy, and selection tools.
@@ -12,34 +13,6 @@ import { BridgeClient } from "../transport/bridge-client.js";
  * Uses shared Zod schemas (Vector3Schema, RotationSchema) for consistent
  * Vector3 and Rotation parameter validation across multiple tools.
  */
-
-// A 3D vector accepted as EITHER an object {x,y,z} OR a comma string "x,y,z".
-// The value is passed through to the bridge unchanged; the C# handler parses
-// both forms (C# is the source of truth for parsing). See the cross-language
-// vector/color contract.
-const Vector3Object = z.object({
-  x: z.number().describe("X coordinate"),
-  y: z.number().describe("Y coordinate"),
-  z: z.number().describe("Z coordinate"),
-});
-
-const Vector3Schema = z
-  .union([
-    Vector3Object,
-    z.string().describe('Comma string "x,y,z", e.g. "0,0,200"'),
-  ])
-  .describe('3D vector — object {x,y,z} OR comma string "x,y,z"');
-
-const RotationSchema = z
-  .union([
-    z.object({
-      pitch: z.number().describe("Pitch angle in degrees"),
-      yaw: z.number().describe("Yaw angle in degrees"),
-      roll: z.number().describe("Roll angle in degrees"),
-    }),
-    z.string().describe('Comma string "pitch,yaw,roll", e.g. "0,90,0"'),
-  ])
-  .describe('Euler rotation: object {pitch,yaw,roll} OR comma string "pitch,yaw,roll"');
 
 export function registerGameObjectTools(
   server: McpServer,
@@ -212,7 +185,7 @@ export function registerGameObjectTools(
   // ── get_scene_hierarchy ──────────────────────────────────────────
   server.tool(
     "get_scene_hierarchy",
-    "Get the scene tree — GameObjects with their names, GUIDs, components, and parent/child relationships. Pair maxDepth with rootId to drill into a subtree without paying for the whole scene",
+    "Get the scene tree — GameObjects with their names, GUIDs, components, and parent/child relationships. Pair maxDepth with rootId to drill into a subtree without paying for the whole scene. On a dressed scene (hundreds of objects) pass namesOnly:true first — it returns just {id,name,childCount} per object (no components/enabled) so a 'what is in this scene' overview stays a few kB instead of overflowing the result budget; then drill into one subtree with rootId",
     {
       maxDepth: z
         .number()
@@ -224,6 +197,10 @@ export function registerGameObjectTools(
         .string()
         .optional()
         .describe("Optional GUID of a GameObject to start traversal from. Omit to walk from the scene roots"),
+      namesOnly: z
+        .boolean()
+        .optional()
+        .describe("true = compact tree: {id, name, childCount, children} only, no components or enabled flags. Default false"),
     },
     async (params) => {
       const res = await bridge.send("get_scene_hierarchy", params);

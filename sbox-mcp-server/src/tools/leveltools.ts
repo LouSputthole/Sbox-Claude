@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
+import { Vector3Schema } from "../shared/schemas.js";
 
 /**
  * Scene & level-building tools (Batch 21): snap-to-ground, align, distribute,
@@ -11,15 +12,6 @@ import { BridgeClient } from "../transport/bridge-client.js";
 // Vector / colour accepted as EITHER an object OR a comma string, passed
 // through unchanged. The C# handler parses both forms (source of truth). See
 // the cross-language vector/color contract.
-const Vector3Object = z.object({ x: z.number(), y: z.number(), z: z.number() });
-
-const Vector3Schema = z
-  .union([
-    Vector3Object,
-    z.string().describe('Comma string "x,y,z", e.g. "100,100,100"'),
-  ])
-  .describe('Vector — object {x,y,z} OR comma string "x,y,z"');
-
 const ColorObject = z.object({
   r: z.number().min(0),
   g: z.number().min(0),

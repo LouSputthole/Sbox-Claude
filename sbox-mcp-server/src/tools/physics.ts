@@ -1,21 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
+import { Vector3Schema } from "../shared/schemas.js";
 
 /**
  * Physics tools: add_physics, add_collider, add_joint, raycast.
  * Manages rigidbodies, colliders, physics constraints, and ray tracing.
  */
-
-// A 3D vector accepted as EITHER an object {x,y,z} OR a comma string "x,y,z",
-// passed through unchanged. The C# handler parses both forms (source of truth).
-// See the cross-language vector/color contract.
-const Vector3Schema = z
-  .union([
-    z.object({ x: z.number(), y: z.number(), z: z.number() }),
-    z.string().describe('Comma string "x,y,z", e.g. "0,0,200"'),
-  ])
-  .describe('3D vector — object {x,y,z} OR comma string "x,y,z"');
 
 export function registerPhysicsTools(
   server: McpServer,

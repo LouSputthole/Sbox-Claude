@@ -3,64 +3,79 @@ import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
 import { existsSync, readFileSync, statSync } from "fs";
 import { join } from "path";
+import { homedir } from "os";
 import { inlineCaptureReply } from "./camera.js";
 
 /**
- * Diagnostic tools (Batch 24 — "let Claude see its own errors"): read s&box's
- * editor log so Claude can check compile errors, exceptions, and Log.Info
- * output directly — instead of flying blind or relying on the user to relay
- * them.
- *
- * Deliberately reads the log FILE on the Node side (not over the bridge IPC),
- * so it works even when the s&box editor has crashed and the bridge is down —
- * which is exactly when you need the log most.
- *
  * Log path resolution:
- *   1. SBOX_LOG_PATH env var (explicit override — use this on macOS/Linux or
- *      non-Steam installs).
- *   2. Windows Steam auto-detect: parse steamapps/libraryfolders.vdf for each
- *      library, look for steamapps/common/sbox/logs/sbox-dev.log, pick newest.
+ *   1. SBOX_LOG_PATH env var (explicit override — use this for non-Steam installs
+ *      or when the auto-detect below misses; on Proton the log lives in the
+ *      Linux-side Steam library, NOT the Wine prefix).
+ *   2. Steam auto-detect on Windows, Linux and macOS: read every
+ *      steamapps/libraryfolders.vdf we can find, look for
+ *      steamapps/common/sbox/logs/sbox-dev.log in each library, pick newest.
+ *      (Pre-2.2.1 the detect was gated on win32, so Linux users always got an
+ *      empty read_log unless they set SBOX_LOG_PATH — GitHub issue #10.)
  */
 
-function locateSboxLog(): { path: string | null; tried: string[] } {
+/** Candidate Steam roots for the given platform. Exported for tests. */
+export function steamRootsFor(platform: NodeJS.Platform, home: string): string[] {
+  switch (platform) {
+    case "win32":
+      return ["C:\\Program Files (x86)\\Steam", "C:\\Program Files\\Steam"];
+    case "darwin":
+      return [join(home, "Library", "Application Support", "Steam")];
+    default:
+      // Native Steam (.steam symlink + XDG), the Debian/Ubuntu deb, the Flatpak,
+      // and the Snap.
+      return [
+        join(home, ".steam", "steam"),
+        join(home, ".steam", "root"),
+        join(home, ".local", "share", "Steam"),
+        join(home, ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam"),
+        join(home, "snap", "steam", "common", ".local", "share", "Steam"),
+      ];
+  }
+}
+
+export function locateSboxLog(opts?: {
+  env?: string | undefined;
+  platform?: NodeJS.Platform;
+  home?: string;
+}): { path: string | null; tried: string[] } {
   const tried: string[] = [];
 
-  const env = process.env.SBOX_LOG_PATH;
+  const env = opts?.env ?? process.env.SBOX_LOG_PATH;
   if (env) {
     tried.push(env);
     if (existsSync(env)) return { path: env, tried };
   }
 
-  if (process.platform === "win32") {
-    const steamRoots = [
-      "C:\\Program Files (x86)\\Steam",
-      "C:\\Program Files\\Steam",
-    ];
-    const libs: string[] = [];
-    for (const steam of steamRoots) {
-      const vdf = join(steam, "steamapps", "libraryfolders.vdf");
-      if (existsSync(vdf)) {
-        libs.push(steam);
-        try {
-          const txt = readFileSync(vdf, "utf-8");
-          for (const m of txt.matchAll(/"path"\s+"([^"]+)"/g)) {
-            libs.push(m[1].replace(/\\\\/g, "\\"));
-          }
-        } catch {
-          /* ignore unreadable vdf */
-        }
+  const platform = opts?.platform ?? process.platform;
+  const home = opts?.home ?? homedir();
+  const libs: string[] = [];
+  for (const steam of steamRootsFor(platform, home)) {
+    const vdf = join(steam, "steamapps", "libraryfolders.vdf");
+    if (!existsSync(vdf)) continue;
+    libs.push(steam);
+    try {
+      const txt = readFileSync(vdf, "utf-8");
+      for (const m of txt.matchAll(/"path"\s+"([^"]+)"/g)) {
+        libs.push(m[1].replace(/\\\\/g, "\\"));
       }
+    } catch {
+      /* ignore unreadable vdf — the root itself is still probed */
     }
-    const candidates: string[] = [];
-    for (const lib of libs) {
-      const p = join(lib, "steamapps", "common", "sbox", "logs", "sbox-dev.log");
-      tried.push(p);
-      if (existsSync(p)) candidates.push(p);
-    }
-    if (candidates.length > 0) {
-      candidates.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
-      return { path: candidates[0], tried };
-    }
+  }
+  const candidates: string[] = [];
+  for (const lib of [...new Set(libs)]) {
+    const p = join(lib, "steamapps", "common", "sbox", "logs", "sbox-dev.log");
+    tried.push(p);
+    if (existsSync(p)) candidates.push(p);
+  }
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+    return { path: candidates[0], tried };
   }
 
   return { path: null, tried };
@@ -107,7 +122,7 @@ export function registerDiagnosticTools(
   // ── read_log ───────────────────────────────────────────────────────
   server.tool(
     "read_log",
-    "Read s&box's editor log (sbox-dev.log) so Claude can see compile errors, exceptions, and Log.Info output directly. Reads the log file (not via the bridge), so it works even when the editor has crashed. If auto-detection fails (non-Windows / non-Steam install), set the SBOX_LOG_PATH environment variable to the full log path.",
+    "Read s&box's editor log (sbox-dev.log) so Claude can see compile errors, exceptions, and Log.Info output directly. Reads the log file (not via the bridge), so it works even when the editor has crashed. Auto-detects the Steam library on Windows, Linux and macOS; if that fails (non-Steam install, Proton prefix quirks), set the SBOX_LOG_PATH environment variable to the full log path.",
     {
       lines: z
         .number()

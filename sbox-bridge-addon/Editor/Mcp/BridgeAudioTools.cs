@@ -60,10 +60,13 @@ public static class BridgeAudioTools
 		=> McpGate.Run( "assign_sound", McpGate.Args( ( "id", id ), ( "sound", sound ), ( "playOnStart", playOnStart ) ) );
 
 	/// <summary>
-	/// Create a .sound event file wired to a source .vsnd. Returns { created, path, soundReferenced,
-	/// note } (path is project-relative); errors if the file already exists. Preview the result with
-	/// play_sound_preview or attach it to an object with assign_sound. Note: .sound events have no loop
-	/// flag — looping lives on the SoundPointComponent that plays the event.
+	/// Create a .sound event file wired to a source .vsnd. The file is written under the project's
+	/// Assets/ folder (a relative path like 'sounds/x.sound' becomes Assets/sounds/x.sound — assets
+	/// outside Assets/ compile but the runtime cannot load them). Returns { created, path
+	/// (project-relative), assetPath (what the engine loads, e.g. 'sounds/x.sound'), soundReferenced,
+	/// note }; errors if the file already exists. Preview the result with play_sound_preview or attach
+	/// it to an object with assign_sound. Note: .sound events have no loop flag — looping lives on the
+	/// SoundPointComponent that plays the event.
 	/// </summary>
 	/// <param name="path">Project-relative path for the sound event file (e.g. 'sounds/footstep.sound'; '.sound' appended if missing).</param>
 	/// <param name="sound">Path to the source sound asset (.vsnd) the event plays. Omit to create an empty event and wire it later.</param>

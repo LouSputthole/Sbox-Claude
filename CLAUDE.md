@@ -84,7 +84,8 @@ repo ↔ live copy when developing. **Never sync the repo `.sbproj` into a proje
 3. `restart_editor` (via native `call_tool`; works via lifeline/raw IPC too). The Libraries
    file-watcher is unreliable for external edits (gotcha #9) — restart is THE recompile loop
    (~5-7 min on Gravehold). If the addon itself is compile-broken (bridge tools dead), kill +
-   relaunch `sbox-dev.exe -project <sbproj>` via PowerShell.
+   relaunch `sbox-dev.exe -project "<full path to the .sbproj FILE>"` via PowerShell — the
+   directory form fails with a blocking native dialog (issue #14).
 4. Fingerprint: `get_bridge_status` → `handlerCount` must match the new registration count.
    Successful compiles log NOTHING; only failures log `Compile of 'X' Failed`.
 5. Verify live: `node scripts/verify-native-mcp.mjs` and/or `run_self_test` (8-step

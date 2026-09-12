@@ -38,8 +38,38 @@ public static class ClaudeBridge
 	// the heartbeat timestamp is refreshed from the frame loop at most once per
 	// HeartbeatIntervalMs so a closed/stalled editor reads as disconnected.
 	private static string _startedAtIso;
-	private static DateTime _lastHeartbeatUtc = DateTime.MinValue;
+	private static DateTime _lastStatusWriteUtc = DateTime.MinValue;
 	private const double HeartbeatIntervalMs = 1000;
+
+	// IPC wire-contract version — mirrored by IPC_PROTOCOL_VERSION in the TS client
+	// (sbox-mcp-server/src/transport/bridge-client.ts). Requests newer than this are
+	// refused with a readable error instead of being misparsed (issue #22).
+	internal const int IpcProtocolVersion = 1;
+
+	// Main-thread liveness. OnEditorFrame stamps this every frame (cheap); the poll
+	// TIMER thread publishes it into status.json as `heartbeat`, alongside its own
+	// `processHeartbeat`. If frames stop while the timer keeps ticking, the editor
+	// PROCESS is alive but its main thread is blocked — a modal dialog ("External
+	// Changes Detected", a crash popup) or a very long operation — and status.json
+	// says so via `blockedBy` instead of looking identical to a crash (issue #14).
+	private static long _lastFrameTicksUtc;
+	private const double MainThreadStallMs = 5000;
+
+	// Request-file bookkeeping (issues #19 / #20). When the poller picks a request up it
+	// RENAMES req_<id>.json → req_<id>.json.processing (atomic, same directory) instead
+	// of deleting it; the sentinel is deleted only after the RESPONSE has been written.
+	// So: the poller can't re-read it (pattern no longer matches), the client can see
+	// "picked up, still executing" on a timeout, and a crash mid-handler leaves evidence
+	// that is swept + logged on the next start instead of vanishing. _seenRequestIds
+	// makes a replayed/duplicate request id a no-op for SeenIdRetention (bounded memory:
+	// ids are evicted as they age out).
+	private const string ProcessingSuffix = ".processing";
+	private static readonly Dictionary<string, DateTime> _seenRequestIds = new();
+	private static readonly Dictionary<string, int> _readFailures = new();
+	private static readonly object _seenLock = new();
+	private static readonly TimeSpan SeenIdRetention = TimeSpan.FromMinutes( 5 );
+	private static DateTime _lastEvictUtc = DateTime.MinValue;
+	private static string _lastPollError;
 
 	// Set on the first editor frame after bootstrap, so we don't re-initialize on every frame.
 	private static bool _initialized;
@@ -81,31 +111,61 @@ public static class ClaudeBridge
 	}
 
 	/// <summary>
-	/// Write status.json. This doubles as a HEARTBEAT: the `heartbeat` field is
-	/// refreshed from the editor frame loop, so the MCP server can tell a live
-	/// editor from a closed/crashed/frame-stalled one. A write-once status file
-	/// used to leave the bridge reporting "connected" forever after the first run.
+	/// Write status.json. This doubles as a HEARTBEAT. `heartbeat` is the last time the
+	/// editor MAIN THREAD ticked (stamped by OnEditorFrame) so the MCP server can tell a
+	/// live editor from a closed/crashed/frame-stalled one; `processHeartbeat` is the
+	/// time of THIS write, which runs on the poll-timer thread and therefore keeps
+	/// updating while the main thread is blocked. When the two diverge by more than
+	/// MainThreadStallMs, `blockedBy` explains the stall (issue #14). Written atomically
+	/// (temp + rename) so a reader never sees a torn file. A write-once status file used
+	/// to leave the bridge reporting "connected" forever after the first run.
 	/// </summary>
 	static void WriteStatus( bool running )
 	{
 		if ( _ipcDir == null ) return;
 		try
 		{
+			var now = DateTime.UtcNow;
+			var lastFrame = new DateTime( Interlocked.Read( ref _lastFrameTicksUtc ), DateTimeKind.Utc );
+			var stalledMs = (long)(now - lastFrame).TotalMilliseconds;
+			string blockedBy = null;
+			if ( running && stalledMs > MainThreadStallMs )
+				blockedBy = $"main thread stalled for {stalledMs / 1000} s — a modal editor dialog (e.g. \"External Changes Detected\") or a long operation; the process itself is alive";
+
 			var statusPath = Path.Combine( _ipcDir, "status.json" );
-			File.WriteAllText( statusPath, JsonSerializer.Serialize( new
+			var tmpPath = statusPath + ".tmp";
+			File.WriteAllText( tmpPath, JsonSerializer.Serialize( new
 			{
 				running,
 				version = BridgeVersion,
+				protocolVersion = IpcProtocolVersion,
 				startedAt = _startedAtIso,
-				heartbeat = DateTime.UtcNow.ToString( "o" ),
+				heartbeat = lastFrame.ToString( "o" ),
+				processHeartbeat = now.ToString( "o" ),
+				mainThreadStalledMs = stalledMs,
+				blockedBy,
 				handlerCount = _handlers.Count,
 				ipcDir = _ipcDir
 			} ), _utf8NoBom );
+			File.Move( tmpPath, statusPath, true );
 		}
 		catch ( Exception ex )
 		{
-			Log.Warning( $"[SboxBridge] Status write error: {ex.Message}" );
+			LogOnce( ref _lastStatusError, $"[SboxBridge] Status write error: {ex.Message}" );
 		}
+	}
+
+	private static string _lastStatusError;
+
+	/// <summary>
+	/// Log a warning once per distinct message (the previous message for this slot is
+	/// remembered) so a condition that recurs every poll tick can't spam the console.
+	/// </summary>
+	static void LogOnce( ref string slot, string message )
+	{
+		if ( message == slot ) return;
+		slot = message;
+		Log.Warning( message );
 	}
 
 	static void StartBridge()
@@ -118,9 +178,17 @@ public static class ClaudeBridge
 			Directory.CreateDirectory( _ipcDir );
 
 			_startedAtIso = DateTime.UtcNow.ToString( "o" );
+			Interlocked.Exchange( ref _lastFrameTicksUtc, DateTime.UtcNow.Ticks );
+
+			// Request files from a previous editor session (crash mid-processing) — their
+			// callers timed out long ago. Log what was lost, then clear them (issue #20).
+			// BEFORE the first status write: a client only sends once status.json is fresh,
+			// so nothing live can be swept.
+			SweepStaleRequestFiles();
+
 			_running = true;
 			WriteStatus( true );
-			_lastHeartbeatUtc = DateTime.UtcNow;
+			_lastStatusWriteUtc = DateTime.UtcNow;
 
 			// execute_csharp writes a temp Editor/__Exec_*.cs, hotloads, runs, then deletes it.
 			// If that snippet fails to COMPILE, the whole editor assembly (local.<project>.editor —
@@ -169,8 +237,45 @@ public static class ClaudeBridge
 		}
 	}
 
+	/// <summary>
+	/// Delete request files left over from a previous session. A `.processing` sentinel
+	/// means the editor died INSIDE that handler; a bare req file means it was never picked
+	/// up (the client deletes its own file on timeout, so both are rare). Each one is a real
+	/// lost command — log it by name + command rather than dropping it silently. Never throws.
+	/// </summary>
+	internal static void SweepStaleRequestFiles()
+	{
+		try
+		{
+			var leftovers = Directory.GetFiles( _ipcDir, "req_*.json" )
+				.Concat( Directory.GetFiles( _ipcDir, "req_*.json" + ProcessingSuffix ) )
+				.Concat( Directory.GetFiles( _ipcDir, "req_*.json.tmp" ) )
+				.ToArray();
+			foreach ( var f in leftovers )
+			{
+				string command = "?";
+				try
+				{
+					using var doc = JsonDocument.Parse( File.ReadAllText( f, Encoding.UTF8 ) );
+					if ( doc.RootElement.TryGetProperty( "command", out var c ) ) command = c.GetString() ?? "?";
+				}
+				catch ( Exception ) { command = "<unparseable>"; }
+
+				try { File.Delete( f ); }
+				catch ( Exception ex ) { Log.Warning( $"[SboxBridge] Could not delete stale request '{Path.GetFileName( f )}': {ex.Message}" ); continue; }
+
+				var state = f.EndsWith( ProcessingSuffix, StringComparison.Ordinal ) ? "the editor went down while EXECUTING it" : "it was never picked up";
+				Log.Warning( $"[SboxBridge] Discarded request from a previous session: {Path.GetFileName( f )} ({command}) — {state}. Its caller has timed out; re-issue it if it mattered." );
+			}
+		}
+		catch ( Exception ex )
+		{
+			Log.Warning( $"[SboxBridge] Request-file sweep failed: {ex.Message}" );
+		}
+	}
+
 	// Pending requests read from disk, to be processed on main thread
-	static readonly Queue<(string responseId, string json)> _pendingRequests = new();
+	static readonly Queue<(string responseId, string reqFile, string json)> _pendingRequests = new();
 	static readonly object _queueLock = new();
 
 	static void RegisterHandlers()
@@ -668,7 +773,11 @@ public static class ClaudeBridge
 	}
 
 	/// <summary>
-	/// Runs on a timer thread — only reads files from disk and queues them.
+	/// Runs on a timer thread — reads request files from disk and queues them for the
+	/// main thread, and publishes the status heartbeat. The request file is NOT deleted
+	/// here: it is renamed to a `.processing` sentinel that ProcessPendingOnMainThread
+	/// removes only after the response is on disk (issue #20). _seenRequestIds turns a
+	/// replayed id into a no-op (issue #19).
 	/// </summary>
 	static void ReadRequestFiles( object state )
 	{
@@ -676,30 +785,93 @@ public static class ClaudeBridge
 
 		try
 		{
+			var now = DateTime.UtcNow;
+
+			// Heartbeat from THIS thread (throttled) so status.json keeps updating —
+			// and can say "main thread stalled" — while a modal dialog blocks the editor.
+			if ( (now - _lastStatusWriteUtc).TotalMilliseconds >= HeartbeatIntervalMs )
+			{
+				_lastStatusWriteUtc = now;
+				WriteStatus( true );
+			}
+
 			var files = Directory.GetFiles( _ipcDir, "req_*.json" );
 			foreach ( var reqFile in files )
 			{
+				var fileName = Path.GetFileNameWithoutExtension( reqFile );
+				var responseId = fileName.Substring( 4 );
+
+				bool duplicate;
+				lock ( _seenLock )
+				{
+					// Already picked up this session (queued, executing, or done) — never run it twice.
+					duplicate = _seenRequestIds.ContainsKey( responseId );
+				}
+				if ( duplicate )
+				{
+					try { File.Delete( reqFile ); }
+					catch ( Exception ex ) { LogOnce( ref _lastPollError, $"[SboxBridge] Could not delete duplicate request {responseId}: {ex.Message}" ); }
+					Log.Info( $"[SboxBridge] Ignored replayed request {responseId} — already processed this session." );
+					continue;
+				}
+
 				try
 				{
 					var json = File.ReadAllText( reqFile, Encoding.UTF8 );
-					File.Delete( reqFile );
-
-					var fileName = Path.GetFileNameWithoutExtension( reqFile );
-					var responseId = fileName.Substring( 4 );
-
+					// Claim it: atomic rename to the sentinel. If this throws (client still
+					// holds the file), nothing is queued and the next tick retries.
+					var processingFile = reqFile + ProcessingSuffix;
+					File.Move( reqFile, processingFile, true );
+					lock ( _seenLock )
+					{
+						_seenRequestIds[responseId] = now;
+						_readFailures.Remove( reqFile );
+					}
 					lock ( _queueLock )
 					{
-						_pendingRequests.Enqueue( (responseId, json) );
+						_pendingRequests.Enqueue( (responseId, processingFile, json) );
 					}
 				}
-				catch ( IOException ) { }
+				catch ( IOException ex )
+				{
+					// Usually a sharing violation while the client renames the file into
+					// place — transient by design. A file that STAYS unreadable is a real
+					// problem, so say so once after ~1 s of retries instead of hiding it (#18).
+					int n;
+					lock ( _seenLock )
+					{
+						_readFailures.TryGetValue( reqFile, out n );
+						_readFailures[reqFile] = ++n;
+					}
+					if ( n == 20 )
+						Log.Warning( $"[SboxBridge] Request file {Path.GetFileName( reqFile )} has been unreadable for ~1 s: {ex.Message}" );
+				}
 				catch ( Exception ex )
 				{
-					Log.Warning( $"[SboxBridge] Read error: {ex.Message}" );
+					LogOnce( ref _lastPollError, $"[SboxBridge] Read error on {Path.GetFileName( reqFile )}: {ex.GetType().Name}: {ex.Message}" );
+				}
+			}
+
+			// Bound the dedup set: evict ids older than SeenIdRetention (~1 MB per 9k ids).
+			if ( (now - _lastEvictUtc).TotalSeconds >= 30 )
+			{
+				_lastEvictUtc = now;
+				lock ( _seenLock )
+				{
+					var cutoff = now - SeenIdRetention;
+					foreach ( var id in _seenRequestIds.Where( kv => kv.Value < cutoff ).Select( kv => kv.Key ).ToArray() )
+						_seenRequestIds.Remove( id );
+					foreach ( var f in _readFailures.Keys.Where( f => !File.Exists( f ) ).ToArray() )
+						_readFailures.Remove( f );
 				}
 			}
 		}
-		catch { }
+		catch ( Exception ex )
+		{
+			// Directory.GetFiles can fail if the IPC dir vanished (temp cleanup) — log once
+			// per distinct message rather than swallowing it (issue #18).
+			LogOnce( ref _lastPollError, $"[SboxBridge] Poll error: {ex.GetType().Name}: {ex.Message}" );
+		}
 	}
 
 	/// <summary>
@@ -711,7 +883,7 @@ public static class ClaudeBridge
 	{
 		while ( true )
 		{
-			(string responseId, string json) item;
+			(string responseId, string reqFile, string json) item;
 			lock ( _queueLock )
 			{
 				if ( _pendingRequests.Count == 0 ) break;
@@ -720,7 +892,7 @@ public static class ClaudeBridge
 
 			string response;
 			try { response = ProcessRequest( item.json ).GetAwaiter().GetResult(); }
-			catch ( Exception ex ) { response = MakeError( null, $"Processing error: {ex.Message}" ); }
+			catch ( Exception ex ) { response = MakeError( item.responseId, $"Processing error: {ex.Message}" ); }
 
 			try
 			{
@@ -732,8 +904,12 @@ public static class ClaudeBridge
 			}
 			catch ( Exception ex )
 			{
-				Log.Warning( $"[SboxBridge] Write error: {ex.Message}" );
+				Log.Warning( $"[SboxBridge] Write error for {item.responseId}: {ex.Message}" );
 			}
+
+			// Response is on disk — NOW the `.processing` sentinel can go (issue #20).
+			try { File.Delete( item.reqFile ); }
+			catch ( Exception ex ) { Log.Warning( $"[SboxBridge] Could not delete processed request {Path.GetFileName( item.reqFile )}: {ex.Message}" ); }
 		}
 	}
 
@@ -772,15 +948,13 @@ public static class ClaudeBridge
 			}
 		}
 
-		// Refresh the liveness heartbeat (throttled). Driven from the frame loop
-		// on purpose: if frames stop firing (editor closed or stalled) the
-		// heartbeat goes stale within seconds and the MCP server reports
-		// "disconnected" instead of a permanent false-positive.
-		if ( _running && (DateTime.UtcNow - _lastHeartbeatUtc).TotalMilliseconds >= HeartbeatIntervalMs )
-		{
-			_lastHeartbeatUtc = DateTime.UtcNow;
-			WriteStatus( true );
-		}
+		// Stamp main-thread liveness. Driven from the frame loop on purpose: if frames
+		// stop firing (editor closed, crashed, or blocked by a modal dialog) the
+		// `heartbeat` the poll thread publishes goes stale within seconds and the MCP
+		// server reports "disconnected" (with `blockedBy` when the process is still
+		// alive) instead of a permanent false-positive.
+		if ( _running )
+			Interlocked.Exchange( ref _lastFrameTicksUtc, DateTime.UtcNow.Ticks );
 
 		try
 		{
@@ -806,6 +980,14 @@ public static class ClaudeBridge
 
 		if ( string.IsNullOrEmpty( id ) )
 			return MakeError( null, "Missing 'id'" );
+
+		// Wire-contract check (issue #22): a client speaking a NEWER protocol than this
+		// addon gets a readable refusal instead of a misparsed request. Older clients
+		// (no protocolVersion field) are accepted as v1.
+		if ( root.TryGetProperty( "protocolVersion", out var pvProp ) && pvProp.ValueKind == JsonValueKind.Number
+			&& pvProp.TryGetInt32( out var pv ) && pv > IpcProtocolVersion )
+			return MakeError( id, $"Request uses IPC protocol v{pv} but this addon (v{BridgeVersion}) speaks v{IpcProtocolVersion} — update the addon in Libraries/ or pin sbox-mcp-server to a matching version." );
+
 		if ( string.IsNullOrEmpty( command ) )
 			return MakeError( id, "Missing 'command'" );
 
@@ -849,6 +1031,117 @@ public static class ClaudeBridge
 
 	internal static bool IsRunning => _running;
 	internal static string[] RegisteredCommands => _handlers.Keys.ToArray();
+	internal static string IpcDirectory => _ipcDir;
+
+	/// <summary>
+	/// Fingerprint of the project's currently-loaded GAME assembly — the one hotload
+	/// swaps. Its MVID changes on every successful recompile, so an agent can tell
+	/// whether a trigger_hotload has actually landed instead of trusting silence and
+	/// running the old code (issue #15). Resolved through TypeLibrary so it always
+	/// reflects the LIVE assembly, never an unloaded predecessor. Never throws.
+	/// </summary>
+	internal static object GetGameAssemblyFingerprint()
+	{
+		try
+		{
+			var ident = Project.Current?.Config?.Ident;
+			var candidates = new Dictionary<string, Assembly>( StringComparer.OrdinalIgnoreCase );
+			foreach ( var td in Game.TypeLibrary.GetTypes<Component>() )
+			{
+				var asm = td?.TargetType?.Assembly;
+				var name = asm?.GetName()?.Name;
+				if ( string.IsNullOrEmpty( name ) ) continue;
+				if ( name.StartsWith( "Sandbox", StringComparison.OrdinalIgnoreCase )
+					|| name.StartsWith( "System", StringComparison.OrdinalIgnoreCase )
+					|| name.StartsWith( "Microsoft", StringComparison.OrdinalIgnoreCase )
+					|| name.EndsWith( ".editor", StringComparison.OrdinalIgnoreCase ) ) continue;
+				candidates[name] = asm;
+			}
+
+			// Project game code compiles as local.<ident> / package.local.<ident>; installed
+			// libraries as package.<org>.<ident>. Prefer the local one, then anything that
+			// names the project ident, then the first non-engine assembly with Components.
+			Assembly pick = null;
+			foreach ( var kv in candidates )
+				if ( kv.Key.StartsWith( "local.", StringComparison.OrdinalIgnoreCase ) || kv.Key.StartsWith( "package.local.", StringComparison.OrdinalIgnoreCase ) ) { pick = kv.Value; break; }
+			if ( pick == null && !string.IsNullOrEmpty( ident ) )
+				foreach ( var kv in candidates )
+					if ( kv.Key.Contains( ident, StringComparison.OrdinalIgnoreCase ) ) { pick = kv.Value; break; }
+			if ( pick == null ) pick = candidates.Values.FirstOrDefault();
+
+			if ( pick == null )
+				return new { available = false, note = "No non-engine Component types are loaded (empty Code/ folder, or the game assembly failed to compile — check get_compile_errors)." };
+
+			return new
+			{
+				available = true,
+				assembly = pick.GetName().Name,
+				mvid = pick.ManifestModule.ModuleVersionId.ToString(),
+				candidateAssemblies = candidates.Count,
+				note = "mvid changes on every successful recompile of this assembly — compare against trigger_hotload's assemblyBefore.mvid."
+			};
+		}
+		catch ( Exception ex )
+		{
+			return new { available = false, note = $"fingerprint unavailable: {ex.GetType().Name}: {ex.Message}" };
+		}
+	}
+
+	/// <summary>
+	/// Resolve a user-supplied ASSET path (sound / material / prefab) to an absolute file
+	/// under the project's Assets/ folder. 'sounds/x.sound' and 'Assets/sounds/x.sound'
+	/// both map to &lt;project&gt;/Assets/sounds/x.sound. assetPath is the engine-relative
+	/// form the runtime loads ('sounds/x.sound'); projectPath the project-relative form
+	/// ('Assets/sounds/x.sound'). Assets written anywhere else compile and even preview,
+	/// but the runtime cannot find them (issue #13).
+	/// </summary>
+	internal static bool TryResolveAssetPath( string userPath, out string fullPath, out string assetPath, out string projectPath, out string error )
+	{
+		fullPath = assetPath = projectPath = null;
+		var root = Project.Current.GetRootPath();
+		var assetsRoot = Project.Current.GetAssetsPath();
+		if ( string.IsNullOrEmpty( assetsRoot ) ) assetsRoot = Path.Combine( root, "Assets" );
+
+		var rel = (userPath ?? "").Replace( '\\', '/' ).TrimStart( '/' );
+		if ( rel.Length == 0 ) { error = "path is required"; return false; }
+
+		// Accept the project-relative form list_* tools report ('Assets/prefabs/x.prefab').
+		var assetsRel = Path.GetRelativePath( root, assetsRoot ).Replace( '\\', '/' ).Trim( '/' );
+		if ( assetsRel.Length > 0 && assetsRel != "." && rel.StartsWith( assetsRel + "/", StringComparison.OrdinalIgnoreCase ) )
+			rel = rel.Substring( assetsRel.Length + 1 );
+
+		fullPath = Path.GetFullPath( Path.Combine( assetsRoot, rel ) );
+		var boundary = assetsRoot.TrimEnd( '/', '\\' ) + Path.DirectorySeparatorChar;
+		if ( !fullPath.StartsWith( boundary, StringComparison.OrdinalIgnoreCase ) )
+		{
+			error = "Asset path must stay inside the project's Assets folder";
+			return false;
+		}
+
+		assetPath = Path.GetRelativePath( assetsRoot, fullPath ).Replace( '\\', '/' );
+		projectPath = Path.GetRelativePath( root, fullPath ).Replace( '\\', '/' );
+		error = null;
+		return true;
+	}
+
+	/// <summary>
+	/// Resolve a path to an EXISTING project file, accepting both the project-relative
+	/// form ('Assets/prefabs/x.prefab', what list_prefabs returns) and the engine-relative
+	/// form ('prefabs/x.prefab', what the asset system uses). Issue #13: every read tool
+	/// should accept whichever form another tool handed the agent.
+	/// </summary>
+	internal static bool TryResolveExistingProjectFile( string userPath, out string fullPath, out string error )
+	{
+		if ( !TryResolveProjectPath( userPath, out fullPath, out error ) ) return false;
+		if ( File.Exists( fullPath ) ) return true;
+		if ( TryResolveAssetPath( userPath, out var assetFull, out _, out _, out _ ) && File.Exists( assetFull ) )
+		{
+			fullPath = assetFull;
+			return true;
+		}
+		error = $"File not found: {userPath} (tried project-relative and Assets/-relative)";
+		return false;
+	}
 
 	// Many handlers signal failure by returning an object with a non-empty
 	// `error` string property instead of throwing. Detect that via reflection
@@ -1330,6 +1623,24 @@ public static class ClaudeBridge
 			children   = depth >= maxDepth
 				? Array.Empty<object>()
 				: go.Children.Select( c => SerializeGoTree( c, depth + 1, maxDepth ) ).ToArray()
+		};
+	}
+
+	/// <summary>
+	/// Compact variant for get_scene_hierarchy namesOnly:true — id, name, childCount and
+	/// children only (no components/enabled). childCount is the TOTAL child count even
+	/// when the depth cap stops recursion, so a truncated subtree is visible as such.
+	/// </summary>
+	internal static object SerializeGoTreeCompact( GameObject go, int depth, int maxDepth )
+	{
+		return new
+		{
+			id         = go.Id.ToString(),
+			name       = go.Name,
+			childCount = go.Children.Count,
+			children   = depth >= maxDepth
+				? Array.Empty<object>()
+				: go.Children.Select( c => SerializeGoTreeCompact( c, depth + 1, maxDepth ) ).ToArray()
 		};
 	}
 }
@@ -1865,6 +2176,14 @@ public class GetSceneHierarchyHandler : IBridgeHandler
 			: 10;
 		if ( maxDepth < 0 ) maxDepth = 0;
 
+		// namesOnly:true — {id,name,childCount,children} per node, no components/enabled.
+		// A dressed scene (~900 objects) at maxDepth 2 was 147k chars with components; the
+		// "what is in this scene" question needs a few kB (issue #16).
+		var namesOnly = p.TryGetProperty( "namesOnly", out var no ) && no.ValueKind == JsonValueKind.True;
+		Func<GameObject, int, int, object> serialize = ( go, depth, cap ) => namesOnly
+			? ClaudeBridge.SerializeGoTreeCompact( go, depth, cap )
+			: ClaudeBridge.SerializeGoTree( go, depth, cap );
+
 		// Optional: start traversal from a specific GameObject by GUID instead of from
 		// the scene roots. Useful for drilling into one subtree without dumping the
 		// entire scene tree first (GitHub issue #4 bonus suggestion).
@@ -1885,13 +2204,14 @@ public class GetSceneHierarchyHandler : IBridgeHandler
 					sceneName = scene.Name,
 					rootId = idStr,
 					maxDepth,
-					hierarchy = new[] { ClaudeBridge.SerializeGoTree( root, 0, maxDepth ) }
+					namesOnly,
+					hierarchy = new[] { serialize( root, 0, maxDepth ) }
 				} );
 			}
 		}
 
 		var roots = scene.Children
-			.Select( go => ClaudeBridge.SerializeGoTree( go, 0, maxDepth ) )
+			.Select( go => serialize( go, 0, maxDepth ) )
 			.ToArray();
 
 		return Task.FromResult<object>( new
@@ -1899,6 +2219,7 @@ public class GetSceneHierarchyHandler : IBridgeHandler
 			sceneName = scene.Name,
 			objectCount = scene.GetAllObjects( true ).Count(),
 			maxDepth,
+			namesOnly,
 			hierarchy = roots
 		} );
 	}
@@ -2146,6 +2467,18 @@ public class SetPropertyHandler : IBridgeHandler
 
 		if ( component == null )
 			return Task.FromResult<object>( new { error = $"Component not found: {componentType}" } );
+
+		// Engine landmines (issue #12, SDK 26.07.22): setting either of these on a Terrain
+		// kills its rendering until the scene is reloaded, and a scene that SERIALIZES
+		// ClipMapLodExtentTexels NREs in CreateClipmapSceneObject on every subsequent load.
+		if ( component.GetType().Name == "Terrain"
+			&& ( propertyName == "ClipMapLodExtentTexels" || propertyName == "Enabled" ) )
+			return Task.FromResult<object>( new
+			{
+				error = $"Refusing Terrain.{propertyName}: on current engine builds this stops the terrain rendering until the scene is reloaded" +
+					( propertyName == "ClipMapLodExtentTexels" ? " and, once saved, throws in CreateClipmapSceneObject on every load" : "" ) +
+					". If you really need it, use execute_csharp and reload the scene afterwards (checkpoint_scene first)."
+			} );
 
 		try
 		{
@@ -2541,7 +2874,6 @@ public class CreateMaterialHandler : IBridgeHandler
 {
 	public Task<object> Execute( JsonElement p )
 	{
-		var rootPath = Project.Current.GetRootPath();
 		// Accept "path" (preferred — matches the create_material tool) or legacy "name"(+"directory").
 		// Previously this did p.GetProperty("name") which THREW KeyNotFoundException when the
 		// tool sent "path" (the "dictionary key" bug). Now it reads either.
@@ -2557,10 +2889,11 @@ public class CreateMaterialHandler : IBridgeHandler
 			return Task.FromResult<object>( new { error = "path is required (e.g. 'materials/walls/brick.vmat')" } );
 		if ( !rel.EndsWith( ".vmat", StringComparison.OrdinalIgnoreCase ) ) rel += ".vmat";
 
-		if ( !ClaudeBridge.TryResolveProjectPath( rel, out var fullPath, out var pathErr ) )
+		// Materials must live under Assets/ to be mounted by the asset system (issue #13).
+		if ( !ClaudeBridge.TryResolveAssetPath( rel, out var fullPath, out var assetPath, out var projectPath, out var pathErr ) )
 			return Task.FromResult<object>( new { error = pathErr } );
 		if ( File.Exists( fullPath ) )
-			return Task.FromResult<object>( new { error = $"Material already exists: {rel}" } );
+			return Task.FromResult<object>( new { error = $"Material already exists: {projectPath}" } );
 
 		Directory.CreateDirectory( Path.GetDirectoryName( fullPath ) );
 
@@ -2590,8 +2923,7 @@ public class CreateMaterialHandler : IBridgeHandler
 		sb.Append( "}\n" );
 
 		File.WriteAllText( fullPath, sb.ToString() );
-		var relativePath = Path.GetRelativePath( rootPath, fullPath ).Replace( '\\', '/' );
-		return Task.FromResult<object>( new { created = true, path = relativePath, shader, propertiesWritten = wrote } );
+		return Task.FromResult<object>( new { created = true, path = projectPath, assetPath, shader, propertiesWritten = wrote } );
 	}
 }
 
@@ -2646,7 +2978,6 @@ public class CreateSoundEventHandler : IBridgeHandler
 {
 	public Task<object> Execute( JsonElement p )
 	{
-		var rootPath = Project.Current.GetRootPath();
 
 		// Preferred: a full project-relative "path" (what the MCP schema sends).
 		// Legacy fallback: "name" + optional "directory" (pre-v2 callers).
@@ -2666,11 +2997,14 @@ public class CreateSoundEventHandler : IBridgeHandler
 		else
 			return Task.FromResult<object>( new { error = "path (e.g. 'sounds/footstep.sound') is required" } );
 
-		if ( !ClaudeBridge.TryResolveProjectPath( relRequested, out var fullPath, out var pathErr ) )
+		// Sound events must live under Assets/ — a file at the project root compiles to a
+		// .sound_c and even previews, but the runtime reports "Couldn't find sound event"
+		// once per frame (issue #13). Resolve relative paths under Assets/ by default.
+		if ( !ClaudeBridge.TryResolveAssetPath( relRequested, out var fullPath, out var assetPath, out var projectPath, out var pathErr ) )
 			return Task.FromResult<object>( new { error = pathErr } );
 
 		if ( File.Exists( fullPath ) )
-			return Task.FromResult<object>( new { error = $"Sound already exists: {relRequested}" } );
+			return Task.FromResult<object>( new { error = $"Sound already exists: {projectPath}" } );
 
 		Directory.CreateDirectory( Path.GetDirectoryName( fullPath ) );
 
@@ -2702,11 +3036,11 @@ public class CreateSoundEventHandler : IBridgeHandler
 		}
 
 		File.WriteAllText( fullPath, JsonSerializer.Serialize( evt, new JsonSerializerOptions { WriteIndented = true } ) );
-		var relativePath = Path.GetRelativePath( rootPath, fullPath ).Replace( '\\', '/' );
 		return Task.FromResult<object>( new
 		{
 			created = true,
-			path = relativePath,
+			path = projectPath,
+			assetPath,
 			soundReferenced = sounds.Length > 0,
 			note = sounds.Length > 0
 				? "Sound event written with the source .vsnd wired. Preview with play_sound_preview or attach with assign_sound."
@@ -2735,7 +3069,6 @@ public class CreatePrefabHandler : IBridgeHandler
 		if ( go == null )
 			return Task.FromResult<object>( new { error = $"GameObject not found: {id}" } );
 
-		var rootPath = Project.Current.GetRootPath();
 
 		// If "path" is given use it directly, otherwise fall back to name+directory
 		string relPath;
@@ -2751,7 +3084,8 @@ public class CreatePrefabHandler : IBridgeHandler
 			relPath = Path.Combine( subdir, fileName );
 		}
 
-		if ( !ClaudeBridge.TryResolveProjectPath( relPath, out var fullPath, out var pathErr ) )
+		// Prefabs must live under Assets/ for GameObject.Clone(path) to resolve them (issue #13).
+		if ( !ClaudeBridge.TryResolveAssetPath( relPath, out var fullPath, out var assetPath, out var projectPath, out var pathErr ) )
 			return Task.FromResult<object>( new { error = pathErr } );
 
 		Directory.CreateDirectory( Path.GetDirectoryName( fullPath ) );
@@ -2769,11 +3103,11 @@ public class CreatePrefabHandler : IBridgeHandler
 
 			int compCount = node["Components"] is System.Text.Json.Nodes.JsonArray ca ? ca.Count : 0;
 			int childCount = node["Children"] is System.Text.Json.Nodes.JsonArray ch ? ch.Count : 0;
-			var relativePath = Path.GetRelativePath( rootPath, fullPath ).Replace( '\\', '/' );
 			return Task.FromResult<object>( new
 			{
 				created = true,
-				path = relativePath,
+				path = projectPath,
+				assetPath,
 				sourceId = id,
 				components = compCount,
 				children = childCount,
@@ -2796,11 +3130,10 @@ public class InstantiatePrefabHandler : IBridgeHandler
 			return Task.FromResult<object>( new { error = "No active scene" } );
 
 		var prefabPath = p.GetProperty( "path" ).GetString();
-		if ( !ClaudeBridge.TryResolveProjectPath( prefabPath, out var fullPath, out var pathErr ) )
-			return Task.FromResult<object>( new { error = pathErr } );
-
-		if ( !File.Exists( fullPath ) )
-			return Task.FromResult<object>( new { error = $"Prefab not found: {prefabPath}" } );
+		// Accept both 'Assets/prefabs/x.prefab' (what list_prefabs returns) and
+		// 'prefabs/x.prefab' (the engine-relative form) — issue #13.
+		if ( !ClaudeBridge.TryResolveExistingProjectFile( prefabPath, out var fullPath, out var pathErr ) )
+			return Task.FromResult<object>( new { error = $"Prefab not found: {prefabPath} ({pathErr})" } );
 
 		try
 		{
@@ -2890,11 +3223,10 @@ public class GetPrefabInfoHandler : IBridgeHandler
 	public Task<object> Execute( JsonElement p )
 	{
 		var prefabPath = p.GetProperty( "path" ).GetString();
-		if ( !ClaudeBridge.TryResolveProjectPath( prefabPath, out var fullPath, out var pathErr ) )
-			return Task.FromResult<object>( new { error = pathErr } );
-
-		if ( !File.Exists( fullPath ) )
-			return Task.FromResult<object>( new { error = $"Prefab not found: {prefabPath}" } );
+		// Accept both 'Assets/prefabs/x.prefab' (what list_prefabs returns) and
+		// 'prefabs/x.prefab' (the engine-relative form) — issue #13.
+		if ( !ClaudeBridge.TryResolveExistingProjectFile( prefabPath, out var fullPath, out var pathErr ) )
+			return Task.FromResult<object>( new { error = $"Prefab not found: {prefabPath} ({pathErr})" } );
 
 		// Structured summary (v2) — the raw JSON is available via read_file; this reports
 		// what an agent needs to decide whether/where to instantiate.
@@ -5310,20 +5642,30 @@ public class TriggerHotloadHandler : IBridgeHandler
 			// edited directly on disk (via write_file/edit_script). Bumping the project's
 			// .csproj timestamps nudges the watcher to re-scan and recompile. Skip
 			// Libraries/ (packages) so we only touch this project's code.
+			// Fingerprint BEFORE touching anything so the caller can tell when the
+			// recompile has actually landed (issue #15): the nudge below is asynchronous,
+			// editing an EXISTING .cs can leave the old assembly running silently, and
+			// successful compiles log nothing.
+			var assemblyBefore = ClaudeBridge.GetGameAssemblyFingerprint();
+
 			var touched = new List<string>();
+			var skipped = new List<string>();
 			foreach ( var csproj in Directory.GetFiles( root, "*.csproj", SearchOption.AllDirectories ) )
 			{
 				if ( csproj.Replace( '\\', '/' ).Contains( "/Libraries/" ) ) continue;
 				try { File.SetLastWriteTimeUtc( csproj, DateTime.UtcNow ); touched.Add( Path.GetRelativePath( root, csproj ).Replace( '\\', '/' ) ); }
-				catch { }
+				catch ( Exception ex ) { skipped.Add( $"{Path.GetRelativePath( root, csproj ).Replace( '\\', '/' )}: {ex.Message}" ); }
 			}
 
 			return Task.FromResult<object>( new
 			{
 				triggered = touched.Count > 0,
 				touched,
+				skipped,
+				assemblyBefore,
+				upToDate = false,
 				note = touched.Count > 0
-					? "Bumped .csproj timestamps to nudge a recompile. If changes still don't apply, enter+exit play mode or use restart_editor (the reliable path for externally-edited C#)."
+					? "Bumped .csproj timestamps to nudge a recompile. NOT synchronous: poll get_bridge_status.gameAssembly until its mvid differs from assemblyBefore.mvid (or check get_compile_errors) BEFORE trusting invoke_button/describe_type output — an edited (not new) .cs can otherwise run the OLD assembly silently. If the mvid never changes within ~30 s the file-watcher missed the edit: enter+exit play mode or use restart_editor (the reliable path for externally-edited C#)."
 					: "No project .csproj found to touch. Enter+exit play mode or use restart_editor to force a recompile.",
 				packageNote = "A newly-added PackageReference (installed library dependency) is NEVER resolved by hotload — use restart_editor for new package dependencies."
 			} );
@@ -7893,7 +8235,10 @@ public class FindObjectsHandler : IBridgeHandler
 		int limit = p.TryGetProperty( "limit", out var l ) ? l.GetInt32() : 50;
 		if ( limit < 1 ) limit = 1; if ( limit > 500 ) limit = 500;
 
+		// Count EVERY match but only materialise `limit` rows, and say so: a capped list
+		// with a matching total looked complete when it wasn't (issue #16).
 		var results = new List<object>();
+		int total = 0;
 		foreach ( var go in scene.GetAllObjects( true ) )
 		{
 			if ( go == null ) continue;
@@ -7906,10 +8251,21 @@ public class FindObjectsHandler : IBridgeHandler
 					if ( string.Equals( comp.GetType().Name, compQ, StringComparison.OrdinalIgnoreCase ) ) { has = true; break; }
 				if ( !has ) continue;
 			}
-			results.Add( new { id = go.Id.ToString(), name = go.Name } );
-			if ( results.Count >= limit ) break;
+			total++;
+			if ( results.Count < limit )
+				results.Add( new { id = go.Id.ToString(), name = go.Name } );
 		}
-		return Task.FromResult<object>( new { count = results.Count, objects = results } );
+		bool truncated = total > results.Count;
+		return Task.FromResult<object>( new
+		{
+			count = results.Count,
+			total,
+			showing = results.Count,
+			limit,
+			truncated,
+			objects = results,
+			note = truncated ? $"Showing {results.Count} of {total} matches — raise limit (max 500) or narrow the filter." : null
+		} );
 	}
 }
 
