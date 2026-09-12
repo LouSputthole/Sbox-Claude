@@ -37,7 +37,12 @@ jobs:
       # so resolve CODEX_HOME from a step and export it for the rest of the job.
       - name: Resolve Codex home
         shell: bash
-        run: echo "CODEX_HOME=${RUNNER_TEMP}/codex-home" >> "$GITHUB_ENV"
+        # The Codex CLI refuses to start ("failed to load configuration") when
+        # CODEX_HOME does not exist, so create both homes up front (the -git one is
+        # used by the GitHub-marketplace steps at the end).
+        run: |
+          mkdir -p "${RUNNER_TEMP}/codex-home" "${RUNNER_TEMP}/codex-home-git"
+          echo "CODEX_HOME=${RUNNER_TEMP}/codex-home" >> "$GITHUB_ENV"
 
       - uses: actions/setup-node@v5
         with:
