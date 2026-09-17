@@ -2,14 +2,14 @@
 
 > Let non-coders build s&box games through conversation with Claude Code.
 
-## Status: v2.2.0
+## Status: v2.3.0
 
 **Current working source: 273 native tools / 28 toolsets / 57 read-only / 7 lifeline /
 286 total / 278 handlers.** Released v2.1.0 added the 30-tool Tier-2 +
 gameplay-recording + cinematic waves on top of v2.0.0 "Native"; those 30 were
-live-verified on Gravehold — see CHANGELOG `[2.1.0]`. The eleven `[Unreleased]` tools
-included in the working-source totals have passed source and offline gates; live editor
-smoke remains pending. Run `get_bridge_status` for the installed live count — it's the
+live-verified on Gravehold — see CHANGELOG `[2.1.0]`. v2.3.0 (2026-09-17) released the placement-plan /
+camera-capture tools and the issues #10–#23 hardening wave, live-verified on `untilted2` —
+see CHANGELOG `[2.3.0]`. Run `get_bridge_status` for the installed live count — it's the
 assembly fingerprint.
 
 The bridge runs on **s&box's built-in editor MCP server** (`http://127.0.0.1:7269/mcp`,

@@ -13,6 +13,9 @@
  * Usage: node scripts/verify-native-mcp.mjs [--port 7269]
  */
 
+import { rmSync } from "node:fs";
+import { join } from "node:path";
+
 const port = process.argv.includes("--port")
   ? process.argv[process.argv.indexOf("--port") + 1]
   : "7269";
@@ -237,14 +240,26 @@ try {
     check("error semantics (bad GUID throws)", /not found|error/i.test(e.message), e.message.slice(0, 100));
   }
 
-  // 8. create_sound_event accepts `path` (v2 fix): aiming at an EXISTING .sound must
-  // produce the "already exists" error — the pre-fix handler would fail on a missing
-  // `name` property instead. No file is written either way.
+  // 8. create_sound_event honors `path` and resolves it under Assets/ (#13); a second
+  // call must hit the "already exists" guard. Self-contained: the old form aimed at a
+  // Gravehold-only file and silently WROTE it into any other project.
+  const soundFiles = [];
   try {
-    await callTool("create_sound_event", { path: "Assets/audio/fx/dig.sound" });
-    check("create_sound_event path param honored", false, "expected already-exists error");
+    const made = JSON.parse((await callTool("create_sound_event", { path: "sounds/__bridge_verify.sound" })).text);
+    const root = JSON.parse((await callTool("get_project_info", {})).text).path;
+    soundFiles.push(join(root, made.path), join(root, made.path + "_c"));
+    check("create_sound_event resolves under Assets/", made.path === "Assets/sounds/__bridge_verify.sound" && made.assetPath === "sounds/__bridge_verify.sound", made.path);
+    try {
+      await callTool("create_sound_event", { path: "sounds/__bridge_verify.sound" });
+      check("create_sound_event already-exists guard", false, "second create succeeded");
+    } catch (e) {
+      check("create_sound_event already-exists guard", /already exists/i.test(e.message), e.message.slice(0, 100));
+    }
   } catch (e) {
-    check("create_sound_event path param honored", /already exists/i.test(e.message), e.message.slice(0, 100));
+    check("create_sound_event resolves under Assets/", false, e.message.slice(0, 120));
+  } finally {
+    await new Promise((r) => setTimeout(r, 500)); // let the asset compiler drop the _c
+    for (const f of soundFiles) rmSync(f, { force: true });
   }
 
   // 9. (PARKED — engine limitation on 26.07.08b) Auto-undo for bridge mutations is not
@@ -310,6 +325,12 @@ try {
     check("batch_set_property dry-run + apply", dryOk && wetOk, `dry:${dryOk} apply:${wetOk}`);
   } catch (e) {
     check("wave-2 batch/prefab chain", false, e.message.slice(0, 200));
+  } finally {
+    // the verify prefab used to be left behind in the project's Assets/prefabs
+    try {
+      const root = JSON.parse((await callTool("get_project_info", {})).text).path;
+      for (const f of ["__bridge_verify.prefab", "__bridge_verify.prefab_c"]) rmSync(join(root, "Assets", "prefabs", f), { force: true });
+    } catch { /* editor gone — nothing to clean */ }
   }
 
   // wave 2: playtest_abort with no job running
