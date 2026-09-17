@@ -18,7 +18,7 @@ But the tools aren't the real story. **The bridge ships a brain.** The companion
 
 The **s&box Codex Bridge** is a first-party distribution of the whole experience for **OpenAI Codex** users: the same 273 native tools, the same cookbook brain, the same API knowledge, the same screenshot-verify workflow, generated from the Claude plugin by the same scripts, so the two can never drift.
 
-    codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.2.0
+    codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.3.0
     codex plugin add sbox-codex-bridge@sboxskins
 
 And because the editor hosts the MCP server itself, **any MCP client**: Claude Code, Codex, or anything that speaks streamable HTTP, connects straight to it over local HTTP. No Node.js required.
@@ -85,6 +85,15 @@ You describe what you want. The AI does the work.
 ---
 
 ## What's new
+
+### v2.3.0, know when your code is live, an editor that can't play dead, and tougher IPC
+
+    Hotload you can trust, trigger_hotload and get_bridge_status now fingerprint the live game assembly, including s&box fast hotloads (method-body edits that swap code without a full reload). No more running stale code, no more needless editor restarts.
+    Frozen is not crashed, a modal dialog blocking the editor now reads as "process alive, main thread blocked" instead of looking like a dead editor.
+    File IPC that doesn't lose things, requests are claimed and only removed after the response is written, replayed requests are ignored, a protocol handshake refuses mismatched versions in plain English, and no transport error is swallowed silently.
+    Plan before you place, dry-run placement plans for scatter, path, and grid with exact commit receipts, plus model geometry inspection, camera bookmarks, compared multi-view captures, and top-down orthographic shots. All live-verified.
+    Assets land where the runtime loads them, sounds, materials, and prefabs resolve under Assets/, and a just-rewritten prefab instantiates fresh instead of from a stale cache.
+    Quality of life, compact namesOnly scene trees, find_objects tells you when a list is truncated, Terrain landmines are refused, and read_log auto-detects the log on Linux and macOS.
 
 ### v2.2.0, arguments that just work, multiplayer that tells the truth, and Codex
 
@@ -229,7 +238,7 @@ Method A, Claude Code plugin (recommended). Use the one-command plugin at the to
 
 Method B, Codex plugin. Same experience for OpenAI Codex:
 
-    codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.2.0
+    codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.3.0
     codex plugin add sbox-codex-bridge@sboxskins
 
 Method C, manual / any MCP client. The editor hosts the server itself (on by default, Editor → Preferences → MCP Server), so this is one command:

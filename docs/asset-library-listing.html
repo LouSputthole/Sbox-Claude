@@ -47,7 +47,7 @@
 
 <blockquote class="codex"><strong>The s&amp;box Codex Bridge</strong> is a first-party distribution of the whole experience for <strong>OpenAI Codex</strong>: same 273 tools, same cookbook brain, same screenshot-verify workflow, generated from the Claude plugin by the same scripts, so the two <u>can never drift</u>.</blockquote>
 
-<pre>codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.2.0
+<pre>codex plugin marketplace add LouSputthole/Sbox-Claude --ref codex-v2.3.0
 codex plugin add sbox-codex-bridge@sboxskins</pre>
 
 <p>And because the <em>editor</em> hosts the MCP server, <strong>any MCP client</strong> connects over local HTTP, no Node.js required.</p>
@@ -100,6 +100,16 @@ codex plugin add sbox-codex-bridge@sboxskins</pre>
 <hr class="divider">
 
 <h2>🚀 What's new</h2>
+
+<h3>v2.3.0: know when your code is live, an editor that can't play dead, and tougher IPC</h3>
+<ul>
+  <li><strong>Hotload you can trust</strong>: <code>trigger_hotload</code> and <code>get_bridge_status</code> now fingerprint the live game assembly, including s&amp;box fast hotloads (method-body edits that swap code without a full reload). No more running stale code, no more needless editor restarts.</li>
+  <li><strong>Frozen is not crashed</strong>: a modal dialog blocking the editor now reads as "process alive, main thread blocked" instead of looking like a dead editor.</li>
+  <li><strong>File IPC that doesn't lose things</strong>: requests are claimed and only removed after the response is written, replayed requests are ignored, a protocol handshake refuses mismatched versions in plain English, and no transport error is swallowed silently.</li>
+  <li><strong>Plan before you place</strong>: dry-run placement plans for scatter, path, and grid with exact commit receipts, plus model geometry inspection, camera bookmarks, compared multi-view captures, and top-down orthographic shots. All live-verified.</li>
+  <li><strong>Assets land where the runtime loads them</strong>: sounds, materials, and prefabs resolve under <code>Assets/</code>, and a just-rewritten prefab instantiates fresh instead of from a stale cache.</li>
+  <li><strong>Quality of life</strong>: compact <code>namesOnly</code> scene trees, <code>find_objects</code> tells you when a list is truncated, Terrain landmines are refused, and <code>read_log</code> auto-detects the log on Linux and macOS.</li>
+</ul>
 
 <h3>v2.2.0: args that just work, multiplayer that tells the truth, and Codex</h3>
 <ul>
