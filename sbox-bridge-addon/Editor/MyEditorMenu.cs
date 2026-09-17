@@ -32,7 +32,7 @@ public static class ClaudeBridge
 
 	// Bridge build version — surfaced in status.json + the Status menu so a
 	// marketplace-addon-vs-MCP-server skew is visible at a glance.
-	internal const string BridgeVersion = "2.2.0";
+	internal const string BridgeVersion = "2.3.0";
 
 	// status.json doubles as a heartbeat. _startedAtIso is stamped once at start;
 	// the heartbeat timestamp is refreshed from the frame loop at most once per
@@ -1033,12 +1033,15 @@ public static class ClaudeBridge
 	internal static string[] RegisteredCommands => _handlers.Keys.ToArray();
 	internal static string IpcDirectory => _ipcDir;
 
+	private static string _lastGameAssemblyName;
+
 	/// <summary>
 	/// Fingerprint of the project's currently-loaded GAME assembly — the one hotload
 	/// swaps. Its MVID changes on every successful recompile, so an agent can tell
 	/// whether a trigger_hotload has actually landed instead of trusting silence and
-	/// running the old code (issue #15). Resolved through TypeLibrary so it always
-	/// reflects the LIVE assembly, never an unloaded predecessor. Never throws.
+	/// running the old code (issue #15). The assembly NAME comes from the project ident
+	/// (via TypeLibrary); the fingerprint is the highest-Version loaded build of that name,
+	/// because a fast hotload never moves the TypeLibrary's assembly. Never throws.
 	/// </summary>
 	internal static object GetGameAssemblyFingerprint()
 	{
@@ -1058,27 +1061,60 @@ public static class ClaudeBridge
 				candidates[name] = asm;
 			}
 
-			// Project game code compiles as local.<ident> / package.local.<ident>; installed
-			// libraries as package.<org>.<ident>. Prefer the local one, then anything that
-			// names the project ident, then the first non-engine assembly with Components.
+			// Project game code compiles as [package.]<org>.<ident> (org is "local" for an
+			// unpublished project). Match the ident EXACTLY: mid-swap the game types briefly
+			// leave the TypeLibrary, and a "package.local.*" prefix rule then fingerprinted
+			// package.local.menu (and a first-non-engine last resort an unrelated library), so a
+			// caller comparing mvids saw a false "recompile landed" (caught live 2026-09-16).
+			// The prefix rule survives only for a project with no ident; the last resolved
+			// name is remembered so the swap window still answers correctly.
 			Assembly pick = null;
-			foreach ( var kv in candidates )
-				if ( kv.Key.StartsWith( "local.", StringComparison.OrdinalIgnoreCase ) || kv.Key.StartsWith( "package.local.", StringComparison.OrdinalIgnoreCase ) ) { pick = kv.Value; break; }
-			if ( pick == null && !string.IsNullOrEmpty( ident ) )
+			if ( !string.IsNullOrEmpty( ident ) )
+			{
+				var org = Project.Current?.Config?.Org;
+				foreach ( var o in new[] { org, "local" } )
+				{
+					if ( pick != null || string.IsNullOrEmpty( o ) ) continue;
+					if ( !candidates.TryGetValue( $"package.{o}.{ident}", out pick ) )
+						candidates.TryGetValue( $"{o}.{ident}", out pick );
+				}
+			}
+			else
+			{
 				foreach ( var kv in candidates )
-					if ( kv.Key.Contains( ident, StringComparison.OrdinalIgnoreCase ) ) { pick = kv.Value; break; }
-			if ( pick == null ) pick = candidates.Values.FirstOrDefault();
+					if ( kv.Key.StartsWith( "local.", StringComparison.OrdinalIgnoreCase ) || kv.Key.StartsWith( "package.local.", StringComparison.OrdinalIgnoreCase ) ) { pick = kv.Value; break; }
+			}
+			var gameName = pick?.GetName().Name ?? _lastGameAssemblyName;
+			if ( string.IsNullOrEmpty( gameName ) )
+				return new { available = false, note = "No project Component types are loaded (empty Code/ folder, the game assembly failed to compile — check get_compile_errors — or a hotload is mid-swap: poll again)." };
+			_lastGameAssemblyName = gameName;
 
-			if ( pick == null )
-				return new { available = false, note = "No non-engine Component types are loaded (empty Code/ folder, or the game assembly failed to compile — check get_compile_errors)." };
+			// FAST HOTLOAD: a method-body-only edit loads the new assembly and detours into it
+			// but leaves TypeLibrary pointing at the OLD one, so the TypeLibrary mvid never moves
+			// while the new code is already live. Every compile bumps the assembly Version
+			// (0.0.N), so the highest-Version loaded copy of this name is the real newest build.
+			Assembly newest = pick;
+			int loaded = 0;
+			foreach ( var asm in AppDomain.CurrentDomain.GetAssemblies() )
+			{
+				var an = asm.GetName();
+				if ( !string.Equals( an.Name, gameName, StringComparison.OrdinalIgnoreCase ) ) continue;
+				loaded++;
+				if ( newest == null || an.Version > newest.GetName().Version ) newest = asm;
+			}
+			if ( newest == null )
+				return new { available = false, note = $"'{gameName}' is not loaded right now (hotload mid-swap?) — poll again." };
 
 			return new
 			{
 				available = true,
-				assembly = pick.GetName().Name,
-				mvid = pick.ManifestModule.ModuleVersionId.ToString(),
+				assembly = gameName,
+				mvid = newest.ManifestModule.ModuleVersionId.ToString(),
+				version = newest.GetName().Version?.ToString(),
+				fastHotloaded = pick != null && !ReferenceEquals( newest, pick ),
+				loadedBuilds = loaded,
 				candidateAssemblies = candidates.Count,
-				note = "mvid changes on every successful recompile of this assembly — compare against trigger_hotload's assemblyBefore.mvid."
+				note = "mvid/version change on every successful recompile (full swap OR fast hotload) — compare against trigger_hotload's assemblyBefore.mvid."
 			};
 		}
 		catch ( Exception ex )
@@ -2178,7 +2214,7 @@ public class GetSceneHierarchyHandler : IBridgeHandler
 
 		// namesOnly:true — {id,name,childCount,children} per node, no components/enabled.
 		// A dressed scene (~900 objects) at maxDepth 2 was 147k chars with components; the
-		// "what is in this scene" question needs a few kB (issue #16).
+		// "what is in this scene" question needs far less than the full tree (issue #16).
 		var namesOnly = p.TryGetProperty( "namesOnly", out var no ) && no.ValueKind == JsonValueKind.True;
 		Func<GameObject, int, int, object> serialize = ( go, depth, cap ) => namesOnly
 			? ClaudeBridge.SerializeGoTreeCompact( go, depth, cap )
@@ -3142,8 +3178,15 @@ public class InstantiatePrefabHandler : IBridgeHandler
 			// any REGISTERED .prefab. Try both the given path and the Assets/-stripped form.
 			GameObject go = null;
 			string method = null;
+			// A prefab (re)written moments ago can still be STALE in the asset system — Clone
+			// then returns the PREVIOUS contents (caught live 2026-09-16: create_prefab →
+			// instantiate_prefab over a cached path lost its components). Read it from disk.
+			// Known ceiling: a 10 s write-age heuristic; ask the asset system for its load stamp if
+			// a slow machine ever proves that window too short.
+			bool justWritten = ( DateTime.UtcNow - File.GetLastWriteTimeUtc( fullPath ) ).TotalSeconds < 10;
 			foreach ( var candidate in new[] { prefabPath, StripAssetsPrefix( prefabPath ) }.Distinct() )
 			{
+				if ( justWritten ) break;
 				try { go = GameObject.Clone( candidate ); } catch { /* fall through */ }
 				if ( go != null ) { method = "engine (GameObject.Clone)"; break; }
 			}

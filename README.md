@@ -3,7 +3,7 @@
 > **Build s&box games by talking to Claude Code.** Describe what you want — Claude writes the C#, builds the scenes, wires up components, and iterates until it works.
 
 <p>
-<strong>v2.2.0</strong> · <strong>273 native tools</strong> · <strong>286 total tools / 278 handlers</strong> · <strong>28 toolsets</strong> (+ 7 lifeline tools) · Source-available (no independent redistribution; official channels authorized) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
+<strong>v2.3.0</strong> · <strong>273 native tools</strong> · <strong>286 total tools / 278 handlers</strong> · <strong>28 toolsets</strong> (+ 7 lifeline tools) · Source-available (no independent redistribution; official channels authorized) · built by <a href="https://sboxskins.gg">sboxskins.gg</a>
 </p>
 
 <p>📖 <strong>Full docs:</strong> <a href="https://sboxskins.gg/claudebridge">sboxskins.gg/claudebridge</a> — <a href="https://sboxskins.gg/claudebridge/plugin">setup</a> · <a href="https://sboxskins.gg/claudebridge/changelog">changelog</a> · <a href="https://sboxskins.gg/claudebridge/troubleshooting">troubleshooting</a> · <a href="https://sboxskins.gg/claudebridge/faq">FAQ</a></p>
@@ -25,6 +25,29 @@ Claude Code connects to the **live s&box editor** through the editor's **native 
 > **[docs/FAQ.md](docs/FAQ.md)** (do my old workflows still work, can an agent modify my project, what's next).
 
 ---
+
+## What's new in v2.3.0
+
+- **Know when your code is actually live.** `trigger_hotload` returns `assemblyBefore` and
+  `get_bridge_status` returns `gameAssembly` (mvid + version). It tracks **fast hotloads** too —
+  a method-body edit swaps code without moving the TypeLibrary, so the fingerprint follows the
+  newest loaded build, not the TypeLibrary's (live-verified: body edit, structural edit, delete).
+- **A frozen editor no longer looks like a crashed one.** The heartbeat runs off the main
+  thread and reports `mainThreadStalledMs` / `blockedBy`, so a modal dialog reads as *process
+  alive, main thread blocked*.
+- **Sturdier file IPC.** Requests are claimed with a `.processing` sentinel and deleted only
+  after the response is written, replayed request ids are ignored, a `protocolVersion`
+  handshake refuses a newer server readably, and no transport error is swallowed silently.
+- **Plan before you place.** `dryRun:true` placement plans for `scatter_props`,
+  `place_along_path`, and `grid_duplicate` + `commit_placement_plan` with slot→GUID receipts;
+  `inspect_model_geometry`, provenance-rich `get_bounds`, `find_objects_near`, camera
+  bookmarks, compared multi-view captures, and orthographic `capture_topdown`.
+- **Big scenes fit in context.** `get_scene_hierarchy namesOnly:true`; `find_objects` reports
+  `total` / `showing` / `truncated`.
+- **Assets land where the runtime can load them.** `create_sound_event` / `create_material` /
+  `create_prefab` resolve under `Assets/`; a just-written prefab instantiates from disk instead
+  of a stale asset-system cache.
+- `read_log` auto-detects `sbox-dev.log` on Linux and macOS Steam installs (Proton).
 
 ## What's new in v2.2.0
 
@@ -111,7 +134,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
    ```
 3. **(Optional, recommended) Add the lifeline** — the editor-down diagnostics server. The native server dies with the editor; the lifeline answers "why did the editor crash" when nothing else can:
    ```bash
-   claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.2.0 --lifeline
+   claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2.3.0 --lifeline
    ```
 
 **Prefer the plugin?** `/plugin marketplace add LouSputthole/Sbox-Claude` then `/plugin install sbox-claude` — from v2.0.0 the plugin's `.mcp.json` wires **both** servers (native + lifeline) for you and ships the workflow skills. You still install the editor addon (step 1).
@@ -183,7 +206,7 @@ Three steps. Node.js is **not** required (only for the optional lifeline).
 
 | Piece | What it is |
 |---|---|
-| **MCP server config** | `.mcp.json` registers **both servers** from v2.0.0 — `sbox` (the native HTTP endpoint at `http://127.0.0.1:7269/mcp`) and `sbox-lifeline` (`npx -y sbox-mcp-server@2.2.0 --lifeline`) — no manual registration, no version drift |
+| **MCP server config** | `.mcp.json` registers **both servers** from v2.0.0 — `sbox` (the native HTTP endpoint at `http://127.0.0.1:7269/mcp`) and `sbox-lifeline` (`npx -y sbox-mcp-server@2.3.0 --lifeline`) — no manual registration, no version drift |
 | **Skill: `sbox-build-feature`** | The screenshot-driven build workflow: confirm the bridge is alive → brainstorm non-trivial features → research the API with `describe_type` → bite-sized edits → hotload + scan the log → **screenshot and read the inline PNG**. Plus a table of s&box gotchas (Cloud assets aren't persistent; Citizen bone names are case-sensitive; `CitizenAnimationHelper.IkRightHand` drives IK at runtime; `Color` properties want `"r, g, b, a"` strings; etc.) |
 | **Skill: `sbox-api`** | Schema-grounded s&box API knowledge — the Unity→s&box translation table, the Ten Rules, and curated component/UI/networking/physics references, so Claude stops hallucinating Unity patterns |
 | **Skill: `sbox-cookbook`** | A master **router** indexing code-grounded recipes mined from **51 public-source s&box games** plus the modern engine repos: engine references (networking-authority, architecture, player-controller, ui-razor, and more), systems (inventory, economy, saves, progression, gacha, leaderboards, building, crafting, dialogue, rounds, waves, anti-cheat…), and genre recipes (tycoon, shopkeeper, survival-horror, deathmatch, platformer, card-battler, social-hub…). Ask "how do I build a tycoon / an inventory / a save system?" and it routes you to a grounded how-to |

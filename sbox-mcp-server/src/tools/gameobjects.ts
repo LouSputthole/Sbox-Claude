@@ -185,7 +185,7 @@ export function registerGameObjectTools(
   // ── get_scene_hierarchy ──────────────────────────────────────────
   server.tool(
     "get_scene_hierarchy",
-    "Get the scene tree — GameObjects with their names, GUIDs, components, and parent/child relationships. Pair maxDepth with rootId to drill into a subtree without paying for the whole scene. On a dressed scene (hundreds of objects) pass namesOnly:true first — it returns just {id,name,childCount} per object (no components/enabled) so a 'what is in this scene' overview stays a few kB instead of overflowing the result budget; then drill into one subtree with rootId",
+    "Get the scene tree — GameObjects with their names, GUIDs, components, and parent/child relationships. Pair maxDepth with rootId to drill into a subtree without paying for the whole scene. On a dressed scene (hundreds of objects) pass namesOnly:true first — it returns just {id,name,childCount} per object (no components/enabled) for a lighter 'what is in this scene' overview (~30% smaller; size still scales with object count, so keep maxDepth low); then drill into one subtree with rootId",
     {
       maxDepth: z
         .number()
