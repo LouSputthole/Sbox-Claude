@@ -2,10 +2,34 @@
 
 All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claudebridge/changelog](https://sboxskins.gg/claudebridge/changelog).
 
-## [Unreleased]
+## [2.3.0] -- 2026-09-17
 
 ### Added
 
+- `get_scene_hierarchy namesOnly:true` — compact `{id,name,childCount,children}` tree (no
+  components/enabled) for a "what is in this scene" overview. Measured ~30% smaller
+  (271 kB vs 391 kB on a flat 1,544-object scene) — pair it with `maxDepth` / `rootId` to stay
+  inside the result budget (#16).
+- `find_objects` now reports `total` / `showing` / `truncated` (+ a note) so a capped list can
+  no longer look complete (#16).
+- `trigger_hotload` returns `assemblyBefore` (the live game-assembly MVID) and `get_bridge_status`
+  returns `gameAssembly`; poll until the MVID changes before trusting `invoke_button` after
+  editing an existing `.cs` — the nudge is asynchronous and successful compiles log nothing (#15).
+- `status.json` heartbeat now runs on the addon's poll-timer thread and publishes `heartbeat`
+  (main thread), `processHeartbeat` (poll thread), `mainThreadStalledMs` and `blockedBy`, so a
+  modal editor dialog ("External Changes Detected") reads as *process alive, main thread
+  blocked* instead of looking identical to a crash. `get_bridge_status` and request-timeout
+  errors say so (#14).
+- IPC `protocolVersion` stamped on every request and in `status.json`; the addon refuses
+  requests from a newer protocol with a readable error (#22).
+- `sbox-dev.log` auto-detection on Linux and macOS (`~/.steam/steam`, `~/.local/share/Steam`,
+  Flatpak, Snap, `~/Library/Application Support/Steam`, plus every library in
+  `libraryfolders.vdf`) — previously gated on Windows so `read_log` was empty off-Windows
+  without `SBOX_LOG_PATH` (#10).
+- 19 new Node tests (31 total): an in-process fake editor drives the full file-IPC round-trip
+  (atomic write, `protocolVersion`, modal-stall diagnostics, loud parse failures), every
+  registered tool's zod schema is swept, the shared vector contract is checked in both wire
+  forms, and log detection is verified per platform (#21).
 - Deterministic `dryRun:true` placement plans for `place_along_path`, `grid_duplicate`, and `scatter_props`, plus `commit_placement_plan` for exact, rollback-protected creation with slot-to-GUID receipts.
 - `inspect_model_geometry` for model-local render/physics bounds, footprint, height, and pivot-to-ground offsets before placement.
 - Provenance-rich `get_bounds` aggregates for render, all physics, and non-trigger physics, plus play-aware `find_objects_near`.
@@ -14,6 +38,29 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 
 ### Changed
 
+- File-IPC request files are renamed to a `req_<id>.json.processing` sentinel when picked up
+  and deleted only AFTER the response is written (was: deleted immediately after reading,
+  before processing). A timeout can now say "picked up, still executing" vs "never picked up",
+  and an editor crash mid-handler leaves the request on disk where the next session sweeps
+  and logs it by command instead of losing it silently. Processed request ids are remembered
+  for 5 minutes so a replayed/duplicate request is a no-op rather than a second
+  `create_gameobject` (#19, #20).
+- Every formerly-silent `catch {}` on the transport path (TS `bridge-client.ts`, C# poller)
+  now logs: malformed `status.json`, unreadable/undeletable IPC files, poll errors (once per
+  distinct message), and an unparseable response fails the request within ~250 ms with the
+  first 200 chars instead of spinning to the 30 s timeout (#18).
+- `create_sound_event`, `create_material` and `create_prefab` resolve relative paths under
+  `Assets/` (a `.sound` written at the project root compiled and previewed but the runtime
+  could not load it) and return both `path` (project-relative) and `assetPath`
+  (engine-relative); `get_prefab_info` / `instantiate_prefab` accept either form (#13).
+- `set_property` refuses `Terrain.ClipMapLodExtentTexels` and `Terrain.Enabled` (both kill
+  terrain rendering until scene reload; the former NREs on every later load once saved) (#12).
+- Screenshot tool descriptions document two engine capture limits: UI text may rasterise as
+  solid boxes, and Terrain renders as a truncated ribbon from any temporary camera (#11, #12).
+- Vector3 / Rotation zod schemas live in `src/shared/schemas.ts` instead of being re-declared
+  in eight tool modules; `camera.ts` / `diagnostics.ts` keep their strict variants on purpose (#22).
+- Removed the dead `host` / `port` fields from `BridgeClient`, `get_bridge_status`, `--help`
+  and the `SBOX_BRIDGE_HOST` / `SBOX_BRIDGE_PORT` env vars — there has never been a socket (#23).
 - `set_transform` now pre-parses every supplied value, supports explicit world/local space, returns before/after receipts, and rolls back if apply or receipt construction fails.
 - `batch_set_property` dry runs now perform the same coercion/reference resolution as apply, distinguish changes from no-ops, and avoid needless setters.
 - Scatter placement now rejects error models and invalid ranges, preserves fixed non-unit scale, and grounds model bottoms using traced end positions plus model-local pivot offsets.
@@ -30,10 +77,27 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
   instance" action. Client liveness is cached by an asynchronous watcher, and cleanup
   performs OS process discovery/kill/wait work off the editor thread, keeping
   `multiplayer_test_status` and `stop_multiplayer_test` responsive while a client lives.
+- `gameAssembly` / `assemblyBefore` now follow **fast hotloads**. A method-body-only edit loads
+  the new assembly and detours into it but never moves the TypeLibrary, so the first cut of the
+  #15 fingerprint sat still while new code was already live — telling an agent to restart the
+  editor for nothing. The fingerprint is now the highest-`Version` loaded build of the project
+  assembly, with `version`, `fastHotloaded` and `loadedBuilds` reported (live-verified: body
+  edit, structural edit, delete).
+- The same fingerprint matched the project ident by `package.local.*` PREFIX, so mid-swap it
+  briefly reported `package.local.menu` — a false "recompile landed". It now matches the ident
+  exactly and remembers the resolved name across the swap window.
+- `instantiate_prefab` reads a prefab written in the last 10 s straight from disk. The asset
+  system can still hold the PREVIOUS contents of a just-rewritten path, so `create_prefab` →
+  `instantiate_prefab` could clone a stale tree.
+- `scripts/verify-native-mcp.mjs` no longer writes `Assets/audio/fx/dig.sound` into any project
+  that is not Gravehold, and now deletes its verify prefab and sound event (41 checks).
 - Rotation arguments now semantically unwrap native-stringified JSON objects/arrays before parsing, preserving `pitch`/`yaw`/`roll` keys regardless of property order across shared, strict `set_transform`, camera-bookmark, character/equipment, capture, and `drive_player` paths.
 - The proven multiplayer-test handlers from the installed library are now present in canonical source, registered, exposed through TypeScript/native MCP wrappers, and covered by discovery/status smoke checks. Starts now reject overlap, validate host-plus-client capacity, count joins from a pre-spawn connection baseline, create private/hidden lobbies, and roll back newly created lobbies when every spawn fails; failed client kills remain tracked for truthful retryable cleanup.
 
-> Source and offline gates are verified; live editor smoke coverage remains pending and is tracked in `TESTING.md`.
+> Live-verified 2026-09-16 on editor 26.09.01c (project `untilted2`): clean addon compile, 278 handlers,
+> live gate 41/41 twice, `run_self_test` 8/8 (published 2.2.0 server against the 2.3.0 addon, so the
+> mixed-version upgrade path holds), and TESTING.md smoke rows 2–14 and 16. Row 15 (modal-dialog
+> stall) is covered by the fake-editor Node test only, not exercised against a real modal.
 
 ## [2.2.0] -- 2026-07-24
 

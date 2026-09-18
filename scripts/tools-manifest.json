@@ -510,7 +510,7 @@
     {
       "module": "audio",
       "name": "create_sound_event",
-      "description": "Create a .sound event file wired to a source .vsnd. Returns { created, path, soundReferenced, note } (path is project-relative); errors if the file already exists. Preview the result with play_sound_preview or attach it to an object with assign_sound. Note: .sound events have no loop flag — looping lives on the SoundPointComponent that plays the event",
+      "description": "Create a .sound event file wired to a source .vsnd. The file is written under the project's Assets/ folder (a relative path like 'sounds/x.sound' becomes Assets/sounds/x.sound — assets outside Assets/ compile but the runtime cannot load them). Returns { created, path (project-relative), assetPath (what the engine loads, e.g. 'sounds/x.sound'), soundReferenced, note }; errors if the file already exists. Preview the result with play_sound_preview or attach it to an object with assign_sound. Note: .sound events have no loop flag — looping lives on the SoundPointComponent that plays the event",
       "params": [
         {
           "name": "path",
@@ -2426,7 +2426,7 @@
     {
       "module": "diagnostics",
       "name": "read_log",
-      "description": "Read s&box's editor log (sbox-dev.log) so Claude can see compile errors, exceptions, and Log.Info output directly. Reads the log file (not via the bridge), so it works even when the editor has crashed. If auto-detection fails (non-Windows / non-Steam install), set the SBOX_LOG_PATH environment variable to the full log path.",
+      "description": "Read s&box's editor log (sbox-dev.log) so Claude can see compile errors, exceptions, and Log.Info output directly. Reads the log file (not via the bridge), so it works even when the editor has crashed. Auto-detects the Steam library on Windows, Linux and macOS; if that fails (non-Steam install, Proton prefix quirks), set the SBOX_LOG_PATH environment variable to the full log path.",
       "params": [
         {
           "name": "lines",
@@ -3657,7 +3657,7 @@
     {
       "module": "gameobjects",
       "name": "get_scene_hierarchy",
-      "description": "Get the scene tree — GameObjects with their names, GUIDs, components, and parent/child relationships. Pair maxDepth with rootId to drill into a subtree without paying for the whole scene",
+      "description": "Get the scene tree — GameObjects with their names, GUIDs, components, and parent/child relationships. Pair maxDepth with rootId to drill into a subtree without paying for the whole scene. On a dressed scene (hundreds of objects) pass namesOnly:true first — it returns just {id,name,childCount} per object (no components/enabled) for a lighter 'what is in this scene' overview (~30% smaller; size still scales with object count, so keep maxDepth low); then drill into one subtree with rootId",
       "params": [
         {
           "name": "maxDepth",
@@ -3673,6 +3673,14 @@
           "optional": true,
           "type": {
             "kind": "string"
+          }
+        },
+        {
+          "name": "namesOnly",
+          "description": "true = compact tree: {id, name, childCount, children} only, no components or enabled flags. Default false",
+          "optional": true,
+          "type": {
+            "kind": "boolean"
           }
         }
       ]
@@ -6986,7 +6994,7 @@
     {
       "module": "objecttools",
       "name": "find_objects",
-      "description": "Query the scene for GameObjects by name (case-insensitive substring), component type name, and/or tag — combine filters (AND). Returns {id,name} for matches (limit default 50, max 500). Read-only; works during play. Use it to get GUIDs to feed into align/distribute/set_tint/group/delete/etc.",
+      "description": "Query the scene for GameObjects by name (case-insensitive substring), component type name, and/or tag — combine filters (AND). Returns { count, total, showing, truncated, objects:[{id,name}] } — total is EVERY match in the scene, showing/count how many rows were returned (limit default 50, max 500), truncated:true when rows were cut so you can raise limit or narrow the filter. Read-only; works during play. Use it to get GUIDs to feed into align/distribute/set_tint/group/delete/etc.",
       "params": [
         {
           "name": "name",
@@ -8459,7 +8467,7 @@
     {
       "module": "scripts",
       "name": "trigger_hotload",
-      "description": "Force s&box to recompile and hotload all C# scripts immediately. Use after creating or editing scripts to see changes in real-time",
+      "description": "Nudge s&box to recompile and hotload the project's C# (bumps the .csproj timestamps the file-watcher keys on). NOT synchronous: the compile lands on a later frame, and editing an EXISTING .cs can leave the OLD assembly running silently. Returns { triggered, touched, assemblyBefore, note } — assemblyBefore is the current game-assembly fingerprint; poll get_bridge_status.gameAssembly until it differs (or verify with an explicit marker such as a version string in a Log.Info) BEFORE trusting invoke_button / describe_type output. Falls back to restart_editor for new package dependencies",
       "params": []
     },
     {
@@ -8884,7 +8892,7 @@
     {
       "module": "status",
       "name": "get_bridge_status",
-      "description": "Check the s&box Bridge connection — call this FIRST in a session. Returns a human summary plus JSON: connected, roundTripOk (heartbeat can be fresh while the editor's request loop is stalled — trust roundTripOk), bridgeVersion vs mcpServerVersion + versionsAligned (a mismatch means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs, latencyMs, and ipcDir (transport is file IPC; host/port are legacy fields).",
+      "description": "Check the s&box Bridge connection — call this FIRST in a session. Returns a human summary plus JSON: connected, roundTripOk (heartbeat can be fresh while the editor's request loop is stalled — trust roundTripOk), bridgeVersion vs mcpServerVersion + versionsAligned (a mismatch means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs, processHeartbeatAgeMs + blockedBy (editor process alive but main thread stalled = a modal dialog is open), gameAssembly (fingerprint that changes on every hotload — compare against trigger_hotload's assemblyBefore), latencyMs, and ipcDir (transport is file IPC).",
       "params": []
     },
     {

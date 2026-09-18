@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
+import { Vector3Schema } from "../shared/schemas.js";
 
 /**
  * Stats & Achievements pack — five scaffolds:
@@ -17,22 +18,6 @@ import { BridgeClient } from "../transport/bridge-client.js";
  * describe_type (Stats.Increment/SetValue/Flush, Leaderboards.GetFromStat ->
  * Board2.SetFriendsOnly/SetAggregationMin/SetSortAscending/Refresh(token)).
  */
-
-// A 3D vector accepted as EITHER an object {x,y,z} OR a comma string "x,y,z".
-// The value is passed through to the bridge unchanged; the C# handler parses
-// both forms (C# is the source of truth for parsing).
-const Vector3Object = z.object({
-  x: z.number().describe("X coordinate"),
-  y: z.number().describe("Y coordinate"),
-  z: z.number().describe("Z coordinate"),
-});
-
-const Vector3Schema = z
-  .union([
-    Vector3Object,
-    z.string().describe('Comma string "x,y,z", e.g. "0,0,200"'),
-  ])
-  .describe('3D vector — object {x,y,z} OR comma string "x,y,z"');
 
 export function registerStatsAchievementsTools(
   server: McpServer,

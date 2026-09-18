@@ -8,7 +8,7 @@
  * scripts, console, scenes, etc.) has its own register function in src/tools/.
  *
  * CLI flags: --version / -v, --help / -h
- * Environment: SBOX_BRIDGE_IPC_DIR (the real knob); SBOX_BRIDGE_HOST / SBOX_BRIDGE_PORT (legacy, cosmetic)
+ * Environment: SBOX_BRIDGE_IPC_DIR (the IPC directory — must match the addon), SBOX_LOG_PATH (editor log override)
  */
 
 import { readFileSync } from "fs";
@@ -109,8 +109,8 @@ USAGE
 ENVIRONMENT VARIABLES
   SBOX_BRIDGE_IPC_DIR   IPC directory — MUST match the s&box addon's dir.
                         Default: <os tmpdir>/sbox-bridge-ipc
-  SBOX_BRIDGE_HOST      Legacy/cosmetic — shown in get_bridge_status only
-  SBOX_BRIDGE_PORT      Legacy/cosmetic — shown in get_bridge_status only
+  SBOX_LOG_PATH         Full path to sbox-dev.log (auto-detected from Steam
+                        on Windows/Linux/macOS; set it for Proton or non-Steam)
 
 CONNECT TO CLAUDE CODE
   claude mcp add sbox -- node /path/to/sbox-mcp-server/dist/index.js
@@ -200,11 +200,9 @@ The plugin ships an \`sbox-build-feature\` skill that codifies the workflow abov
   },
 );
 
-// Bridge client talks to the s&box editor via file IPC. host/port are cosmetic.
-const bridge = new BridgeClient(
-  process.env.SBOX_BRIDGE_HOST ?? "127.0.0.1",
-  parseInt(process.env.SBOX_BRIDGE_PORT ?? "29015", 10)
-);
+// Bridge client talks to the s&box editor via file IPC (SBOX_BRIDGE_IPC_DIR).
+// There is no socket — see transport/bridge-client.ts.
+const bridge = new BridgeClient();
 
 // ── Lifeline mode (v2 migration) ───────────────────────────────────
 // With the native editor MCP server carrying the full tool surface, this stdio

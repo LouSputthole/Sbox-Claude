@@ -20,7 +20,12 @@ public class GetBridgeStatusHandler : IBridgeHandler
 			connected = true,
 			running = ClaudeBridge.IsRunning,
 			version = ClaudeBridge.BridgeVersion,
+			protocolVersion = ClaudeBridge.IpcProtocolVersion,
 			handlerCount = ClaudeBridge.HandlerCount,
+			ipcDir = ClaudeBridge.IpcDirectory,
+			// Changes on every successful recompile — pair with trigger_hotload.assemblyBefore
+			// to know when an edit has actually landed (issue #15).
+			gameAssembly = ClaudeBridge.GetGameAssemblyFingerprint(),
 			registeredCommands = ClaudeBridge.RegisteredCommands
 		} );
 }

@@ -25,8 +25,6 @@ jobs:
             node: "18"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
-    env:
-      CODEX_HOME: ${{ runner.temp }}/codex-home
 
     steps:
       - uses: actions/checkout@v5
@@ -34,13 +32,30 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      # The `runner` context is not available in job-level `env` (GitHub rejects the
+      # workflow at parse time — every run since the file landed failed with zero jobs),
+      # so resolve CODEX_HOME from a step and export it for the rest of the job.
+      - name: Resolve Codex home
+        shell: bash
+        # The Codex CLI refuses to start ("failed to load configuration") when
+        # CODEX_HOME does not exist, so create both homes up front (the -git one is
+        # used by the GitHub-marketplace steps at the end).
+        run: |
+          mkdir -p "${RUNNER_TEMP}/codex-home" "${RUNNER_TEMP}/codex-home-git"
+          echo "CODEX_HOME=${RUNNER_TEMP}/codex-home" >> "$GITHUB_ENV"
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node }}
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.x"
+          # Pinned: the tree-sitter wheels below are published for 3.12; "3.x" resolved to
+          # 3.14 where a source build would be needed.
+          python-version: "3.12"
+
+      - name: Install C# syntax-check dependencies
+        run: python -m pip install --disable-pip-version-check "tree-sitter==0.26.0" "tree-sitter-c-sharp==0.23.5"
 
       - name: Install MCP dependencies
         working-directory: sbox-mcp-server

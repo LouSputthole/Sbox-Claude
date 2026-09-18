@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { BridgeClient } from "../transport/bridge-client.js";
+import { Vector3Schema, RotationSchema } from "../shared/schemas.js";
 
 /**
  * Gameplay scaffold tools — Phase 1 of "playable game in one ask".
@@ -17,30 +18,6 @@ import { BridgeClient } from "../transport/bridge-client.js";
  * The `sbox-scaffold-game` skill orchestrates these into a playable starter.
  * All scene/file-mutating; refused during play mode by the bridge dispatch.
  */
-
-// A 3D vector accepted as EITHER an object {x,y,z} OR a comma string "x,y,z",
-// passed through unchanged. The C# handler parses both forms (source of truth).
-// See the cross-language vector/color contract.
-const Vector3Object = z.object({
-  x: z.number().describe("X coordinate"),
-  y: z.number().describe("Y coordinate"),
-  z: z.number().describe("Z coordinate"),
-});
-
-const Vector3Schema = z
-  .union([
-    Vector3Object,
-    z.string().describe('Comma string "x,y,z", e.g. "0,0,200"'),
-  ])
-  .describe('3D vector — object {x,y,z} OR comma string "x,y,z"');
-
-const RotationSchema = z
-  .object({
-    pitch: z.number().describe("Pitch angle in degrees"),
-    yaw: z.number().describe("Yaw angle in degrees"),
-    roll: z.number().describe("Roll angle in degrees"),
-  })
-  .describe("Euler rotation with pitch, yaw, roll in degrees");
 
 export function registerGameplayTools(
   server: McpServer,

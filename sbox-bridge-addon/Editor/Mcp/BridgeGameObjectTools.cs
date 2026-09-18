@@ -84,8 +84,10 @@ public static class BridgeGameObjectTools
 
 	/// <summary>
 	/// Query the scene for GameObjects by name (case-insensitive substring), component type name,
-	/// and/or tag — combine filters (AND). Returns {id,name} for matches (limit default 50, max 500).
-	/// Read-only; works during play. Use it to get GUIDs to feed into
+	/// and/or tag — combine filters (AND). Returns { count, total, showing, truncated,
+	/// objects:[{id,name}] } — total is EVERY match in the scene, showing/count how many rows were
+	/// returned (limit default 50, max 500), truncated:true when rows were cut so you can raise limit
+	/// or narrow the filter. Read-only; works during play. Use it to get GUIDs to feed into
 	/// align/distribute/set_tint/group/delete/etc.
 	/// </summary>
 	/// <param name="name">Name substring (case-insensitive).</param>
@@ -141,13 +143,17 @@ public static class BridgeGameObjectTools
 	/// <summary>
 	/// Get the scene tree — GameObjects with their names, GUIDs, components, and parent/child
 	/// relationships. Pair maxDepth with rootId to drill into a subtree without paying for the whole
-	/// scene.
+	/// scene. On a dressed scene (hundreds of objects) pass namesOnly:true first — it returns just
+	/// {id,name,childCount} per object (no components/enabled) for a lighter 'what is in this scene'
+	/// overview (~30% smaller; size still scales with object count, so keep maxDepth low); then drill
+	/// into one subtree with rootId.
 	/// </summary>
 	/// <param name="maxDepth">Maximum recursion depth. Defaults to 10. Use 1 or 2 for cheap top-level overviews.</param>
 	/// <param name="rootId">Optional GUID of a GameObject to start traversal from. Omit to walk from the scene roots.</param>
+	/// <param name="namesOnly">true = compact tree: {id, name, childCount, children} only, no components or enabled flags. Default false.</param>
 	[McpTool.ReadOnly( "get_scene_hierarchy" )]
-	public static Task<object> GetSceneHierarchy( int? maxDepth = null, string rootId = null )
-		=> McpGate.Run( "get_scene_hierarchy", McpGate.Args( ( "maxDepth", maxDepth ), ( "rootId", rootId ) ) );
+	public static Task<object> GetSceneHierarchy( int? maxDepth = null, string rootId = null, bool? namesOnly = null )
+		=> McpGate.Run( "get_scene_hierarchy", McpGate.Args( ( "maxDepth", maxDepth ), ( "rootId", rootId ), ( "namesOnly", namesOnly ) ) );
 
 	/// <summary>
 	/// Get the GameObjects currently selected by the user in the s&amp;box editor. Returns { count,

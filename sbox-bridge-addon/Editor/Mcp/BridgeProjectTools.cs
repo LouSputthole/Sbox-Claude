@@ -158,8 +158,13 @@ public static class BridgeProjectTools
 		=> McpGate.Run( "set_project_thumbnail", McpGate.Args( ( "sourcePath", sourcePath ), ( "base64", base64 ), ( "format", format ) ) );
 
 	/// <summary>
-	/// Force s&amp;box to recompile and hotload all C# scripts immediately. Use after creating or
-	/// editing scripts to see changes in real-time.
+	/// Nudge s&amp;box to recompile and hotload the project's C# (bumps the .csproj timestamps the
+	/// file-watcher keys on). NOT synchronous: the compile lands on a later frame, and editing an
+	/// EXISTING .cs can leave the OLD assembly running silently. Returns { triggered, touched,
+	/// assemblyBefore, note } — assemblyBefore is the current game-assembly fingerprint; poll
+	/// get_bridge_status.gameAssembly until it differs (or verify with an explicit marker such as a
+	/// version string in a Log.Info) BEFORE trusting invoke_button / describe_type output. Falls back
+	/// to restart_editor for new package dependencies.
 	/// </summary>
 	[McpTool( "trigger_hotload" )]
 	public static Task<object> TriggerHotload()

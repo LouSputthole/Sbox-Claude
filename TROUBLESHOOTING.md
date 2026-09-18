@@ -31,7 +31,7 @@ Quick orientation:
 
 The addon side resolves its directory from `Path.GetTempPath()` only and does **not** honor an env override (to stay inside the s&box sandbox), so always realign from the MCP-server side.
 
-> `SBOX_BRIDGE_HOST` / `SBOX_BRIDGE_PORT` are **cosmetic** — there is no network socket. Changing them does nothing except what `get_bridge_status` displays. (Older docs that told you to "change the port in `MyEditorMenu.cs`" are obsolete — that file has no port.)
+> There is no network socket in this transport — the only knob is `SBOX_BRIDGE_IPC_DIR`. (`SBOX_BRIDGE_HOST` / `SBOX_BRIDGE_PORT` were removed after v2.2.0; they never did anything. Older docs that told you to "change the port in `MyEditorMenu.cs`" are obsolete — that file has no port.)
 
 ---
 
@@ -42,6 +42,8 @@ The addon side resolves its directory from `Path.GetTempPath()` only and does **
 **Cause:** The bridge processes queued requests from a **static** `[EditorEvent.Frame]` handler (since v1.3.0). It runs whether or not the Claude Bridge dock is open, so a **closed dock is not the cause**. Two real causes remain: a single very slow handler blocking the frame it runs on, or the editor window being **minimized** long enough that the OS throttles frame events for the process.
 
 **Fix:** Keep the s&box editor window visible (not minimized). If one specific call hangs, suspect that handler — read `read_log` / `get_compile_errors` to see what it's doing. The dock does **not** need to be open.
+
+**Third cause — a modal dialog.** "External Changes Detected" (a `.scene` edited on disk), a crash popup or any native dialog blocks the main thread while the process keeps running. `get_bridge_status` now distinguishes this: `status.json` carries a `processHeartbeat` written from the addon's poll thread plus a `blockedBy` field, so the summary reads *"editor PROCESS is alive but its MAIN THREAD has not ticked for N ms"* instead of *not connected*. Dismiss the dialog in the editor; if you can't reach it, kill and relaunch with `sbox-dev.exe -project "<full path to the .sbproj FILE>"` (the directory form pops another blocking dialog).
 
 **Verify:** Ask Claude to call `is_playing` — it should respond in well under a second.
 
@@ -230,6 +232,27 @@ List the most-recent file there and read it. (And remember §4 — it's the Main
 ## 15. Procedural mesh renders chrome / sky-reflective
 
 **Known limitation.** `MeshComponent.SetFaceMaterial(face, material)` and `MeshComponent.Color` tint don't visibly apply on a `PolygonMesh`. **Workaround:** place a `Ground` plane underneath as a visual fallback while the mesh still provides collision.
+
+---
+
+## 16. Linux / Proton (CachyOS, Arch, Steam Deck…)
+
+Not an officially supported configuration, but the file-IPC transport is just files on a shared filesystem, so it works where the native `:7269` server (Facepunch's, hosted by the editor via HTTP.sys — which Wine implements only partially) may not.
+
+1. **Confirm the addon side is alive.** Editor → Claude Bridge → Status should read `Running vX.Y.Z` with an IPC path like `C:\<prefix-user>\Temp\sbox-bridge-ipc` (`steamuser` on a stock Proton prefix). That dialog is separate from Preferences → MCP Server; it's normal for one to say Running while the other says Not Running.
+2. **Translate the Wine path.** For a stock Proton prefix (s&box is appid 590830):
+   ```bash
+   find ~/.steam ~/.local/share/Steam -maxdepth 12 -name sbox-bridge-ipc 2>/dev/null
+   cat "<that dir>/status.json"     # heartbeat + processHeartbeat should be advancing
+   ```
+3. **Point the MCP server at it** — absolute paths, `~` does not expand in MCP configs:
+   ```json
+   { "mcpServers": { "sbox": { "command": "npx", "args": ["-y", "sbox-mcp-server@2"],
+     "env": { "SBOX_BRIDGE_IPC_DIR": "/home/<username>/.steam/steam/steamapps/compatdata/590830/pfx/drive_c/users/steamuser/Temp/sbox-bridge-ipc" } } } }
+   ```
+4. `read_log` / `get_compile_errors` auto-detect `sbox-dev.log` under `~/.steam/steam`, `~/.local/share/Steam`, Flatpak and Snap libraries (and every library in `libraryfolders.vdf`); set `SBOX_LOG_PATH` only if that misses. The log lives in the Linux-side Steam library, **not** inside the Wine prefix.
+
+If Preferences → MCP Server says Not Running and `sbox-dev.log` has `[MCP] Couldn't start MCP server on port 7269`, that is the engine's server failing under Wine — nothing in the addon can fix it, so use the steps above (GitHub issue #10).
 
 ---
 

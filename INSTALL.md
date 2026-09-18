@@ -125,6 +125,8 @@ cd Sbox-Claude
 ./install.sh --remove-stale                 # also clean old addons-folder installs
 ```
 
+Running s&box under **Proton**? The native `:7269` server may not start under Wine; see root [TROUBLESHOOTING.md](TROUBLESHOOTING.md) §16 for the file-IPC fallback and the `SBOX_BRIDGE_IPC_DIR` prefix path.
+
 The addon's `[McpTool]` wrappers are discovered by the engine automatically once the library compiles — connect Claude Code exactly as in step 3. **Gotcha:** the Libraries file-watcher is unreliable for externally-edited `.cs` files — after syncing addon code, use `restart_editor` rather than expecting a hotload (see [docs/BRIDGE_GOTCHAS.md](docs/BRIDGE_GOTCHAS.md) #9).
 
 ---

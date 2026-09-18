@@ -65,6 +65,13 @@ Companion docs:
 claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2 --lifeline
 ```
 
+**Relaunching from a shell:** `sbox-dev.exe -project` wants the full path to the **`.sbproj`
+file**, not the project directory — the directory form fails with a blocking native dialog:
+
+```powershell
+& "C:\Program Files (x86)\Steam\steamapps\common\sbox\sbox-dev.exe" -project "C:\Users\<username>\Documents\s&box projects\mygame\mygame.sbproj"
+```
+
 ---
 
 ## 6. Scene-mutating tool refused during play mode
@@ -84,6 +91,8 @@ claude mcp add sbox-lifeline -- npx -y sbox-mcp-server@2 --lifeline
 **Diagnosis:** Tools execute on the editor's **main thread**. A **modal dialog** (save prompt, popup, error/crash dialog) blocks that thread, so queued work is never picked up — the native server's `PickupTimeout` detection reports the editor as blocked rather than hanging forever.
 
 **Fix:** Bring the editor window to the foreground and **dismiss the dialog**; pending work resumes immediately. If no dialog is visible and calls still stall (screenshots especially), suspect a GPU/render stall instead — see [BRIDGE_GOTCHAS.md](BRIDGE_GOTCHAS.md) #8 (`restart_editor`; your saved scene survives).
+
+**How to tell a modal from a crash without looking at the screen:** the lifeline's `get_bridge_status` reads the addon's `status.json`, whose heartbeat is now written from the addon's own poll thread. A modal reads as *"editor PROCESS is alive … MAIN THREAD has not ticked for N ms (`blockedBy`: main thread stalled …)"*; a crash reads as *not connected*. The `[MCP] PickupTimeout` line in `read_log` is the native server's version of the same signal. Synthetic input (`SetForegroundWindow` + `SendKeys`) generally cannot dismiss these dialogs; if you can't reach the window, kill and relaunch with the full `.sbproj` path (§5).
 
 ---
 

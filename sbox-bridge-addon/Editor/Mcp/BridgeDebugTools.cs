@@ -110,8 +110,10 @@ public static class BridgeDebugTools
 	/// Check the s&amp;box Bridge connection — call this FIRST in a session. Returns a human summary
 	/// plus JSON: connected, roundTripOk (heartbeat can be fresh while the editor's request loop is
 	/// stalled — trust roundTripOk), bridgeVersion vs mcpServerVersion + versionsAligned (a mismatch
-	/// means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs, latencyMs, and
-	/// ipcDir (transport is file IPC; host/port are legacy fields).
+	/// means restart Claude Code / republish the addon), handlerCount, heartbeatAgeMs,
+	/// processHeartbeatAgeMs + blockedBy (editor process alive but main thread stalled = a modal dialog
+	/// is open), gameAssembly (fingerprint that changes on every hotload — compare against
+	/// trigger_hotload's assemblyBefore), latencyMs, and ipcDir (transport is file IPC).
 	/// </summary>
 	[McpTool.ReadOnly( "get_bridge_status" )]
 	public static Task<object> GetBridgeStatus()
