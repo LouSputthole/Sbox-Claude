@@ -72,6 +72,11 @@ All notable changes to the s&box Claude Bridge. Also online: [sboxskins.gg/claud
 
 ### Fixed
 
+- Multiplayer-test clients now launch with the same working directory, instance id,
+  window preference, and process settings as the editor's built-in "Join via new
+  instance" action. Client liveness is cached by an asynchronous watcher, and cleanup
+  performs OS process discovery/kill/wait work off the editor thread, keeping
+  `multiplayer_test_status` and `stop_multiplayer_test` responsive while a client lives.
 - `gameAssembly` / `assemblyBefore` now follow **fast hotloads**. A method-body-only edit loads
   the new assembly and detours into it but never moves the TypeLibrary, so the first cut of the
   #15 fingerprint sat still while new code was already live — telling an agent to restart the
